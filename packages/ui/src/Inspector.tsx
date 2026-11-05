@@ -410,8 +410,8 @@ export function Inspector({ session, snap, selection, agents, onError, onEditAge
                 <TextField label={t('insp.review.criteria')} multiline value={node.review.criteria ?? ''} placeholder={t('insp.review.criteria.ph')} onCommit={(v) => patch(node.id, { review: { criteria: v } })} />
               )}
               {node.review.mode === 'verdict' && <p className="orq-hint">{t('insp.review.howto')}</p>}
-              <p className="orq-hint">{t('insp.review.ports')}</p>
-              <p className="orq-hint orq-sees">{t('insp.sees.review')} {t('insp.sees.review.back')}</p>
+              <p className="orq-hint">{t(node.review.mode === 'human' ? 'insp.review.ports.human' : 'insp.review.ports')}</p>
+              <p className="orq-hint orq-sees">{node.review.mode === 'human' ? t('insp.sees.review.human') : `${t('insp.sees.review')} ${t('insp.sees.review.back')}`}</p>
             </>
           )}
 
@@ -484,21 +484,36 @@ function HumanReviewFields({ node, level, onRoute }: { node: DiagramNode; level:
     const n = level.nodes.find((x) => x.id === id);
     return n?.label ?? n?.agentId ?? id;
   });
+  const route = node.review?.route ?? 'propose';
   return (
     <>
       <p className="orq-hint">{t('insp.review.human.help')}</p>
-      <fieldset className="orq-insp__radio">
-        <legend>{t('insp.review.route')}</legend>
-        <label>
-          <input type="radio" name={`route-${node.id}`} checked={(node.review?.route ?? 'propose') === 'propose'} onChange={() => onRoute('propose')} />
-          {t('insp.review.route.propose')}
-        </label>
-        <label>
-          <input type="radio" name={`route-${node.id}`} checked={node.review?.route === 'auto'} onChange={() => onRoute('auto')} />
-          {t('insp.review.route.auto')}
-        </label>
-      </fieldset>
-      <p className="orq-hint">{names.length > 0 ? t('insp.review.targets', { list: names.join(', ') }) : t('insp.review.targets.none')}</p>
+      <div className="orq-insp__routes">
+        <span className="orq-insp__routes-label" id={`route-${node.id}`}>
+          {t('insp.review.route')}
+        </span>
+        <div className="orq-insp__pills" role="radiogroup" aria-labelledby={`route-${node.id}`}>
+          {(['propose', 'auto'] as const).map((r) => (
+            <label key={r} className={`orq-pick${route === r ? ' is-on' : ''}`}>
+              <input type="radio" name={`route-${node.id}`} checked={route === r} onChange={() => onRoute(r)} />
+              {t(r === 'propose' ? 'insp.review.route.propose' : 'insp.review.route.auto')}
+            </label>
+          ))}
+        </div>
+        <p className="orq-hint">{t(route === 'propose' ? 'insp.review.route.propose.hint' : 'insp.review.route.auto.hint')}</p>
+      </div>
+      {names.length > 0 ? (
+        <div className="orq-insp__routes">
+          <span className="orq-insp__routes-label">{t('insp.review.targets.title')}</span>
+          <ul className="orq-insp__targets">
+            {names.map((n) => (
+              <li key={n}>{n}</li>
+            ))}
+          </ul>
+        </div>
+      ) : (
+        <p className="orq-hint is-warn">{t('insp.review.targets.none')}</p>
+      )}
     </>
   );
 }

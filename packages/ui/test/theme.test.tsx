@@ -276,6 +276,10 @@ describe('paneles plegables [R21.10]', () => {
     expect(screen.getByRole('navigation', { name: 'Secciones' })).toBeTruthy();
     await userEvent.click(diagrams);
     expect(screen.getByRole('complementary', { name: 'Nodos' })).toBeTruthy();
+    // Sin nada seleccionado el derecho no se ve [R33.6]; su botón lo muestra y lo pliega.
+    expect(screen.queryByLabelText('Propiedades')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Mostrar panel derecho' }));
+    expect(screen.getByLabelText('Propiedades')).toBeTruthy();
     await userEvent.click(screen.getByRole('button', { name: 'Plegar panel derecho' }));
     expect(screen.queryByLabelText('Propiedades')).toBeNull();
   });

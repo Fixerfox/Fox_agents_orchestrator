@@ -43,8 +43,11 @@ describe('SPEC-033 · conocimiento añadido en la interfaz', () => {
     expect(within(screen.getByRole('group', { name: 'Solo en este paso' })).queryByText('Trazo')).toBeNull();
   });
 
-  it('[R33.6] sin nada seleccionado, el panel muestra el diagrama y lo que reciben todos sus agentes', async () => {
+  it('[R33.6] sin nada seleccionado no hay panel; «Ajustes del diagrama» lo abre con lo que reciben todos sus agentes', async () => {
     const api = await mount();
+    await screen.findByRole('navigation', { name: 'Ruta de navegación' });
+    expect(screen.queryByRole('group', { name: 'Para todos sus agentes' })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Ajustes del diagrama' }));
     const box = within(await screen.findByRole('group', { name: 'Para todos sus agentes' }));
     expect(screen.getByRole('heading', { name: 'Principal' })).toBeTruthy();
     await userEvent.click(box.getByRole('button', { name: /Contexto/ }));
@@ -52,5 +55,8 @@ describe('SPEC-033 · conocimiento añadido en la interfaz', () => {
     await userEvent.click(picker.getByRole('button', { name: 'Añadir Glosario' }));
     await userEvent.click(picker.getByRole('button', { name: 'Listo' }));
     await waitFor(() => expect(api.saved.get('principal')!.extra).toEqual({ contextIds: ['glosario'] }), { timeout: 2000 });
+    // Se cierra con su ✕.
+    await userEvent.click(screen.getByRole('button', { name: 'Cerrar los ajustes del diagrama' }));
+    expect(screen.queryByRole('group', { name: 'Para todos sus agentes' })).toBeNull();
   });
 });

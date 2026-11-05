@@ -71,6 +71,17 @@ describe('SPEC-021 · panel izquierdo de Diagramas (prototipo «Editor A»)', ()
     expect(Object.values(data)).toEqual(['transform']);
   });
 
+  it('[R53.16][R32.36] «Revisión humana» y «Varios a la vez» también se arrastran', () => {
+    palette({ onParallel: vi.fn() });
+    for (const [name, kind] of [['+ Revisión humana', 'humanReview'], ['+ Varios a la vez', 'parallel']] as const) {
+      const data: Record<string, string> = {};
+      const button = screen.getAllByRole('button').find((b) => b.getAttribute('aria-label')?.startsWith(name))!;
+      expect(button.getAttribute('draggable')).toBe('true');
+      fireEvent.dragStart(button, { dataTransfer: { setData: (k: string, v: string) => (data[k] = v), effectAllowed: '' } });
+      expect(Object.values(data)).toEqual([kind]);
+    }
+  });
+
   it('[R21.19] sin agentes lo dice y ofrece «Nuevo agente»', async () => {
     const onNewAgent = vi.fn();
     palette({ onNewAgent });

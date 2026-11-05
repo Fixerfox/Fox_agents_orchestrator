@@ -6,6 +6,7 @@ import userEvent from '@testing-library/user-event';
 import type { Diagram, RunEvent } from '@orquestador/core';
 import { EMPTY_LIVE, addNode, connect, createDiagram, deriveLive, disconnect, type RunSummary } from '@orquestador/editor';
 import { App } from '../src/App';
+import { DRAG_TYPE } from '../src/Canvas';
 import { NodePanel } from '../src/NodePanel';
 import { QuestionCard, RunsScreen, type RunsNav } from '../src/RunsScreen';
 import { createMemoryApi } from '../src/memoryApi';
@@ -179,11 +180,21 @@ describe('SPEC-053 · revisión humana (interfaz)', () => {
     expect(screen.getByText(/La ejecución se para aquí hasta que apruebas|La ejecución se para aquí hasta que apruebes/)).toBeTruthy();
     // Aún no está conectada: no hay pasos a los que volver.
     expect(screen.getByText(/No hay ningún paso al que volver/)).toBeTruthy();
-    const auto = screen.getByLabelText('Lo decide el asistente solo') as HTMLInputElement;
-    expect((screen.getByLabelText('El asistente propone a qué paso volver y tú confirmas') as HTMLInputElement).checked).toBe(true);
-    await userEvent.click(auto);
-    await waitFor(() => expect((screen.getByLabelText('Lo decide el asistente solo') as HTMLInputElement).checked).toBe(true));
+    const routes = within(screen.getByRole('radiogroup', { name: 'Si pides cambios' }));
+    expect((routes.getByLabelText('Me propone y confirmo') as HTMLInputElement).checked).toBe(true);
+    expect(screen.getByText(/propone a qué paso volver y tú lo confirmas/)).toBeTruthy();
+    await userEvent.click(routes.getByLabelText('Decide solo'));
+    await waitFor(() => expect((screen.getByLabelText('Decide solo') as HTMLInputElement).checked).toBe(true));
+    expect(screen.getByText(/elige el paso y la ejecución sigue/)).toBeTruthy();
+    // Los textos son los del modo humano, no los del revisor.
+    expect(screen.queryByText(/Claude verá: lo que dijo el revisor/)).toBeNull();
+    expect(screen.getByText(/déjalo sin conectar y el asistente elegirá/)).toBeTruthy();
+    // La tarjeta lleva el ojo.
+    expect(card.querySelector('.lucide-eye')).toBeTruthy();
     await userEvent.selectOptions(screen.getByLabelText('Cómo decide'), 'verdict');
     await waitFor(() => expect(screen.getByLabelText('Criterio para aprobar')).toBeTruthy());
+    // También se suelta en el lienzo arrastrándola desde la paleta.
+    fireEvent.drop(screen.getByTestId('canvas'), { dataTransfer: { getData: (k: string) => (k === DRAG_TYPE ? 'humanReview' : ''), types: [DRAG_TYPE] }, clientX: 10, clientY: 10 });
+    await waitFor(() => expect(screen.getAllByLabelText(/^Revisión «Revisión humana/).length).toBeGreaterThan(1));
   });
 });

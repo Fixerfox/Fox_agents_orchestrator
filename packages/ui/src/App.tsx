@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
-import { BookOpen, Bot, Copy, FileText, Pencil, Plug, Plus, Replace, Sparkles, Trash2, Workflow, X } from 'lucide-react';
+import { BookOpen, Bot, Copy, FileText, Pencil, Plug, Plus, Replace, SlidersHorizontal, Sparkles, Trash2, Workflow, X } from 'lucide-react';
 import { AssignPicker } from './AssignPicker';
 import { finalSteps, validateDiagram, projectPermission, slugify, type AppSettings, type ProjectPermission, type DeliverableSpec, type Diagram, type RunEvent } from '@orquestador/core';
 
@@ -55,7 +55,7 @@ import { RunModal, RunsScreen, type RunsNav } from './RunsScreen';
 import { JobsScreen } from './JobsScreen';
 import { useRunsIndex } from './useRunsIndex';
 import { StartScreen, type StartPath } from './StartScreen';
-import { Toolbar } from './Toolbar';
+import { DiagramMenu, SaveStatus, Toolbar } from './Toolbar';
 import { isTypingTarget, shortcutFor } from './shortcuts';
 import { useSession } from './useSession';
 
@@ -131,6 +131,8 @@ export function App({ api, agents: builtIn = [], confirm = (m) => window.confirm
   /** Fichero de la última ejecución abierto en el visor [R45.10]. */
   const [sideWidth, setSideWidth] = useState(readSideWidth);
   const [rightOpen, setRightOpen] = useState(true);
+  /** «Ajustes del diagrama»: el panel derecho sin nada seleccionado [R33.6]. */
+  const [diagramPanel, setDiagramPanel] = useState(false);
   /** Lateral derecho: propiedades o asistente [R29.5]. */
   /** Asistente abierto: en Diagramas ocupa el lateral derecho; en el resto, un panel acoplado [R29.5][R38.1]. */
   const [assistOpen, setAssistOpen] = useState(false);
@@ -227,6 +229,12 @@ export function App({ api, agents: builtIn = [], confirm = (m) => window.confirm
     [],
   );
   const selectedNode = selection.nodes.length === 1 ? snap.level.nodes.find((n) => n.id === selection.nodes[0]) : undefined;
+  // Sin nada seleccionado, el panel derecho no se ve salvo que se pidan los ajustes del diagrama o el asistente [R33.6].
+  const hasSelection = selection.nodes.length + selection.edges.length > 0;
+  const sideVisible = rightOpen && (assistOpen || hasSelection || diagramPanel);
+  useEffect(() => {
+    if (hasSelection) setDiagramPanel(false);
+  }, [hasSelection]);
   const selRef = useRef(selection);
   selRef.current = selection;
   const engine = settings?.engine ?? 'simulated';
@@ -732,7 +740,8 @@ export function App({ api, agents: builtIn = [], confirm = (m) => window.confirm
         onDropKnowledge={addExtra}
         onOpenDiagram={(id) => void openDiagram(id)}
         onEdit={focusField}
-        onAddAt={(kind, at) => (kind === 'agent' ? setPicker({ at }) : onAdd({ kind }, at))}
+        onAddAt={(kind, at, opts) => (kind === 'agent' ? setPicker({ at }) : onAdd(kind === 'review' && opts?.human ? { kind, human: true } : { kind }, at))}
+        onDropParallel={(edgeId) => (edgeId ? setParallelAt(edgeId) : openParallel())}
         {...(section === 'diagrams' ? { onInsert, onInsertTransform: (edgeId: string) => guard(() => select(session.insertOnEdge(edgeId, { kind: 'transform' }))) } : {})}
       />
     </ReactFlowProvider>
@@ -795,7 +804,20 @@ export function App({ api, agents: builtIn = [], confirm = (m) => window.confirm
           onOpenLive={() => (setSection('runs'), setRunsNav({ section: 'live' }))}
           onOpenRuns={() => (setSection('runs'), setRunsNav({ section: 'inbox' }))}
           runError={run.error}
-          {...(section === 'diagrams' ? { rightOpen, onToggleRight: () => setRightOpen((v) => !v) } : {})}
+          {...(section === 'diagrams'
+            ? {
+                rightOpen: sideVisible,
+                onToggleRight: () => {
+                  if (sideVisible) {
+                    setRightOpen(false);
+                    setDiagramPanel(false);
+                  } else {
+                    setRightOpen(true);
+                    if (!hasSelection && !assistOpen) setDiagramPanel(true);
+                  }
+                },
+              }
+            : {})}
           {...(project !== undefined
             ? {
                 assistantOpen: assistOpen && (section !== 'diagrams' || rightOpen),
@@ -880,10 +902,50 @@ export function App({ api, agents: builtIn = [], confirm = (m) => window.confirm
                 onNewAgent={() => openLibrary('agents', { tab: 'agents', id: 'new' })}
               />
               <main className="orq-main">
-                <Breadcrumbs crumbs={snap.crumbs} onGo={(p) => session.goTo(p)} onUp={() => session.up()} onRename={(name) => guard(() => session.rename(name))} renameRequest={renameReq} />
+                <Breadcrumbs
+                  crumbs={snap.crumbs}
+                  onGo={(p) => session.goTo(p)}
+                  onUp={() => session.up()}
+                  onRename={(name) => guard(() => session.rename(name))}
+                  renameRequest={renameReq}
+                  actions={
+                    <>
+                      <DiagramMenu
+                        compact
+                        diagramName={snap.diagram.name}
+                        currentDiagramId={snap.diagram.id}
+                        onListDiagrams={async () => {
+                          const r = await api.listDiagrams();
+                          return r.ok ? r.value : [];
+                        }}
+                        onOpenDiagram={(id) => void openDiagram(id)}
+                        onRenameDiagram={() => setRenameReq((n) => n + 1)}
+                        onDuplicateDiagram={project !== undefined ? () => void duplicateDiagram() : undefined}
+                        onDeleteDiagram={project !== undefined ? () => void deleteDiagram() : undefined}
+                        onNew={() => void newDiagram()}
+                      />
+                      <SaveStatus saveState={project === undefined ? 'no-project' : saveState === 'saving' ? 'saving' : saveState === 'error' ? 'error' : snap.dirty ? 'dirty' : 'saved'} dirty={snap.dirty} />
+                      <button
+                        type="button"
+                        className={`orq-btn orq-btn--small orq-btn--ghost orq-crumbs__settings${diagramPanel && sideVisible ? ' is-on' : ''}`}
+                        aria-pressed={diagramPanel && sideVisible}
+                        onClick={() => {
+                          if (diagramPanel && sideVisible) return setDiagramPanel(false);
+                          select('');
+                          setAssistOpen(false);
+                          setRightOpen(true);
+                          setDiagramPanel(true);
+                        }}
+                      >
+                        <SlidersHorizontal size={14} aria-hidden="true" />
+                        {t('diagram.settings')}
+                      </button>
+                    </>
+                  }
+                />
                 {canvas}
               </main>
-              {rightOpen && (
+              {sideVisible && (
                 <div className="orq-side" style={{ width: sideWidth }}>
                   <ResizeHandle width={sideWidth} min={SIDE_MIN} max={Math.max(SIDE_MIN, Math.min(760, window.innerWidth - 520))} reset={SIDE_DEFAULT} onChange={setSideWidth} onCommit={saveSideWidth} />
                   {assistOpen ? (
@@ -894,6 +956,14 @@ export function App({ api, agents: builtIn = [], confirm = (m) => window.confirm
                     <div className="orq-side__head">
                       <span className="orq-side__title">{t('insp.tab.step')}</span>
                       <button type="button" className="orq-ib" aria-label={t('insp.close')} title={t('insp.close')} onClick={() => select('')}>
+                        <X size={16} aria-hidden="true" />
+                      </button>
+                    </div>
+                  )}
+                  {!hasSelection && (
+                    <div className="orq-side__head">
+                      <span className="orq-side__title">{t('insp.tab.diagram')}</span>
+                      <button type="button" className="orq-ib" aria-label={t('diagram.settings.close')} title={t('diagram.settings.close')} onClick={() => setDiagramPanel(false)}>
                         <X size={16} aria-hidden="true" />
                       </button>
                     </div>

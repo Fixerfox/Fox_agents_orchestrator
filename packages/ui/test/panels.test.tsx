@@ -10,7 +10,7 @@ import { Breadcrumbs } from '../src/Breadcrumbs';
 import { Inspector } from '../src/Inspector';
 import { Palette } from '../src/Palette';
 import { ProblemsPanel } from '../src/ProblemsPanel';
-import { Toolbar } from '../src/Toolbar';
+import { SaveStatus, Toolbar } from '../src/Toolbar';
 
 const P = { x: 0, y: 0 };
 const AGENTS = [
@@ -165,7 +165,11 @@ describe('problemas y ejecutar [R14.3]', () => {
   );
 
   it('[R14.5] el indicador muestra cambios sin guardar', () => {
-    render(bar());
+    // Va en la cabecera del Diseñador, no en la barra superior [R32.38].
+    const { unmount } = render(bar());
+    expect(screen.queryByText('Cambios sin guardar')).toBeNull();
+    unmount();
+    render(<SaveStatus dirty />);
     expect(screen.getByText('Cambios sin guardar')).toBeTruthy();
   });
 });
@@ -316,6 +320,8 @@ describe('panel derecho en ventanas estrechas [R21.16]', () => {
   it('[R21.16] con ventana ancha empieza abierto y al estrecharse se cierra solo', async () => {
     const listeners = withMedia(false);
     await mountApp();
+    // Sin nada seleccionado el panel no se ve [R33.6]; con algo seleccionado, sí.
+    await userEvent.click(screen.getByRole('button', { name: 'Ajustes del diagrama' }));
     expect(screen.getByRole('complementary', { name: 'Propiedades' })).toBeTruthy();
     listeners.forEach((l) => l({ matches: true }));
     await vi.waitFor(() => expect(screen.queryByRole('complementary', { name: 'Propiedades' })).toBeNull());

@@ -12,7 +12,7 @@ Que un agente pueda usar algo solo en un diagrama o en un paso concreto, sin añ
 - **R33.3** [M8a] Al ejecutar un paso, el agente recibe lo suyo más lo del diagrama raíz y lo del paso, sin repetir (`mergeExtra`). El adaptador de Claude carga esas skills y contextos como si fueran del agente.
 - **R33.4** [M8a] El evento `agent.request` dice qué vino del diagrama y qué del paso (`extra.diagram`, `extra.node`), para el registro técnico.
 - **R33.5** [M8a] En el panel de un paso, «Solo en este paso» muestra lo añadido con fichas (discontinuas) que se quitan y botones «+ Skill», «+ Contexto» (y «+ MCP» cuando haya) que abren el selector.
-- **R33.6** [M8a] Sin nada seleccionado, el panel derecho muestra el diagrama: su nombre y «Para todos sus agentes» con el mismo editor.
+- **R33.6** [M8a] Sin nada seleccionado, el panel derecho no se ve (cambio del 05/11 a petición del usuario). «Ajustes del diagrama», en la cabecera del Diseñador, o el botón de mostrar el panel lo abren con el diagrama: su nombre y «Para todos sus agentes» con el mismo editor; se cierra con su ✕, con el mismo botón o al seleccionar algo.
 
 ### Conectores en el lienzo
 - **R33.10** [M8a] Cada paso de agente tiene dos conectores más: arriba, skills y contextos; abajo, MCP. Lo añadido a ese paso se dibuja como fichas enchufadas a su conector con línea discontinua (se mueven con el paso y no son nodos del diagrama), cada una con × para quitarla; el «+» junto al conector abre el selector de ese tipo solo para ese paso. La tarjeta del paso solo muestra lo que trae el agente.

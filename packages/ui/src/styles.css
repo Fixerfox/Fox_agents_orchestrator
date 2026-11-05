@@ -1980,3 +1980,21 @@ button.orq-story__line:hover { background: var(--raised); }
 .orq-hreview__thumbname { padding: 4px 6px; font: 500 11px var(--mono); color: var(--text2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* La tarjeta de vista previa queda siempre por encima de todo lo del lienzo (fichas de conocimiento, otros pasos, conexiones) [R54.2]. */
 .react-flow__node:has(.orq-node__card) { z-index: 2000 !important; }
+
+/* Cabecera del Diseñador: nombre, menú del diagrama, guardado y ajustes del diagrama [R32.38][R33.6]. */
+.orq-crumbs__actions { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; }
+.orq-crumbs__actions .orq-crumbs__settings { margin-left: auto; }
+.orq-crumbs__settings.is-on { color: var(--accent-text); border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
+.orq-topbar__diagram.is-compact { padding: 0 6px; }
+
+/* Inspector de la revisión humana: opciones como píldoras y pasos posibles como fichas [R53.16]. */
+.orq-insp__routes { display: flex; flex-direction: column; gap: 6px; }
+.orq-insp__routes-label { font-size: 12px; font-weight: 600; color: var(--text2); }
+.orq-insp__pills { display: flex; gap: 6px; flex-wrap: wrap; }
+.orq-insp__routes .orq-hint { margin: 0; }
+.orq-insp__targets { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px; }
+.orq-insp__targets li { font-size: 12px; padding: 2px 8px; border-radius: 6px; border: 1px solid var(--line); background: var(--raised); color: var(--text); }
+.orq-hint.is-warn { color: var(--accent-text); }
+.orq-inspector label.orq-pick { flex-direction: row; gap: 6px; font-size: 12px; line-height: normal; color: var(--text2); }
+.orq-inspector label.orq-pick.is-on { color: var(--accent-text); }
+.orq-inspector .orq-pick input { height: auto; padding: 0; border: 0; }

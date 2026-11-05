@@ -5,13 +5,14 @@ import { HandMark } from './agentLook';
 export type SectionId = 'project' | 'diagrams' | 'library' | 'agents' | 'knowledge' | 'jobs' | 'runs' | 'settings';
 
 const ITEMS: { id: SectionId; icon: typeof Bot; label: MessageKey; full?: MessageKey }[] = [
-  { id: 'project', icon: FolderGit2, label: 'nav.project' },
+  // Orden pedido por el usuario (05/11): lo que se usa al trabajar arriba, el proyecto al final.
+  { id: 'runs', icon: Clock3, label: 'nav.runs', full: 'nav.runs.full' },
+  { id: 'jobs', icon: Rocket, label: 'nav.jobs' },
   { id: 'diagrams', icon: Waypoints, label: 'nav.diagrams' },
   { id: 'library', icon: FolderTree, label: 'nav.library' },
   { id: 'agents', icon: Bot, label: 'nav.agents' },
   { id: 'knowledge', icon: BookOpen, label: 'nav.knowledge', full: 'nav.knowledge.full' },
-  { id: 'jobs', icon: Rocket, label: 'nav.jobs' },
-  { id: 'runs', icon: Clock3, label: 'nav.runs', full: 'nav.runs.full' },
+  { id: 'project', icon: FolderGit2, label: 'nav.project' },
 ];
 
 interface Props {

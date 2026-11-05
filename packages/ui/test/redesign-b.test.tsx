@@ -23,7 +23,7 @@ describe('SPEC-032 · M7b navegación y biblioteca', () => {
   it('[R32.13][R52.5] un rail global lleva a cada sección a pantalla completa y marca la activa', async () => {
     await mount();
     const names = rail().getAllByRole('button').map((b) => b.getAttribute('aria-label'));
-    expect(names).toEqual(['Proyecto', 'Diseñador', 'Diagramas', 'Agentes', 'Conocimiento', 'Trabajos', 'Ejecuciones', 'Ajustes']);
+    expect(names).toEqual(['Ejecuciones', 'Trabajos', 'Diseñador', 'Diagramas', 'Agentes', 'Conocimiento', 'Proyecto', 'Ajustes']);
     expect(rail().getByRole('button', { name: 'Diseñador' }).getAttribute('aria-current')).toBe('page');
     for (const [btn, region] of [
       ['Agentes', 'Agentes'],

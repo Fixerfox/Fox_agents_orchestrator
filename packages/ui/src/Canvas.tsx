@@ -35,7 +35,9 @@ interface Props {
   /** Eventos de la ejecución en pantalla: con ellos, pulsar un hilo abre su inspector [R42.6]. */
   events?: readonly RunEvent[];
   /** Añade un nodo en una posición del lienzo (menú contextual); el agente abre la galería [R21.12]. */
-  onAddAt?: (kind: 'agent' | 'router' | 'loop' | 'review' | 'transform', position: { x: number; y: number }) => void;
+  onAddAt?: (kind: 'agent' | 'router' | 'loop' | 'review' | 'transform', position: { x: number; y: number }, opts?: { human?: boolean }) => void;
+  /** «Varios a la vez» soltado en el lienzo: sobre una conexión, en ella; si no, en la de siempre [R32.36]. */
+  onDropParallel?: (edgeId: string | undefined) => void;
   /** «Insertar transformación» en el menú de una conexión [R37.11]. */
   onInsertTransform?: (edgeId: string) => void;
   /** Doble clic en un nodo que no es un bucle: abre su ventana de ejecución [R15.12]. */
@@ -249,7 +251,7 @@ export function buildFlowNodes(
         ...(n.kind === 'output' && path.length === 0 ? { note: dlvLabel ? t('node.output.deliverable', { what: dlvLabel }) : t('node.output.note') } : {}),
         ...waitsOf(level, path, n.id, live),
         ...(n.kind === 'loop' && n.loop ? { inner: n.loop.body.nodes.filter((b) => b.kind === 'agent' || b.kind === 'router' || b.kind === 'transform').map((b) => b.label ?? b.id).slice(0, 3), note: t('node.loop.max', { n: n.loop.maxIterations }) } : {}),
-        ...(n.kind === 'review' && n.review ? { note: t('node.review.max', { n: n.review.maxRounds }) } : {}),
+        ...(n.kind === 'review' && n.review ? { note: t('node.review.max', { n: n.review.maxRounds }), ...(n.review.mode === 'human' ? { human: true } : {}) } : {}),
         ...(runStatus ? { runStatus } : {}),
         ...(n.kind === 'agent' && n.agentId && extra.agentLooks?.[n.agentId] ? { look: extra.agentLooks[n.agentId] } : {}),
         // Mano levantada: este paso (o algo dentro de él) espera tu respuesta [R39.6].
@@ -306,7 +308,7 @@ export function buildFlowEdges(level: Diagram, path: readonly string[], live?: L
 
 
 /** Lienzo de React Flow. La sesión es la fuente de verdad; el arrastre se confirma al soltar [R14.4]. */
-export function Canvas({ session, onSelection, onReject, live, events, onAddAt, onOpenNode, onEdit, selectRequest, agentNames, onInsert, extras, agentMenu, readOnly = false, onAddSubdiagram, onOpenDiagram, onAddKnowledge, onDropKnowledge, onInsertTransform }: Props) {
+export function Canvas({ session, onSelection, onReject, live, events, onAddAt, onDropParallel, onOpenNode, onEdit, selectRequest, agentNames, onInsert, extras, agentMenu, readOnly = false, onAddSubdiagram, onOpenDiagram, onAddKnowledge, onDropKnowledge, onInsertTransform }: Props) {
   const flow = useReactFlow();
   const [menu, setMenu] = useState<MenuTarget>();
   const closeMenu = useCallback(() => setMenu(undefined), []);
@@ -481,6 +483,15 @@ export function Canvas({ session, onSelection, onReject, live, events, onAddAt, 
         }
         if (raw.startsWith('diagram:')) {
           onAddSubdiagram?.(raw.slice('diagram:'.length), flow.screenToFlowPosition({ x: e.clientX, y: e.clientY }));
+          return;
+        }
+        if (raw === 'parallel') {
+          const edge = (e.target as HTMLElement).closest('.react-flow__edge');
+          onDropParallel?.(edge?.getAttribute('data-id') ?? edge?.getAttribute('data-testid')?.replace(/^rf__edge-/, '') ?? undefined);
+          return;
+        }
+        if (raw === 'humanReview') {
+          onAddAt?.('review', flow.screenToFlowPosition({ x: e.clientX, y: e.clientY }), { human: true });
           return;
         }
         const kind = raw as 'agent' | 'router' | 'loop' | 'review' | 'transform';

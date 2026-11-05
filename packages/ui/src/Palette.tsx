@@ -28,7 +28,7 @@ export interface AgentOption {
 }
 
 export type NodeSpec = { kind: 'agent'; agentId: string } | { kind: 'router' } | { kind: 'loop' } | { kind: 'review' } | { kind: 'transform' };
-type Kind = 'agent' | 'router' | 'loop' | 'review' | 'transform';
+type Kind = 'agent' | 'router' | 'loop' | 'review' | 'transform' | 'humanReview' | 'parallel';
 
 interface Props {
   agents: AgentOption[];
@@ -257,8 +257,8 @@ export function Palette({ agents, examples, usage, onAdd, onPickAgent, onAddAgen
                   className="orq-pal__row"
                   aria-label={aria}
                   title={hint}
-                  draggable={kind !== 'parallel' && kind !== 'humanReview'}
-                  {...(kind !== 'parallel' && kind !== 'humanReview' ? { onDragStart: drag(kind) } : {})}
+                  draggable
+                  onDragStart={drag(kind)}
                   onClick={() => (kind === 'agent' ? onPickAgent() : kind === 'parallel' ? onParallel?.() : kind === 'humanReview' ? onAdd({ kind: 'review', human: true }) : onAdd({ kind }))}
                 >
                   <Icon {...SZ} />

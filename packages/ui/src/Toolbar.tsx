@@ -93,21 +93,7 @@ export function Toolbar(p: Props) {
   return (
     <header className="orq-topbar" role="toolbar" aria-label={t('app.title')}>
       <ProjectMenu {...p} />
-      {p.diagramName !== undefined && (
-        <>
-          <span className="orq-topbar__sep" aria-hidden="true">
-            /
-          </span>
-          <DiagramMenu {...p} />
-        </>
-      )}
-      <span className={`orq-status is-${p.saveState ?? (p.dirty ? 'dirty' : 'saved')}`} role="status">
-        {p.saveState
-          ? t(({ saved: 'save.state.saved', dirty: 'save.state.dirty', saving: 'save.state.saving', error: 'save.state.error', 'no-project': 'save.state.noProject' } as const)[p.saveState])
-          : p.dirty
-            ? t('toolbar.unsaved')
-            : t('toolbar.saved')}
-      </span>
+      {/* El diagrama abierto y su guardado van en la cabecera del Diseñador, donde tienen sentido [R32.38]. */}
       <span className="orq-topbar__gap" />
       {icon(t('toolbar.new'), p.onNew, <FilePlus2 {...SZ} />)}
       {icon(t('toolbar.undo'), p.onUndo, <Undo2 {...SZ} />, !p.canUndo)}
@@ -183,7 +169,26 @@ export function Toolbar(p: Props) {
 }
 
 /** Selector de diagramas desde el nombre del diagrama: abrir otro o crear uno nuevo [R32.28]. */
-function DiagramMenu(p: Props) {
+/** Estado del guardado del diagrama, para la cabecera del Diseñador [R32.38]. */
+export function SaveStatus(p: Pick<Props, 'saveState' | 'dirty'>) {
+  return (
+    <span className={`orq-status is-${p.saveState ?? (p.dirty ? 'dirty' : 'saved')}`} role="status">
+      {p.saveState
+        ? t(({ saved: 'save.state.saved', dirty: 'save.state.dirty', saving: 'save.state.saving', error: 'save.state.error', 'no-project': 'save.state.noProject' } as const)[p.saveState])
+        : p.dirty
+          ? t('toolbar.unsaved')
+          : t('toolbar.saved')}
+    </span>
+  );
+}
+
+export type DiagramMenuProps = Pick<Props, 'diagramName' | 'currentDiagramId' | 'onListDiagrams' | 'onOpenDiagram' | 'onRenameDiagram' | 'onDuplicateDiagram' | 'onDeleteDiagram' | 'onNew'> & {
+  /** Solo la flecha: el nombre ya se ve al lado [R32.38]. */
+  compact?: boolean;
+};
+
+/** Menú del diagrama abierto: renombrar, duplicar, eliminar, cambiar a otro o crear uno [R32.28][R32.38]. */
+export function DiagramMenu(p: DiagramMenuProps) {
   const [open, setOpen] = useState(false);
   const [list, setList] = useState<{ id: string; name: string }[]>();
   const box = useOutside<HTMLDivElement>(open, () => setOpen(false));
@@ -199,8 +204,8 @@ function DiagramMenu(p: Props) {
   };
   return (
     <div className="orq-projmenu" ref={box}>
-      <button ref={button} type="button" className="orq-projmenu__btn orq-topbar__diagram" aria-haspopup="menu" aria-expanded={open} aria-label={t('topbar.diagram', { name })} title={t('topbar.diagram', { name })} onClick={toggle}>
-        <span>{name}</span>
+      <button ref={button} type="button" className={`orq-projmenu__btn orq-topbar__diagram${p.compact ? ' is-compact' : ''}`} aria-haspopup="menu" aria-expanded={open} aria-label={t('topbar.diagram', { name })} title={t('topbar.diagram', { name })} onClick={toggle}>
+        {!p.compact && <span>{name}</span>}
         <ChevronDown {...SZ} />
       </button>
       {open && (

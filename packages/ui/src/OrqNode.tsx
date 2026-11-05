@@ -1,7 +1,7 @@
 import { AgentAvatar, AskFirstMark, HandMark, type AgentLook } from './agentLook';
 import { Handle, Position, type NodeProps, type Node } from '@xyflow/react';
 import { useState, type ReactNode } from 'react';
-import { AlertTriangle, Bot, Boxes, Braces, Check, CircleDashed, CircleSlash, FileCode, FileText, GitFork, Image as ImageIcon, Loader2, MessageCircleQuestion, Minus, Play, Repeat2, ShieldCheck, Square, X } from 'lucide-react';
+import { AlertTriangle, Bot, Boxes, Braces, Check, CircleDashed, CircleSlash, Eye, FileCode, FileText, GitFork, Image as ImageIcon, Loader2, MessageCircleQuestion, Minus, Play, Repeat2, ShieldCheck, Square, X } from 'lucide-react';
 import { t, type LiveNodeStatus, type LoopInfo, type MessageKey, type ReviewInfo } from '@orquestador/editor';
 
 export interface OrqNodeData extends Record<string, unknown> {
@@ -34,6 +34,8 @@ export interface OrqNodeData extends Record<string, unknown> {
   review?: ReviewInfo;
   /** «+» de los conectores de conocimiento (arriba) y MCP (abajo) del agente [R33.10]. */
   onPort?: (port: 'know' | 'mcp') => void;
+  /** Revisión en modo «Lo reviso yo»: lleva el ojo [R53.16]. */
+  human?: boolean;
   /** Archivos que creó o cambió el paso en la ejecución [R54.1]. */
   files?: readonly NodeFile[];
   /** «Ampliar»: la vista previa en grande [R54.2]. */
@@ -73,7 +75,7 @@ export function OrqNode({ data, selected }: NodeProps<OrqFlowNode>) {
       : t('node.aria', { kind, name: data.label });
   const withStatus = data.runStatus ? t('node.aria.status', { base, status: t(`node.status.${data.runStatus}` as MessageKey) }) : base;
   const aria = [withStatus, data.look?.askFirst ? t('askfirst.mark') : '', data.asking ? t('hand.mark') : ''].filter(Boolean).join(', ');
-  const Icon = KIND_ICON[data.kind];
+  const Icon = data.human ? Eye : KIND_ICON[data.kind];
   const StatusIcon = data.runStatus ? STATUS_ICON[data.runStatus] : undefined;
   const fixed = data.kind === 'entry' || data.kind === 'output';
   return (

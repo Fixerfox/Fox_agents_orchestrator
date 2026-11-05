@@ -126,8 +126,9 @@ describe('SPEC-052 · lanzar desde Trabajos', () => {
     await userEvent.type(d.getByLabelText('Entrada'), 'semana 45');
     await userEvent.click(d.getByRole('button', { name: 'Lanzar y ver la ejecución' }));
     expect(await screen.findByRole('heading', { name: 'Informe semanal', level: 1 })).toBeTruthy();
-    // el Diseñador sigue con el que estaba abierto
-    expect(screen.getByRole('button', { name: 'Diagrama «Principal»' })).toBeTruthy();
+    // el Diseñador sigue con el que estaba abierto (su menú va en la cabecera del Diseñador [R32.38])
+    await userEvent.click(within(screen.getByRole('navigation', { name: 'Secciones' })).getByRole('button', { name: 'Diseñador' }));
+    expect(await screen.findByRole('button', { name: 'Diagrama «Principal»' })).toBeTruthy();
     await waitFor(async () => {
       const r = await api.listRuns();
       expect(r.ok && r.value[0]?.status).toBe('succeeded');

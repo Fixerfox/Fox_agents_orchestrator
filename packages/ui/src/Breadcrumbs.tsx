@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ArrowUp, Pencil } from 'lucide-react';
 import { MAX_DIAGRAM_NAME, t, type Crumb } from '@orquestador/editor';
 
@@ -10,9 +10,11 @@ interface Props {
   onRename?: ((name: string) => void) | undefined;
   /** Cada cambio pide editar el nombre (p. ej. tras «Nuevo» o «Renombrar»). */
   renameRequest?: number;
+  /** Lo que va tras el nombre: menú del diagrama, guardado y ajustes del diagrama [R32.38][R33.6]. */
+  actions?: ReactNode;
 }
 
-export function Breadcrumbs({ crumbs, onGo, onUp, onRename, renameRequest = 0 }: Props) {
+export function Breadcrumbs({ crumbs, onGo, onUp, onRename, renameRequest = 0, actions }: Props) {
   const [editing, setEditing] = useState(false);
   const handled = useRef(renameRequest);
   const canRename = onRename !== undefined;
@@ -71,6 +73,7 @@ export function Breadcrumbs({ crumbs, onGo, onUp, onRename, renameRequest = 0 }:
           );
         })}
       </ol>
+      {actions && <div className="orq-crumbs__actions">{actions}</div>}
     </nav>
   );
 }
