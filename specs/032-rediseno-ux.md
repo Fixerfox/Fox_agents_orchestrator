@@ -1,0 +1,72 @@
+# SPEC-032 · Rediseño de uso: tarea por nodo, Claude en los campos y flujo de montaje
+
+**Estado:** M7a y M7b implementados; M7c pendiente · **Hito:** M7a / M7b · **Paquetes:** `core`, `claude`, `runtime`, `editor`, `ui`
+
+## Propósito
+La revisión de UX del 05/11 (artefacto «Orquestador — Rediseño UX») encontró que el modelo no deja decirle a cada nodo qué hacer (solo hay una orden global), que «Redactar con Claude» abre un segundo cuadro de texto encima del que ya existe, que añadir un nodo lo deja suelto y en rojo, y que el motor (simulado o real) no se ve. Esta spec recoge los cambios elegidos por el usuario: Editor A + C, Nodo A, patrón ✦ único, Agentes A, Carpeta 1-2-3, Ejecución A + B e Inicio A.
+
+## Requisitos
+
+### Tarea por nodo
+- **R32.1** [M7a] Un nodo `agent` puede tener una `task` (texto, como máximo 20 000 caracteres) que se guarda en el diagrama. Una tarea más larga es un problema de validación del nodo.
+- **R32.2** [M7a] Al ejecutar un nodo con tarea, el agente recibe la tarea como encargo principal y la entrada del nodo debajo, marcada como entrada; sin tarea recibe solo la entrada, como antes. La tarea viaja en `AgentRequest.task` y queda registrada en el evento `agent.request`.
+- **R32.3** [M7a] El inspector de un nodo agente muestra primero «Qué tiene que hacer» (campo de tarea de varias líneas que se confirma al salir, un paso de historial) y debajo el agente asignado como tarjeta con nombre, descripción y un selector para cambiarlo.
+- **R32.4** [M7a] La tarjeta del nodo en el lienzo muestra un extracto de la tarea (una línea); si no tiene, muestra «Sin tarea» en tono de aviso, sin contarlo como error.
+
+### Claude dentro del campo (sustituye la presentación de R26.1–R26.3)
+- **R32.5** [M7a] En los formularios de agente, contexto de texto y skill no hay un panel «Redactar con Claude» aparte: el campo largo (instrucciones, texto o contenido) tiene en su barra un único botón con el icono ✦. Con el campo vacío dice «Escribir con Claude»; con texto, «Mejorar».
+- **R32.6** [M7a] El botón abre un menú anclado al campo con una sola línea para la indicación y atajos («Más estricto», «Más corto», «Añade ejemplos», «Formato de salida fijo»); un atajo lanza la petición directamente. Esc cierra el menú y devuelve el foco al botón.
+- **R32.7** [M7a] La propuesta se muestra en el propio campo como diferencias por líneas (quitadas tachadas, añadidas resaltadas, con texto alternativo para lectores de pantalla) con «Aceptar», «Otra versión» y «Descartar». Aceptar aplica todos los campos propuestos al borrador; no se guarda nada hasta «Guardar» (se mantienen R26.2 y R26.4).
+
+### Montar el diagrama
+- **R32.8** [M7a] Cada conexión del nivel actual muestra un botón «+» en su punto medio (con nombre accesible). Al pulsarlo se abre un buscador con los agentes del proyecto y los pasos Router y Bucle; elegir uno inserta el nodo entre los dos extremos, conectado a ambos, y quita la conexión original. Es un solo paso de deshacer.
+- **R32.9** [M7a] La operación de editor `insertOnEdge` valida que la conexión exista, conserva la condición de la arista original en el tramo que sale del router y coloca el nodo en el punto medio si cabe; si no, a un paso (280 px) del origen, desplazando a la derecha los nodos que quedan detrás.
+- **R32.10** [M7a] Los problemas propios de un diagrama a medio montar (nodo al que no llega ninguna conexión, router sin salidas) son avisos: se muestran en ámbar, en el nodo y en el panel, separados de los errores (en rojo). Ambos siguen impidiendo ejecutar y el panel dice cuántos hay de cada tipo. «Sin tarea» no es un problema (R32.4).
+
+### Barra superior
+- **R32.11** [M7a] La barra superior muestra siempre el motor activo, «Simulado» o «Claude», junto a Ejecutar; pulsarlo abre Ajustes. Se actualiza al guardar Ajustes.
+- **R32.12** [M7a] Crear, abrir y cerrar proyecto se agrupan en un menú de proyecto que se abre desde el nombre del proyecto; el selector de tema sale de la barra (queda en Ajustes).
+
+### Navegación y biblioteca (M7b)
+- **R32.13** [M7b] Un rail global de 72 px con icono y texto lleva a Proyecto, Diagramas, Agentes, Conocimiento, Ejecuciones y, abajo, Ajustes; la sección activa se marca con `aria-current="page"`. Todas son pantallas completas dentro de la ventana, no modales; Ejecuciones muestra un contador de preguntas pendientes.
+- **R32.14** [M7b] Agentes (prototipo «Agentes A») es una lista con buscador y un editor con cabecera fija: nombre, «Sin guardar» cuando hay cambios, «Descartar», «Eliminar» y «Guardar» (también Ctrl+S dentro del formulario). El cuerpo tiene a la izquierda nombre, descripción e instrucciones (con ✦) y a la derecha modelo, skills, contextos, «Dónde se usa» y «Avanzado» (identificador y máximo de turnos).
+- **R32.15** [M7b] Conocimiento tiene pestañas Contextos y Skills; cada elemento dice cuántos agentes lo usan, y su editor muestra «Lo usan» con fichas para quitarlo de un agente y un selector para asignarlo a otro (se guarda en el agente).
+
+### Carpeta del proyecto con `.claude`
+- **R32.16** [M7b] El contrato ofrece `inspectWorkFolder`: con la carpeta de trabajo elegida analiza `.claude/agents`, `.claude/skills` y `.mcp.json` con el analizador de paquetes (SPEC-025), resume la carpeta (SPEC-031) y lee los documentos guía de la raíz (CLAUDE.md, TRABAJO.md, AGENTS.md, recortados). No instala nada ni devuelve rutas; se confirma con `confirmImport`.
+- **R32.17** [M7b] El asistente «Conectar la carpeta del proyecto» tiene tres pasos (Carpeta, Revisar, Listo): elegir la carpeta y ver lo encontrado; revisar agentes y skills con casillas, el resumen del proyecto (editable, con ✦) y los documentos guía como contexto común, los permisos de acceso y los MCP (solo informativos, desactivados); al aplicar instala lo marcado, crea los contextos comunes y los asigna a todos los agentes. Los elementos se copian; vincular `.claude` para seguir sus cambios queda para M7c (R32.26).
+
+### Ejecución
+- **R32.18** [M7b] Durante una ejecución, las preguntas y permisos pendientes de cualquier nodo se reúnen en «Necesitan tu respuesta» de Ejecuciones (con opciones y respuesta libre; organización en SPEC-035, R35.6), y la barra muestra un botón con el número de preguntas que lleva allí.
+- **R32.19** [M7b] «Ejecutar» abre un diálogo con la entrada, el motor (Simulado o Claude, que se guarda en Ajustes) y el presupuesto en tokens (relleno con el de Ajustes); sustituye a la fila «Orden para el diagrama». Al ejecutar se pasa a Ejecuciones.
+- **R32.20** [M7b] Ejecuciones se organiza como describe SPEC-035 (submenú y vista de una ejecución), que sustituye a las tres pestañas «En directo», «Resultados» y «Registro técnico»: lo que ofrecían sigue en la vista de una ejecución (lienzo con el estado, mensajes por paso, Historial, Resultado con respuesta final, Copiar y cifras). La barra muestra estado, tokens y coste con medidor, y Pausar/Reanudar y Cancelar mientras se ejecuta.
+
+### Editor e inicio
+- **R32.21** [M7b] El panel izquierdo de Diagramas sigue el prototipo «Editor A» (R21.17–R21.20).
+- **R32.22** [M7b] El panel derecho de un nodo tiene la cabecera «Paso» y un botón para cerrarlo (la pestaña «Última ejecución» se quitó con R52.8: lo que hizo un paso se ve en Ejecuciones); en «Paso» el nombre se edita como título, el agente muestra su conocimiento (skills y contextos) y un enlace «Editar el agente», y el pie tiene «Duplicar» y «Eliminar nodo».
+- **R32.23** [M7b] No hay panel inferior: los problemas son un botón junto a «Ejecutar» con el número de avisos o errores que abre su lista.
+- **R32.24** [M7b] La pantalla de inicio (prototipo «Inicio A») pregunta «¿Qué vas a orquestar?» y ofrece tres caminos: «Crear proyecto», «Desde una plantilla» y «Desde la carpeta de un proyecto» (que abre el asistente de R32.17); debajo, los recientes como tabla (proyecto, carpeta, cuándo) con «Abrir proyecto».
+- **R32.25** [M7b] Ajustes es una página con navegación lateral (Claude, Carpeta de trabajo, Presupuesto, Apariencia) y los cambios se guardan solos al momento, con el estado visible; desde el inicio, sin proyecto, tiene «Volver».
+- **R32.26** [M7c] Vincular los agentes y skills de `.claude` para que se actualicen cuando cambian en la carpeta.
+
+### Fidelidad a los prototipos (M7b)
+- **R32.27** [M7b] La tarjeta de un nodo del lienzo muestra, además de la tarea: en un agente, hasta tres fichas con sus skills y contextos; en Entrada, la última entrada usada o «Se pide al ejecutar»; en Salida, «Resultado final»; en un bucle, los pasos que contiene y «máx. N vueltas».
+- **R32.28** [M7b] El nombre del diagrama en la barra superior abre un selector con los diagramas del proyecto (el actual marcado) y «Diagrama nuevo».
+- **R32.29** [M7b] En el panel de un agente (prototipo «Nodo A»): el campo de tarea tiene ✦ dentro («Escribir con Claude» si está vacío, «Mejorar» si no) y la propuesta se revisa en el propio campo; debajo, «Recibe:» con los pasos que le llegan (@entrada o su nombre); la tarjeta del agente tiene «Cambiar», que abre la galería de agentes y sustituye el del nodo, y «Editar»; y, con un proyecto abierto, una sección «Archivos» con «Crear archivos nuevos» (siempre activo) y el selector «Permisos de los agentes» (R47.11), que guarda el ajuste global al momento.
+- **R32.30** [M7b] En la biblioteca, los campos usan lenguaje de tarea: el agente tiene «Para qué sirve» y la skill «Cuándo usarla» y «Pasos»; cada agente de la lista muestra su modelo y en cuántos diagramas se usa («Sonnet 5.5 · 2 diagramas»).
+- **R32.31** [M7b] Un contexto nuevo empieza con «Añadir contexto» y sus caminos: «Escribir» (texto), «Elegir archivos» (abre el diálogo del sistema) y pedírselo a Claude; desde SPEC-038 están en la bienvenida de «Nuevo contexto» (R38.20) y «Con Claude» es el campo del asistente; «Escribir con Claude» sigue en el campo de texto. El editor de un contexto explica «Cómo se entrega» según su tipo (texto en las instrucciones; archivo o web por referencia).
+- **R32.32** [M7b] En Resultados (prototipo «Ejecución C»), «Cambios en la carpeta del proyecto» lista los archivos que la ejecución modificó, con «Restaurar» para devolverlos a como estaban antes (R31.6), y los nuevos, marcados «nuevo».
+- **R32.33** [M7b] Los campos que lee la IA dicen qué verá Claude: el router («Claude verá: lo que sale del paso anterior y el nombre de cada paso siguiente…» o, con reglas, cómo se evalúan las conexiones) y el bucle con evaluador IA (con un ejemplo de condición como texto de ayuda).
+
+### Agentes a mano (M7b)
+- **R32.34** [M7b] El botón derecho (o Mayús+F10) sobre un agente, en el lienzo o en «Tus agentes», abre un menú con «Editar el agente» (solo los del proyecto), «Cambiar el agente…» (en un nodo) o «Añadir al diagrama» (en la paleta), y, agrupadas, las skills y los contextos del agente para abrirlos en Conocimiento, más «Asignar skills…». En el editor del agente, el nombre de cada skill o contexto asignado lo abre sin perder el borrador.
+- **R32.35** [M7b] En una skill guardada, los archivos de referencia de texto se pueden editar («Editar» en su vista) y crear («Nuevo archivo de texto»; sin carpeta va a `referencias/` y sin extensión es `.md`). El contrato `saveSkillFile` crea o reescribe solo archivos de texto dentro de la skill (nunca `SKILL.md` ni binarios), con un máximo de 200 000 caracteres y sin secretos.
+- **R32.36** [M7b] «Varios a la vez» (en Pasos de la paleta y en el «+» de una conexión) sustituye una conexión A → B por 2 a 8 agentes en paralelo (A → cada uno) y los junta «tal cual» (cada uno → B; el paso siguiente recibe cada resultado con su título, R3.3) o «con un agente que los une» (cada uno → Unir → B, con una tarea de ejemplo editable). Las ramas se apilan en columna y lo que queda detrás se desplaza si no cabe; si A es un router, cada tramo conserva su condición; todo es un solo paso de deshacer. Desde la paleta usa la conexión seleccionada o, si no, la única que llega a Salida. Un paso con varias entradas muestra «Espera a N» y, en vivo, «X de N listos». Hay una plantilla «Varios a la vez y unir» (fondo, scripts y música de un mundo).
+- **R32.37** [M7b] *(Sustituido por SPEC-052, R52.2 y R52.8.)* La sesión del editor admite un modo de solo lectura (rechaza cualquier cambio, deshacer, rehacer y cargar otro diagrama), pero una ejecución en marcha ya no lo activa: el diagrama, sus agentes, sus skills y sus contextos se pueden editar, guardar y borrar mientras corre, porque la ejecución usa su copia (R52.1).
+- **R32.38** [M7b] Diagramas sin confusión: al abrir un proyecto se abre su primer diagrama (o se crea y guarda «Principal» si no tiene). Con proyecto abierto, cada cambio se guarda solo poco después (Ctrl+S sigue valiendo) y la barra dice «Sin guardar», «Guardando…», «Guardado», «No se pudo guardar» o, sin proyecto, «Sin proyecto: no se guarda»; antes de abrir otro diagrama, cargar una plantilla o cerrar el proyecto se guarda lo pendiente sin preguntar. El nombre del diagrama se edita en su título encima del lienzo (clic o F2; Intro o salir guardan, Esc cancela) y desde el selector de diagramas («Renombrar»), que también tiene «Duplicar» y «Eliminar…» (con confirmación; el contrato añade `deleteDiagram`). «Nuevo», duplicar y las plantillas crean diagramas con nombre e id propios («Diagrama nuevo 2»…), nunca uno que pise a otro; «Nuevo» deja el nombre listo para escribir.
+- **R32.39** [M7b] El panel izquierdo de Diagramas tiene secciones plegables (Pasos, Tus agentes y Plantillas) con su número de elementos; el plegado se recuerda en el equipo y al buscar se despliega todo. «Tus agentes» se agrupa en «En este diagrama», «Del proyecto» y «De ejemplo» (plegado por defecto si hay agentes del proyecto). Los usos de un agente son un contador («2 usos») que, al pulsarlo, selecciona por turnos los pasos que lo usan; ya no se repiten sus nombres debajo.
+
+## Escenarios
+- Diagrama Entrada → Dibujar (Pixelador) → Salida. «Dibujar» tiene la tarea «Dibuja cada enemigo de la entrada en 32×32». Al ejecutar con la entrada «babosa, dron», el Pixelador recibe la tarea y, debajo, la entrada.
+- En la conexión Dibujar → Salida pulso «+», escribo «rev» y elijo Revisor: queda Dibujar → Revisor → Salida conectado; Ctrl+Z lo deja como estaba.
+- En un agente con instrucciones pulso ✦ Mejorar → «Más estricto»: el campo muestra las líneas cambiadas; Aceptar las aplica y el formulario queda «Sin guardar».

@@ -1,0 +1,5 @@
+Fuente: https://github.com/github/spec-kit
+Commit: ec9a6f3b94c0aa856f77e550785a1ddde1993de1
+Descargado: 2026-11-05
+Licencia: MIT (ver LICENSE)
+Se regenera con: node scripts/build-speckit.mjs

@@ -1,0 +1,13 @@
+{
+  "name": "@orquestador/store",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "sideEffects": false,
+  "dependencies": {
+    "@orquestador/core": "*",
+    "fflate": "^0.8.3"
+  }
+}

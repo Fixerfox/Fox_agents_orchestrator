@@ -1,0 +1,21 @@
+# SPEC-044 · La ejecución en un modal, también desde el Diseñador
+
+**Estado:** Implementada (M8f) · **Hito:** M8f · **Paquetes:** `editor`, `ui`
+
+## Propósito
+El resumen de una ejecución vive en un panel bajo el lienzo de Ejecuciones, estrecho para leer el resultado, y en el Diseñador no hay forma de verlo al terminar sin cambiar de sección. Se quiere un modal amplio con todo lo de la ejecución, que se abra desde el propio diagrama al terminar y desde Ejecuciones.
+
+## Decisiones (05/11/2026)
+1. *Primera:* un modal solo con el resumen (el de R38.25). *Revisión (del usuario, sobre los prototipos):* faltan las pestañas de abajo (Cronograma, Historial, Resultado, Archivos); sin ellas hay que volver a Ejecuciones para cualquier detalle. *Segunda (elegida):* el modal tiene **las mismas pestañas** que la vista de la ejecución y reutiliza sus mismas piezas, así no hay dos versiones que mantener.
+2. Prototipos A (aviso al terminar en el Diseñador) y B (modal) elegidos; en Ejecuciones, tras probar un avance en la pestaña Resumen, el usuario prefirió quitar el panel de pestañas y usar el mismo aviso de A con solo «Ver resumen»; el panel lateral (D) se descarta: tapa el inspector y el resultado necesita ancho.
+3. El aviso del Diseñador sale solo cuando termina la ejecución que se sigue en vivo y es del diagrama abierto; no es un toast que desaparece solo, porque el resultado de una ejecución larga se lee cuando vuelves.
+4. Pulsar un paso en el modal lo lleva a su sitio: en Ejecuciones lo abre en el lateral; en el Diseñador lo selecciona en el lienzo (si es del nivel abierto) y muestra «Última ejecución».
+5. Las líneas: *primera* (la de R15.1) animaba toda conexión recorrida, y al terminar el diagrama parecía seguir en marcha. *Revisión:* «animado» tiene que significar «está pasando ahora». *Segunda (elegida):* solo se anima la conexión que lleva al paso que trabaja; las recorridas quedan en verde continuo; al terminar no se anima nada y las no recorridas se atenúan, así se lee por dónde fue.
+
+## Requisitos
+- **R44.1** [M8f] El modal de una ejecución (amplio, hasta 1280 px) tiene en la cabecera el estado con su icono, la frase de cabecera del resumen y las cifras (duración, tokens y coste); «Copiar» el resultado final si lo hay, «Abrir en Ejecuciones» cuando se abre fuera de Ejecuciones, y se cierra con la ✕, Escape o pulsando fuera. Debajo, las pestañas **Resumen, Cronograma, Historial, Resultado, Archivos y Auditoría** (esta última de SPEC-045), las mismas que la vista de la ejecución; abre en «Resumen» (dos columnas: lo pedido y el resultado final a la izquierda; pasos, revisiones, preguntas y archivos a la derecha).
+- **R44.2** [M8f] Pulsar un paso en el modal cierra el modal y lleva al paso: en Ejecuciones lo abre en el lateral, y desde fuera de Ejecuciones abre esa ejecución con el paso en el lateral. (Antes, en el Diseñador, seleccionaba el paso y su pestaña «Última ejecución»; se quitó con R52.8.)
+- **R44.3** [M8f] *(Sustituido por R52.8.)* El Diseñador ya no avisa de que ha terminado una ejecución: no muestra el estado de ninguna. El aviso con el icono del estado, la frase de cabecera, la duración, los tokens, el coste y «Ver resumen» está en la vista de la ejecución (R44.5).
+- **R44.4** [M8f] Fuera del Diseñador, en la barra superior, el estado de la última ejecución lanzada, ya terminada («Terminada · tokens · coste»), es un botón «Ver resumen de la ejecución» que abre el modal (R52.8).
+- **R44.5** [M8f] En Ejecuciones, la vista de una ejecución ya no tiene el panel de pestañas bajo el lienzo: el lienzo ocupa todo el alto y abajo flota el mismo aviso del Diseñador (icono del estado, frase de cabecera, duración, tokens, coste y archivos) con un único botón, «Ver resumen», que abre el modal; mientras corre, el aviso dice que está en marcha y el modal se abre en «Cronograma», y si ya terminó, en «Resumen». Sustituye al «Ver en grande» de R38.25.
+- **R44.6** [M8f] En los lienzos de la ejecución (Diseñador y Ejecuciones), solo se anima la conexión recorrida que lleva a un paso en cola, en marcha o esperando respuesta; las demás recorridas se ven en verde continuo, también los retornos de revisión (que siguen discontinuos). Cuando la ejecución ya no está en marcha no se anima ninguna y las conexiones que no se recorrieron se atenúan.

@@ -1,0 +1,20 @@
+# SPEC-029 · Asistente en el panel derecho, conectado a la app por MCP
+
+**Estado:** Implementado (M8c, lectura M8f) · **Hito:** M8c, M8f · **Paquetes:** `editor`, `claude`, `ui`, `desktop`
+
+## Propósito
+Un chat con Claude dentro de la app que entiende el proyecto y lo cambia con las mismas acciones que la interfaz: crear y ajustar agentes, skills, contextos y diagramas, sin saltarse validaciones ni confirmaciones.
+
+## Requisitos
+- **R29.1** [M8c] La app ofrece a Claude un servidor MCP propio, `orquestador`, cuyas herramientas son acciones de la interfaz (catálogo único `ASSISTANT_TOOLS`): consultar (agentes, skills, contextos, MCP, diagramas y el diagrama abierto), crear y modificar (agente, skill, contexto, paso, conexión, ramas en paralelo, diagrama nuevo) y acciones destructivas (borrar agente, skill, contexto o paso, y ejecutar el diagrama).
+- **R29.2** [M8c] Las herramientas se ejecutan en la interfaz, sobre el diagrama abierto y con el mismo contrato que usa el usuario: pasan por las mismas validaciones y lo que cambia se ve al momento; los cambios del diagrama se deshacen con Ctrl+Z y los de agentes, skills o contextos con «Deshacer» en la tarjeta de la acción.
+- **R29.3** [M8c] Las acciones destructivas no se hacen hasta que el usuario pulsa «Permitir» en una tarjeta del chat; «Denegar» se lo dice a Claude. Mientras hay una ejecución en marcha, el diagrama sigue en solo lectura también para el asistente (R32.37).
+- **R29.4** [M8c] El proceso principal lanza cada turno con el SDK: con las herramientas `mcp__orquestador__*` y las de Claude Code (R50.7; hasta el 05/11 eran solo las de lectura), el historial reciente de la conversación en el mensaje y un prompt de sistema que explica la app; reenvía a la interfaz el texto según llega y cada llamada a herramienta, y espera su resultado (con límite de tiempo). Un turno se puede detener.
+- **R29.5** [M8c] El panel «Asistente» se abre desde la barra (✦ Asistente) en el lateral derecho: mensajes, tarjetas de acciones (hecha, pendiente de permiso, denegada o con error), campo para escribir (Intro envía, Mayús+Intro salta línea), «Detener» mientras responde y sugerencias para empezar. La conversación se conserva al cambiar de sección.
+- **R29.6** [M8c] Sin el motor de Claude (motor simulado o en la vista previa), el asistente responde que está en modo simulado y explica cómo activarlo; los tests inyectan respuestas simuladas.
+- R29.7 (sustituido por R50.7 y R50.8 el 05/11) El asistente puede leer: `Read`, `Glob` y `Grep` sobre cualquier carpeta o archivo que el usuario le indique (también fuera del proyecto, p. ej. el código de un servidor MCP para saber cómo se arranca) y `WebSearch`/`WebFetch` para consultar documentación. Leer no pide permiso. No tiene `Write`, `Edit`, `Bash` ni ninguna otra herramienta del sistema.
+- R29.8 (sustituido por R50.8 el 05/11: solo se mantiene la carpeta de datos de la app) Nunca lee archivos con secretos: `.env*`, `.ssh`, `.aws`, `.gnupg`, `.azure`, `.kube`, `.docker`, claves (`*.pem`, `*.key`, `*.pfx`, `*.p12`, `id_rsa*`, `id_ed25519*`…), `.npmrc`, `.pypirc`, `.netrc`, `.git-credentials`, archivos `credentials*`/`secrets*` ni la carpeta de datos de la app (donde están la clave y los secretos cifrados). La regla se aplica en un gancho `PreToolUse`, que corre antes que cualquier permiso automático del SDK, y otra vez en `canUseTool`. Claude recibe «Ese archivo puede contener secretos…».
+- **R29.9** [M8f] Cada lectura aparece en el chat como una línea discreta («Ha leído package.json», «Ha buscado «*.json»», «Ha consultado github.com») con solo el nombre del archivo, el patrón o el dominio, nunca la ruta completa. Si se denegó, lo dice. Estas líneas no forman parte del historial que se envía a Claude.
+
+## Limitaciones
+- `Grep` sobre una carpeta busca dentro de todos sus archivos; el gancho bloquea las rutas sensibles que se le pasan, pero no filtra el contenido de un `.env` que aparezca en los resultados de una búsqueda por carpeta. Por eso el prompt le pide no buscar dentro de archivos de secretos y, ante la duda, usar `Glob` y `Read`.

@@ -1,0 +1,12 @@
+*.log
+.orquestador-runs/
+dist/
+node_modules/
+out/
+dist-preview/
+_to_delete/
+_pendiente/
+*.tsbuildinfo
+.orquestador/
+.env
+.env.*

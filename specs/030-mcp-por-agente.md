@@ -1,0 +1,24 @@
+# SPEC-030 · Servidores MCP por agente
+
+**Estado:** Implementado (M8a, M8d) · **Hito:** M8a, M8d · **Paquetes:** `core`, `store`, `claude`, `runtime`, `editor`, `ui`, `desktop`
+
+## Propósito
+Que los agentes usen herramientas externas (un servidor MCP local o web) sin exponer secretos, con permiso del usuario y sin que lo importado se active solo.
+
+## Requisitos
+- **R30.1** [M8a] Un proyecto tiene servidores MCP (`.orquestador/mcp/<id>.json`): nombre, descripción, tipo (comando local `stdio` con comando y argumentos, o servidor web `http` con dirección), nombres de sus secretos (variables de entorno o cabeceras), activado y «de confianza». Los valores secretos nunca están en ese JSON ni llegan a la interfaz: la lista dice solo qué nombres tienen valor.
+- **R30.2** [M8a] La validación exige nombre (hasta 60), comando (hasta 500) o dirección http(s), hasta 50 argumentos, hasta 20 nombres de secreto únicos con letras, números, `_` o `-`; y rechaza guardar algo que parezca una clave escrita a la vista.
+- **R30.3** [M8a] Un agente tiene `mcpIds` (servidores asignados) y se ven y editan en su ficha; también se pueden añadir solo a un paso o a un diagrama (SPEC-033). Borrar un servidor lo quita de los agentes.
+- **R30.4** [M8a] Al ejecutar con Claude, el agente recibe sus servidores activados (lo suyo más lo añadido), con los secretos como variables de entorno (comando) o cabeceras (web). Cada herramienta MCP pregunta en el chat del nodo («¿Puede usar X del servidor Y?»: Permitir, Permitir en esta ejecución, Denegar) salvo que el servidor sea de confianza; una herramienta de un servidor no asignado se deniega.
+- **R30.5** [M8a] «Probar conexión» arranca solo ese servidor y lee el estado y sus herramientas del mensaje de inicio, cortando antes de llamar al modelo (no gasta tokens), con límite de tiempo.
+- **R30.6** [M8a] Lo leído de `.mcp.json` (instalar paquete o carpeta del proyecto) solo trae nombre, comando, argumentos, dirección y nombres de secretos, nunca sus valores; al instalarlo llega apagado hasta que el usuario lo revisa y lo activa.
+- **R30.7** [M8a] Conocimiento tiene la pestaña «MCP»: lista con estado, editor con tipo, comando y argumentos (uno por línea) o dirección, secretos (el valor se escribe y se guarda cifrado; luego solo se ve «guardado» con Cambiar y Quitar), activado, de confianza, aviso de seguridad, «Probar conexión» y «Lo usan».
+- **R30.8** [M8a] Los secretos se guardan cifrados con el almacén del sistema en la configuración de la app, por proyecto y servidor; si el sistema no cifra, no se guardan. Ni el registro ni los mensajes de error los muestran.
+
+## Alta asistida, ámbito y terminal (M8d)
+- **R30.9** [M8d] Cada servidor MCP se guarda en un ámbito, «Guardar en»: «Solo este proyecto» (`.orquestador/mcp/`) o «Todos mis proyectos» (carpeta de configuración de la app, `mcp/`). La lista junta ambos y marca los de la app con «Todos tus proyectos»; si un id existe en los dos, gana el del proyecto. Cambiar el ámbito mueve el servidor y sus secretos. Los secretos de uno de la app se guardan por servidor (no por proyecto). Borrar uno de la app lo quita de los agentes del proyecto abierto; en otros proyectos, un id que ya no existe se ignora al ejecutar y desaparece al guardar el agente.
+- **R30.10** [M8d] Puntos de entrada: el menú contextual de un agente en el lienzo ofrece, bajo «Solo en este paso», «Skill o contexto solo aquí…», «MCP solo aquí…» y «✦ Alta de MCP con Claude…»; la ficha de un MCP ofrece «✦ Configurar con Claude» y «Abrir terminal». Los de Claude abren el asistente y le envían la petición ya escrita (qué agente o qué servidor).
+- **R30.11** [M8d] El asistente gestiona MCP con sus herramientas: `create_mcp` y `update_mcp` (mismas validaciones que la ficha; con «Deshacer»), `test_mcp` (Probar conexión), `assign_mcp` (a un agente o solo a un paso del diagrama abierto), `request_secret` y `open_terminal`. `test_mcp` y `open_terminal` piden «Permitir» porque arrancan un programa en el equipo.
+- **R30.12** [M8d] `request_secret` muestra en el chat una tarjeta con un campo de contraseña para ese secreto (servidor y nombre); al pulsar «Guardar» la interfaz lo guarda cifrado directamente (R30.8). A Claude solo le llega si quedó guardado o si el usuario no lo dio; el valor nunca entra en la conversación, el historial ni la tarjeta.
+- **R30.13** [M8d] Panel «Terminal» integrado (abajo, sobre cualquier sección): ejecuta `claude` (opcionalmente con una petición inicial) o la consola del sistema, siempre en la carpeta del proyecto. La interfaz solo elige el programa (`claude` o `shell`) y el texto de la petición: nunca rutas ni comandos libres. Hasta 3 terminales; cerrar una mata su proceso; cambiar de proyecto o salir las cierra todas.
+- **R30.14** [M8d] Si la terminal integrada no puede arrancar en el equipo, se abre la terminal del sistema en la carpeta del proyecto con el mismo programa y la interfaz lo avisa.
