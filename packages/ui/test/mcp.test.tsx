@@ -61,6 +61,7 @@ describe('SPEC-030 · MCP en la interfaz', () => {
     const api = await mount({ mcp: [{ ...newMcpServer('pixel', 'Pixel'), command: 'npx' }] });
     const a = await goLib('agents');
     await userEvent.click(a.getByRole('button', { name: 'Pintor' }));
+    await userEvent.click(a.getByRole('button', { name: /^Qué sabe/ }));
     await userEvent.click(a.getByRole('button', { name: 'Añadir MCP…' }));
     const picker = within(screen.getByRole('dialog', { name: 'Servidores MCP del agente' }));
     await userEvent.click(picker.getByRole('button', { name: 'Añadir Pixel' }));

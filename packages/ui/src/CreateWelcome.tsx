@@ -35,6 +35,7 @@ export function CreateWelcome({
   actionsLabel,
   actions,
   extra,
+  goLabel,
   onAsk,
 }: {
   title: string;
@@ -52,6 +53,8 @@ export function CreateWelcome({
   actions: WelcomeAction[];
   /** Algo más bajo el campo (p. ej. «Guardarlo en» de MCP). */
   extra?: ReactNode;
+  /** Texto del botón del campo; por defecto «Pedírselo al asistente». */
+  goLabel?: string;
   onAsk: (text: string) => void;
 }) {
   const [text, setText] = useState('');
@@ -78,7 +81,7 @@ export function CreateWelcome({
           <input aria-label={inputLabel} placeholder={placeholder} value={text} autoFocus onChange={(e) => setText(e.target.value)} />
           <button type="submit" className="orq-btn orq-btn--primary" disabled={text.trim() === ''}>
             <Sparkles size={14} strokeWidth={1.5} aria-hidden="true" />
-            {t('mcp.welcome.go')}
+            {goLabel ?? t('mcp.welcome.go')}
           </button>
         </form>
         {extra}

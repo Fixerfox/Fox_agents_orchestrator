@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { BookOpen, Bug, Cloud, Database, FileCode2, FileText, Folder, FolderOpen, GitBranch, Globe, Languages, Link2, MessageSquare, PackagePlus, PenLine, ScrollText, ShieldCheck, TestTube2 } from 'lucide-react';
+import { BookOpen, Bug, Cloud, Code2, Compass, Database, Eye, FileCode2, FileText, FlaskConical, Folder, FolderOpen, GitBranch, Globe, Languages, Link2, MessageSquare, PackagePlus, Palette, PenLine, ScrollText, ShieldCheck, TestTube2 } from 'lucide-react';
 import { t, type MessageKey } from '@orquestador/editor';
 import { CreateWelcome, type WelcomeAction, type WelcomeIdea } from './CreateWelcome';
 
@@ -129,3 +129,41 @@ export function ContextWelcome({ ready, onAsk, onWrite, onFiles, onUrl }: { read
   );
 }
 
+
+/** Ideas de la bienvenida de agentes [R57.1]. */
+const AGENT_IDEAS: { id: string; icon: WelcomeIdea['icon'] }[] = [
+  { id: 'impl', icon: Code2 },
+  { id: 'review', icon: Eye },
+  { id: 'tests', icon: FlaskConical },
+  { id: 'web', icon: Palette },
+  { id: 'docs', icon: ScrollText },
+  { id: 'research', icon: Compass },
+];
+
+/**
+ * Bienvenida de «Nuevo agente» [R57.1]: describirlo o elegir una idea abre los pasos con esa descripción
+ * (no el chat del asistente); «Escribir» abre los pasos en blanco.
+ */
+export function AgentWelcome({ ready, onStart, onWrite, onInstall, onSpecKit }: { ready: boolean; onStart: (text: string) => void; onWrite: () => void; onInstall: () => void; onSpecKit?: (() => void) | undefined }) {
+  const actions: WelcomeAction[] = [
+    { id: 'write', icon: PenLine, title: t('welcome.write'), sub: t('agent.welcome.write.sub'), onClick: onWrite },
+    { id: 'install', icon: PackagePlus, title: t('install.open'), sub: t('agent.welcome.install.sub'), onClick: onInstall },
+    ...(onSpecKit ? [{ id: 'speckit', icon: BookOpen, title: t('speckit.install'), sub: t('skill.welcome.speckit.sub'), onClick: onSpecKit }] : []),
+  ];
+  return (
+    <CreateWelcome
+      title={t('agent.welcome.title')}
+      sub={t('agent.welcome.sub')}
+      ready={ready}
+      inputLabel={t('agent.welcome.input')}
+      placeholder={t('agent.welcome.ph')}
+      prompt={(text) => text}
+      goLabel={t('agent.welcome.go')}
+      ideasLabel={t('welcome.ideas')}
+      ideas={AGENT_IDEAS.map(({ id, icon }) => ({ id, icon, title: t(`agent.idea.${id}` as MessageKey), sub: t(`agent.idea.${id}.sub` as MessageKey), prompt: t(`agent.idea.${id}.ask` as MessageKey) }))}
+      actionsLabel={t('welcome.manual')}
+      actions={actions}
+      onAsk={onStart}
+    />
+  );
+}

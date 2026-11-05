@@ -25,6 +25,7 @@ describe('SPEC-022 · borradores, editor Markdown y archivos de contexto', () =>
     const api = await mount();
     const s = await openAgents();
     await userEvent.click(s.getByRole('button', { name: 'Nuevo agente' }));
+    await userEvent.click(s.getByRole('button', { name: 'Escribir' }));
     await userEvent.type(s.getByLabelText('Nombre'), 'Pintor a medias');
     await userEvent.type(s.getByLabelText('Instrucciones'), 'Texto largo');
     await goLib('contexts');
@@ -63,6 +64,7 @@ describe('SPEC-022 · borradores, editor Markdown y archivos de contexto', () =>
     await mount();
     const s = await openAgents();
     await userEvent.click(s.getByRole('button', { name: 'Nuevo agente' }));
+    await userEvent.click(s.getByRole('button', { name: 'Escribir' }));
     const box = s.getByLabelText('Instrucciones');
     expect(box.className).toContain('orq-md');
     expect(box.className).not.toContain('orq-md--big');
@@ -77,6 +79,7 @@ describe('SPEC-022 · borradores, editor Markdown y archivos de contexto', () =>
     await mount();
     const s = await openAgents();
     await userEvent.click(s.getByRole('button', { name: 'Nuevo agente' }));
+    await userEvent.click(s.getByRole('button', { name: 'Escribir' }));
     const input = s.getByLabelText('Archivo Markdown para Instrucciones');
     await userEvent.upload(input, new File(['# Uno'], 'uno.md', { type: 'text/markdown' }));
     await waitFor(() => expect(value(s.getByLabelText('Instrucciones'))).toBe('# Uno'));
@@ -93,6 +96,7 @@ describe('SPEC-022 · borradores, editor Markdown y archivos de contexto', () =>
     await mount();
     const s = await openAgents();
     await userEvent.click(s.getByRole('button', { name: 'Nuevo agente' }));
+    await userEvent.click(s.getByRole('button', { name: 'Escribir' }));
     await userEvent.type(s.getByLabelText('Instrucciones'), 'mío');
     const input = s.getByLabelText('Archivo Markdown para Instrucciones');
     await userEvent.upload(input, new File(['otro'], 'otro.md'));
@@ -159,6 +163,7 @@ describe('SPEC-026 · redactar con Claude en la interfaz', () => {
     const api = await mount();
     const s = await openAgents();
     await userEvent.click(s.getByRole('button', { name: 'Nuevo agente' }));
+    await userEvent.click(s.getByRole('button', { name: 'Escribir' }));
     expect(s.queryByRole('button', { name: 'Redactar con Claude' })).toBeNull();
     await userEvent.click(s.getByRole('button', { name: 'Escribir con Claude' }));
     await ask(s, 'Describe el agente que quieres', 'Revisa contratos');
@@ -209,6 +214,7 @@ describe('SPEC-026 · redactar con Claude en la interfaz', () => {
     await mount({ draft: () => ({ ok: false, error: { code: 'unavailable', message: 'Claude no tiene una sesión válida.' } }) });
     const s = await openAgents();
     await userEvent.click(s.getByRole('button', { name: 'Nuevo agente' }));
+    await userEvent.click(s.getByRole('button', { name: 'Escribir' }));
     await userEvent.type(s.getByLabelText('Nombre'), 'Mío');
     await userEvent.click(s.getByRole('button', { name: 'Escribir con Claude' }));
     await ask(s, '¿Qué quieres cambiar?', 'algo');
@@ -220,6 +226,7 @@ describe('SPEC-026 · redactar con Claude en la interfaz', () => {
     await mount({ draft: { fields: { name: 'X'.repeat(80) }, problems: [{ field: 'name', message: 'El nombre admite hasta 60 caracteres' }], ms: 7 } });
     const s = await openAgents();
     await userEvent.click(s.getByRole('button', { name: 'Nuevo agente' }));
+    await userEvent.click(s.getByRole('button', { name: 'Escribir' }));
     await userEvent.click(s.getByRole('button', { name: 'Escribir con Claude' }));
     await ask(s, 'Describe el agente que quieres', 'algo');
     expect(await s.findByText(/Nombre: El nombre admite hasta 60 caracteres/)).toBeTruthy();
@@ -265,6 +272,7 @@ describe('SPEC-032 · Claude dentro del campo', () => {
     await mount();
     const s = await openAgents();
     await userEvent.click(s.getByRole('button', { name: 'Nuevo agente' }));
+    await userEvent.click(s.getByRole('button', { name: 'Escribir' }));
     await userEvent.click(s.getByRole('button', { name: 'Escribir con Claude' }));
     expect(s.queryByRole('button', { name: 'Más estricto' })).toBeNull();
     expect(s.getByLabelText('Describe el agente que quieres')).toBeTruthy();

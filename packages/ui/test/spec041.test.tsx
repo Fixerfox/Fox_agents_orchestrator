@@ -58,6 +58,7 @@ describe('SPEC-039 · «Obligatoria» en la ficha del agente [R39.13]', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Crear proyecto' }));
     const lib = await goLib('agents');
     await userEvent.click((await lib.findAllByRole('button', { name: /Implementador/ }))[0]!);
+    await userEvent.click(lib.getByRole('button', { name: /^Qué sabe/ }));
     const toggle = await screen.findByRole('button', { name: t('assign.required', { name: 'Implementar' }) });
     expect(toggle.getAttribute('aria-pressed')).toBe('false');
     await userEvent.click(toggle);

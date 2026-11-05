@@ -59,10 +59,12 @@ describe('SPEC-032 · M7b navegación y biblioteca', () => {
     await mount({ agents: [agent('a', 'Alfa')] });
     const s = await goLib('agents');
     await userEvent.click(s.getByRole('button', { name: 'Alfa' }));
+    await userEvent.click(s.getByRole('button', { name: /^Modelo y aspecto/ }));
     const adv = s.getByText('Avanzado').closest('details')!;
     expect(adv.hasAttribute('open')).toBe(false);
     expect(within(adv).getByText('Identificador:')).toBeTruthy();
     expect(within(adv).getByLabelText(/Máximo de turnos/)).toBeTruthy();
+    await userEvent.click(s.getByRole('button', { name: /^Dónde se usa/ }));
     expect(await s.findByText('Aún no está en ningún diagrama')).toBeTruthy();
   });
 
