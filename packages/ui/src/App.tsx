@@ -55,7 +55,7 @@ import { RunModal, RunsScreen, type RunsNav } from './RunsScreen';
 import { JobsScreen } from './JobsScreen';
 import { useRunsIndex } from './useRunsIndex';
 import { StartScreen, type StartPath } from './StartScreen';
-import { DiagramMenu, SaveStatus, Toolbar } from './Toolbar';
+import { DiagramMenu, EditButtons, SaveStatus, Toolbar } from './Toolbar';
 import { isTypingTarget, shortcutFor } from './shortcuts';
 import { useSession } from './useSession';
 
@@ -764,6 +764,7 @@ export function App({ api, agents: builtIn = [], confirm = (m) => window.confirm
       />
       <div className="orq-shell__main">
         <Toolbar
+          editInHeader
           canUndo={snap.canUndo}
           canRedo={snap.canRedo}
           dirty={snap.dirty}
@@ -924,7 +925,9 @@ export function App({ api, agents: builtIn = [], confirm = (m) => window.confirm
                         onDeleteDiagram={project !== undefined ? () => void deleteDiagram() : undefined}
                         onNew={() => void newDiagram()}
                       />
+                      <span className="orq-grow" />
                       <SaveStatus saveState={project === undefined ? 'no-project' : saveState === 'saving' ? 'saving' : saveState === 'error' ? 'error' : snap.dirty ? 'dirty' : 'saved'} dirty={snap.dirty} />
+                      <EditButtons canUndo={snap.canUndo} canRedo={snap.canRedo} projectOpen={project !== undefined} onNew={() => void newDiagram()} onUndo={undo} onRedo={redo} onSave={() => void save()} />
                       <button
                         type="button"
                         className={`orq-btn orq-btn--small orq-btn--ghost orq-crumbs__settings${diagramPanel && sideVisible ? ' is-on' : ''}`}

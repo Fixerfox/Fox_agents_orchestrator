@@ -55,6 +55,8 @@ interface Props {
   /** «✦ Asistente» abre el chat en el lateral derecho [R29.5]. */
   onAssistant?: () => void;
   assistantOpen?: boolean;
+  /** Nuevo, deshacer, rehacer y guardar van en la cabecera del Diseñador, no aquí [R32.38]. */
+  editInHeader?: boolean;
 }
 
 const SZ = { size: 16, strokeWidth: 1.5, 'aria-hidden': true } as const;
@@ -95,10 +97,7 @@ export function Toolbar(p: Props) {
       <ProjectMenu {...p} />
       {/* El diagrama abierto y su guardado van en la cabecera del Diseñador, donde tienen sentido [R32.38]. */}
       <span className="orq-topbar__gap" />
-      {icon(t('toolbar.new'), p.onNew, <FilePlus2 {...SZ} />)}
-      {icon(t('toolbar.undo'), p.onUndo, <Undo2 {...SZ} />, !p.canUndo)}
-      {icon(t('toolbar.redo'), p.onRedo, <Redo2 {...SZ} />, !p.canRedo)}
-      {icon(t('toolbar.save'), p.onSave, <Save {...SZ} />, !p.projectOpen)}
+      {!p.editInHeader && <EditButtons {...p} />}
       {p.engine && (
         <button type="button" className={`orq-engine is-${p.engine}`} aria-label={t('engine.title', { name: engineName })} title={t('engine.title', { name: engineName })} onClick={p.onOpenSettings}>
           <Cpu {...SZ} />
@@ -169,6 +168,23 @@ export function Toolbar(p: Props) {
 }
 
 /** Selector de diagramas desde el nombre del diagrama: abrir otro o crear uno nuevo [R32.28]. */
+/** Nuevo, deshacer, rehacer y guardar el diagrama [R14.1][R14.5][R32.38]. */
+export function EditButtons(p: Pick<Props, 'canUndo' | 'canRedo' | 'projectOpen' | 'onNew' | 'onUndo' | 'onRedo' | 'onSave'>) {
+  const icon = (label: string, onClick: () => void, node: ReactNode, disabled = false) => (
+    <button type="button" className="orq-ib" aria-label={label} title={label} onClick={onClick} disabled={disabled}>
+      {node}
+    </button>
+  );
+  return (
+    <span className="orq-editbtns" role="group" aria-label={t('toolbar.edit')}>
+      {icon(t('toolbar.new'), p.onNew, <FilePlus2 {...SZ} />)}
+      {icon(t('toolbar.undo'), p.onUndo, <Undo2 {...SZ} />, !p.canUndo)}
+      {icon(t('toolbar.redo'), p.onRedo, <Redo2 {...SZ} />, !p.canRedo)}
+      {icon(t('toolbar.save'), p.onSave, <Save {...SZ} />, !p.projectOpen)}
+    </span>
+  );
+}
+
 /** Estado del guardado del diagrama, para la cabecera del Diseñador [R32.38]. */
 export function SaveStatus(p: Pick<Props, 'saveState' | 'dirty'>) {
   return (

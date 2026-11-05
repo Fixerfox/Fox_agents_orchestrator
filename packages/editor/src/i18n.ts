@@ -1064,6 +1064,7 @@ export const es = {
   'insp.tab.step': 'Paso',
   'insp.tab.diagram': 'Diagrama',
   'diagram.settings': 'Ajustes del diagrama',
+  'toolbar.edit': 'Editar el diagrama',
   'diagram.settings.close': 'Cerrar los ajustes del diagrama',
   'insp.tab.last': 'Última ejecución',
   'insp.close': 'Cerrar el panel',

@@ -140,7 +140,8 @@ describe('iconos y accesibilidad [R21.3][R21.9]', () => {
     for (const b of screen.getAllByRole('button')) {
       if (!(b.textContent ?? '').trim() && b.getAttribute('aria-label')) expect(b.getAttribute('title'), b.getAttribute('aria-label')!).toBe(b.getAttribute('aria-label'));
     }
-    expect(document.querySelectorAll('.orq-topbar svg').length).toBeGreaterThan(6);
+    // Los iconos van en la barra superior y en la cabecera del Diseñador (editar el diagrama) [R32.38].
+    expect(document.querySelectorAll('.orq-topbar svg, .orq-crumbs svg').length).toBeGreaterThan(6);
   });
 
   it('[R21.9] hay foco visible, objetivos de 32 px y se respeta «reducir movimiento»', () => {

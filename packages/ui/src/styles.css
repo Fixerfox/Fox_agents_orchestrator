@@ -1983,7 +1983,8 @@ button.orq-story__line:hover { background: var(--raised); }
 
 /* Cabecera del Diseñador: nombre, menú del diagrama, guardado y ajustes del diagrama [R32.38][R33.6]. */
 .orq-crumbs__actions { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; }
-.orq-crumbs__actions .orq-crumbs__settings { margin-left: auto; }
+.orq-crumbs__actions .orq-grow { flex: 1; }
+.orq-editbtns { display: inline-flex; align-items: center; gap: 2px; }
 .orq-crumbs__settings.is-on { color: var(--accent-text); border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
 .orq-topbar__diagram.is-compact { padding: 0 6px; }
 

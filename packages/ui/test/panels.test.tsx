@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import './setup';
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { EditorSession, createDiagram, exampleTemplates } from '@orquestador/editor';
 import { AgentPicker } from '../src/AgentPicker';
@@ -10,7 +10,7 @@ import { Breadcrumbs } from '../src/Breadcrumbs';
 import { Inspector } from '../src/Inspector';
 import { Palette } from '../src/Palette';
 import { ProblemsPanel } from '../src/ProblemsPanel';
-import { SaveStatus, Toolbar } from '../src/Toolbar';
+import { EditButtons, SaveStatus, Toolbar } from '../src/Toolbar';
 
 const P = { x: 0, y: 0 };
 const AGENTS = [
@@ -171,6 +171,15 @@ describe('problemas y ejecutar [R14.3]', () => {
     unmount();
     render(<SaveStatus dirty />);
     expect(screen.getByText('Cambios sin guardar')).toBeTruthy();
+  });
+
+  it('[R32.38] Nuevo, Deshacer, Rehacer y Guardar van en la cabecera del Diseñador, no en la barra superior', () => {
+    const { unmount } = render(<Toolbar editInHeader canUndo canRedo={false} dirty projectOpen onUndo={() => {}} onRedo={() => {}} onSave={() => {}} onNew={() => {}} onOpenProject={() => {}} onCreateProject={() => {}} />);
+    expect(screen.queryByRole('button', { name: 'Deshacer' })).toBeNull();
+    unmount();
+    render(<EditButtons canUndo canRedo={false} projectOpen onUndo={() => {}} onRedo={() => {}} onSave={() => {}} onNew={() => {}} />);
+    const group = within(screen.getByRole('group', { name: 'Editar el diagrama' }));
+    expect(group.getAllByRole('button').map((b) => b.getAttribute('aria-label'))).toEqual(['Nuevo', 'Deshacer', 'Rehacer', 'Guardar']);
   });
 });
 
