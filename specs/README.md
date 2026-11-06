@@ -16,8 +16,7 @@ El hito indica cuándo debe estar cubierto por tests. `npm run spec:check` exige
 ## Índice
 | Spec | Título | Hito | Estado |
 |---|---|---|---|
-| [061](061-memoria-de-la-ejecucion.md) | Memoria de la ejecución: un diario corto que escribe el Guardián y los agentes leen como contexto de fondo | M12 | Borrador |
-| [060](060-guardian-de-ejecucion.md) | Guardián de la ejecución: servicio interno que frena con reglas lo que se sale de los límites y revisa con un modelo barato y configurable si cada paso hizo lo pedido, con su sección en el Resumen | M12 | Borrador |
+| [060](060-supervisor-de-ejecucion.md) | Supervisor de la ejecución: pieza interna que frena con reglas lo que se sale de los límites, revisa con un modelo barato y configurable si cada paso hizo lo pedido, y escribe la memoria que leen los agentes | M12 | Implementada |
 | [059](059-repartir-entre-ramas.md) | Repartir el trabajo entre ramas en paralelo: el paso de origen divide su trabajo con `## Común` y `## Para <id>`, y cada rama recibe solo lo suyo | M8h | Implementada |
 | [058](058-ramas-en-el-diagrama.md) | Ramas en el diagrama: los pasos de cada rama van rodeados con rayas amarillas, el nodo marca commit, push, PR y demás, y el resumen las destaca | M8g | Implementada |
 | [057](057-crear-agente-por-pasos.md) | Crear un agente por pasos: bienvenida «¿Qué agente necesitas?» con ideas, el asistente redacta el primer borrador, cuatro pasos (qué hace, qué sabe, qué puede hacer, revisar) y una ficha por secciones para editar | M8g | Implementada |

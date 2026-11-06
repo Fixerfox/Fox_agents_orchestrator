@@ -15,6 +15,7 @@ import { ResumeCache } from './run/resume-cache';
 import { RetryPolicy } from './run/retry-policy';
 import { RunAbort } from './run/run-abort';
 import { RunEmitter } from './run/run-emitter';
+import { Supervisor } from './run/supervisor';
 import type { NodeStatus, RunOptions, RunStatus } from './run-types';
 import { mergeInputs } from './text/merge-inputs';
 import { splitInputs } from './text/split';
@@ -31,6 +32,8 @@ export interface OrchestratorDeps {
   sleep?(ms: number, signal: AbortSignal): Promise<void>;
   now?(): Date;
   newRunId?(): Id;
+  /** Activa el Supervisor; `review` dice si revisa con IA, y se pregunta en cada paso [R60.1]. */
+  supervisor?: { review(): boolean; model?(): string; settleMs?: number };
   /** Tipos de nodo; por defecto, los de la aplicación [R56.12]. */
   nodes?: NodeRegistry;
 }
@@ -82,12 +85,18 @@ export class Orchestrator {
     const budget = new BudgetTracker(options.budget, emitter, stop);
     const deliverable = options.deliverable === null ? undefined : (options.deliverable ?? diagram.deliverable);
     let failReason: string | undefined;
+    const watch = this.deps.supervisor;
+    const supervisor = watch
+      ? new Supervisor({ emitter, decider: this.deps.decider, budget, limits: options.budget, signal: stop.signal, review: () => watch.review(), ...(watch.model ? { model: () => watch.model!() } : {}), labelOf: (id) => diagram.nodes.find((n) => n.id === id)?.label ?? id, ...(watch.settleMs !== undefined ? { settleMs: watch.settleMs } : {}) })
+      : undefined;
+    if (supervisor) bus.subscribe((e) => supervisor.observe(e));
     const services: RunServices = {
       signal: stop.signal,
       emitter,
       gate,
       limiter: new ConcurrencyLimiter(Math.max(1, options.maxConcurrency ?? 4)),
       budget,
+      ...(supervisor ? { supervisor } : {}),
       questions,
       retry: new RetryPolicy(options.retry, this.deps.sleep),
       cache: new ResumeCache(options),
@@ -129,6 +138,7 @@ export class Orchestrator {
       } else if (status === 'failed' && failReason) {
         reason = failReason;
       }
+      await supervisor?.settle();
       emitter.emit({ type: 'run.finished', status, ...(reason !== undefined ? { reason } : {}) });
       return {
         runId,

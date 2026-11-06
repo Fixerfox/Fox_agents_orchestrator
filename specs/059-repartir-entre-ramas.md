@@ -38,7 +38,7 @@ El usuario lo resumió así: el agente del que salen dos o más ramas en paralel
 6. **Un paso que solo reparte.**
    - *Primera:* un agente secreto, siempre activo, que conoce el contexto de todos.
    - *Revisión:* un paso invisible que gasta y decide va contra ver qué hace cada agente, y conoce el trabajo peor que quien lo acaba de hacer.
-   - *Segunda (elegida):* **un paso visible y fijo, el Coordinador**, que se coloca solo donde hace falta y no se edita: así el formato de reparto siempre funciona igual. Vigilar la ejecución entera es otra pieza (SPEC-060).
+   - *Segunda (elegida):* **un paso visible y fijo, el Coordinador**, que se coloca solo donde hace falta y no se edita: así el formato de reparto siempre funciona igual. Vigilar la ejecución entera es otra pieza, el Supervisor (SPEC-060).
 7. **Dónde vive en la arquitectura (SPEC-056).** El texto que se añade al prompt y la lectura de las partes son funciones puras de `execution/text/` (`splitRule`, `parseSplit`, `checkSplit`). El orquestador sigue sin lógica de tipos de nodo: cuando un paso con reparto termina, usa la lectura de las partes para saber qué entrada lleva cada conexión, igual que hoy usa `mergeInputs` al juntar.
 
 ## Requisitos

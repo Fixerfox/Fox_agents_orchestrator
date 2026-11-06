@@ -285,6 +285,12 @@ export function NodePanel({ events, live, nodeId, nodePath, label, onAnswer, onE
                   <li key={i} className="orq-t orq-t--input">
                     <strong>{inputTitle(it)}</strong>
                     <Markdown text={it.text} />
+                    {it.memory && (
+                      <details className="orq-t__memory">
+                        <summary>{t('transcript.memory')}</summary>
+                        <pre>{it.memory}</pre>
+                      </details>
+                    )}
                   </li>
                 );
               case 'text':

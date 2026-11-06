@@ -13,6 +13,8 @@ export type AgentStreamEvent =
   | { type: 'branch'; branch: string; via: 'head' | 'command' | 'mcp' | 'ran'; created?: boolean }
   /** Lo que el agente hizo en una rama [R58.11]. */
   | { type: 'git_action'; branch: string; action: 'commit' | 'push' | 'pr' | 'merge' | 'delete' | 'switch'; /** PR o merge request [R58.14]. */ url?: string }
+  /** Acción frenada antes de ocurrir [R60.16]. */
+  | { type: 'blocked'; detail: string }
   | { type: 'usage'; inputTokens: number; outputTokens: number; costUsd?: number }
   /** Archivo creado o modificado por el agente [R31.12]; `change` es opcional para adaptadores que no lo saben. */
   | { type: 'file'; path: string; change?: FileChange; /** Lo cambió un comando (sin copia) [R55.3]. */ via?: FileVia }
@@ -49,6 +51,24 @@ export interface AgentProfile {
   purpose?: string;
   skills: string[];
   mcp: string[];
+}
+
+/** Lo que el Supervisor revisa de un paso [R60.12]. */
+export interface SupervisorReview {
+  step: string;
+  input: Payload;
+  task?: string;
+  actions: string[];
+  output: Payload;
+}
+
+/** Veredicto de la revisión, con la entrada de la memoria [R60.12][R60.19]. */
+export interface SupervisorVerdict {
+  ok: boolean;
+  reason: string;
+  summary: string;
+  outOfScope?: string;
+  usage?: { inputTokens: number; outputTokens: number; costUsd?: number };
 }
 
 export interface AgentQuestion {
@@ -106,6 +126,10 @@ export interface AgentRequest {
   confirm?: boolean;
   /** Regla de reparto: el trabajo de este paso se divide entre sus ramas [R59.4]. */
   split?: string;
+  /** Memoria de la ejecución: contexto de fondo, no instrucciones [R60.21]. */
+  memory?: string;
+  /** Archivos y carpetas a los que se limita este paso [R60.16]. */
+  scope?: string[];
   /** Qué se entregará al final: contrato completo (pasos finales) o una línea de objetivo [R46.4]. */
   deliverable?: { role: 'final' | 'goal'; text: string };
   /** Número de intento (1 = primero). */
@@ -156,6 +180,8 @@ export interface Decider {
   ): Promise<boolean>;
   /** Qué paso tiene que rehacer el trabajo según las correcciones del usuario. Opcional [R53.5][R53.17]. */
   blame?(request: { feedback: string; candidates: BlameCandidate[] }, signal: AbortSignal): Promise<{ nodeId: Id; reason: string }>;
+  /** ¿Lo que hizo un paso corresponde a lo pedido? [R60.12] */
+  supervise?(request: SupervisorReview, signal: AbortSignal): Promise<SupervisorVerdict>;
   /** Nodo «Transformar» con Claude: devuelve el texto convertido. Opcional: sin él, el nodo falla [R37.6]. */
   transform?(request: TransformRequest, signal: AbortSignal): Promise<{ text: string; usage?: TransformUsage }>;
 }

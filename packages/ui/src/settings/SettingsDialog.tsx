@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, KeyRound } from 'lucide-react';
-import { MODELS, loadsClaudeConfig, projectPermission, type AppSettings, type AuthMode, type Engine, type ProjectPermission } from '@orquestador/core';
+import { MODELS, loadsClaudeConfig, projectPermission, type AppSettings, type AuthMode, type Engine, type ProjectPermission, supervisorModel, supervisorReviews } from '@orquestador/core';
 import { PermissionPicker } from '../common';
 import { t, type ConnectionResult, type MessageKey, type ProjectApi, type SettingsView, type WorkFolderView } from '@orquestador/editor';
 import { Field, fieldErrors } from '../common';
@@ -73,6 +73,8 @@ export function SettingsDialog({ api, onClose, onSaved }: Props) {
       ...(tokens.trim() !== '' ? { defaultMaxTokens: Number(tokens) } : {}),
       ...(draft.permissions ? { permissions: draft.permissions } : {}),
       ...(draft.claudeConfig !== undefined ? { claudeConfig: draft.claudeConfig } : {}),
+      ...(draft.supervisorReview !== undefined ? { supervisorReview: draft.supervisorReview } : {}),
+      ...(draft.supervisorModel !== undefined ? { supervisorModel: draft.supervisorModel } : {}),
     };
     const res = await api.saveSettings(body);
     if (!res.ok) {
@@ -271,6 +273,23 @@ export function SettingsDialog({ api, onClose, onSaved }: Props) {
               <input id="set-tokens" type="number" min={1} value={tokens} onChange={(e) => ((touched.current = true), setTokens(e.target.value), setStatus(t('settings.saving')))} />
             </Field>
           </div>
+        </section>
+        <section id="sec-supervisor" aria-labelledby="set-supervisor">
+          <h3 id="set-supervisor">{t('settings.sup')}</h3>
+          <label className="orq-insp__check">
+            <input type="checkbox" checked={supervisorReviews(draft)} onChange={(e) => set({ supervisorReview: e.target.checked })} />
+            {t('settings.sup.review')}
+          </label>
+          <p className="orq-hint">{t('settings.sup.hint')}</p>
+          <Field label={t('settings.sup.model')} id="set-sup-model" error={errors['supervisorModel']}>
+            <select id="set-sup-model" value={supervisorModel(draft)} onChange={(e) => set({ supervisorModel: e.target.value })}>
+              {MODELS.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name}
+                </option>
+              ))}
+            </select>
+          </Field>
         </section>
         <section id="sec-look" aria-labelledby="set-look">
           <h3 id="set-look">{t('settings.section.look')}</h3>

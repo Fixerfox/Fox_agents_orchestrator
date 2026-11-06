@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { type Diagram, type RunEvent } from '@orquestador/core';
 import { type ProjectApi, type RunSnapshot, type HistoryRow, RunClient, settleLive, runTimeline, t } from '@orquestador/editor';
 import { nodeLabel, money, diagramLabel } from './runFormat';
@@ -69,7 +69,7 @@ export function useRunData(api: ProjectApi, runId: string, main: RunSnapshot, ro
     () => runTimeline(events, nowValue, { settled: !running, label: (id, path) => nodeLabel(diagram ?? undefined, id, path) }),
     [events, nowValue, running, diagram],
   );
-  const label = (nodeId: string, nodePath: readonly string[] = []) => nodeLabel(diagram ?? undefined, nodeId, nodePath);
+  const label = useCallback((nodeId: string, nodePath: readonly string[] = []) => nodeLabel(diagram ?? undefined, nodeId, nodePath), [diagram]);
   // Sin la lista no se sabe si una ejecución ajena sigue en marcha: se espera antes de afirmar nada [R35.13].
   const ready = !!snap && !!live && events.length > 0 && (isMain || listLoaded);
   const measured = events.some((e) => e.type === 'agent.usage');
@@ -92,21 +92,21 @@ export type RunData = ReturnType<typeof useRunData>;
  * anteriores) se usa el actual y `old` lo indica; `null` si tampoco existe ya.
  */
 function useRunDiagram(api: ProjectApi, runId: string, diagramId: string | undefined): { diagram: Diagram | null | undefined; old: boolean } {
-  const [state, setState] = useState<{ diagram: Diagram | null | undefined; old: boolean }>({ diagram: undefined, old: false });
+  const [state, setState] = useState<{ runId?: string; diagram: Diagram | null | undefined; old: boolean }>({ diagram: undefined, old: false });
   useEffect(() => {
     let alive = true;
-    setState({ diagram: undefined, old: false });
+    // Lo que ya se ve sigue ahí hasta que llegue lo nuevo: vaciarlo desmontaría el lienzo [R15.16].
     void (async () => {
       const own = await api.runDiagram(runId);
       if (!alive) return;
-      if (own.ok && own.value) return setState({ diagram: own.value, old: false });
+      if (own.ok && own.value) return setState((s) => (s.runId === runId && s.diagram === own.value ? s : { runId, diagram: own.value, old: false }));
       if (!diagramId) return;
       const now = await api.loadDiagram(diagramId);
-      if (alive) setState({ diagram: now.ok ? now.value : null, old: now.ok });
+      if (alive) setState({ runId, diagram: now.ok ? now.value : null, old: now.ok });
     })();
     return () => {
       alive = false;
     };
   }, [api, runId, diagramId]);
-  return state;
+  return state.runId === runId ? state : { diagram: undefined, old: false };
 }

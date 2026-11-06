@@ -1,0 +1,99 @@
+import { branchMemoryLine, newBranchMemory, pathKey, rememberBranch, type Id, type RunEvent } from '@orquestador/core';
+
+export type SupervisorStatus = 'watching' | 'reviewing' | 'alert' | 'rules' | 'done';
+
+export interface SupervisorTarget {
+  key: string;
+  warn: boolean;
+}
+
+/** Lo que enseñan la tarjeta del Supervisor y el panel de la memoria [R60.31]. */
+export interface SupervisorView {
+  status: SupervisorStatus;
+  model?: string;
+  reviewed: number;
+  alerts: number;
+  costUsd: number;
+  branch?: string;
+  /** Pasos en revisión ahora mismo: con agentes en paralelo pueden ser varios [R60.33]. */
+  reviewing: string[];
+  lastAlert?: string;
+  targets: SupervisorTarget[];
+  memory: { label: string; text: string; files: string[] }[];
+}
+
+export function supervisorView(events: readonly RunEvent[], running: boolean, labelOf: (id: Id, path: readonly Id[]) => string): SupervisorView | undefined {
+  let found = false;
+  let reviews = false;
+  let model: string | undefined;
+  let reviewed = 0;
+  let alerts = 0;
+  let costUsd = 0;
+  let lastAlert: string | undefined;
+  let lastKey: string | undefined;
+  const pending = new Map<string, { label: string; count: number }>();
+  const warned = new Set<string>();
+  const branches = newBranchMemory();
+  const memory: SupervisorView['memory'] = [];
+  for (const e of events) {
+    const path = e.nodePath ?? [];
+    switch (e.type) {
+      case 'supervisor.started':
+        found = true;
+        reviews = e.review;
+        model = e.model;
+        break;
+      case 'supervisor.reviewing':
+      {
+        const key = pathKey(path, e.nodeId);
+        pending.set(key, { label: labelOf(e.nodeId, path), count: (pending.get(key)?.count ?? 0) + 1 });
+        break;
+      }
+      case 'supervisor.note': {
+        const key = pathKey(path, e.nodeId);
+        const open = pending.get(key);
+        if (open && open.count > 1) open.count--;
+        else pending.delete(key);
+        if (e.reviewed) reviewed++;
+        memory.push({ label: labelOf(e.nodeId, path), text: e.text, files: e.files });
+        break;
+      }
+      case 'supervisor.alert':
+        alerts++;
+        lastAlert = e.detail;
+        if (e.nodeId !== undefined) {
+          lastKey = pathKey(path, e.nodeId);
+          warned.add(lastKey);
+        }
+        break;
+      case 'supervisor.skipped':
+        if (e.reason === 'failed') reviews = false;
+        break;
+      case 'agent.usage':
+        if (e.source === 'supervisor') costUsd += e.costUsd ?? 0;
+        break;
+      case 'git.branch':
+        rememberBranch(branches, e, labelOf(e.nodeId, path));
+        break;
+      default:
+        break;
+    }
+  }
+  if (!found) return undefined;
+  const open = running ? [...pending.keys()] : [];
+  const keys = open.length > 0 || !running || lastKey === undefined ? open : [lastKey];
+  const status: SupervisorStatus = !running ? 'done' : open.length > 0 ? 'reviewing' : !reviews ? 'rules' : alerts > 0 ? 'alert' : 'watching';
+  const branch = branchMemoryLine(branches).replace(/^Rama de git: /, '');
+  return {
+    status,
+    reviewed,
+    alerts,
+    costUsd,
+    reviewing: open.map((key) => pending.get(key)!.label),
+    targets: keys.map((key) => ({ key, warn: warned.has(key) })),
+    memory,
+    ...(model ? { model } : {}),
+    ...(branch ? { branch } : {}),
+    ...(lastAlert ? { lastAlert } : {}),
+  };
+}

@@ -23,7 +23,19 @@ export interface AppSettings {
    * [R50.3]; sin valor, activado.
    */
   claudeConfig?: boolean;
+  /** El Supervisor revisa con IA; sin valor, activado [R60.14]. */
+  supervisorReview?: boolean;
+  /** Modelo del Supervisor; sin valor, el rápido y barato [R60.14]. */
+  supervisorModel?: string;
 }
+
+/** Modelo del Supervisor si no se elige otro [R60.14]. */
+export const SUPERVISOR_MODEL = 'claude-haiku-5-5';
+
+/** ¿Revisa con IA el Supervisor? Activado salvo que se apague [R60.14]. */
+export const supervisorReviews = (settings: Pick<AppSettings, 'supervisorReview'>): boolean => settings.supervisorReview !== false;
+
+export const supervisorModel = (settings: Pick<AppSettings, 'supervisorModel'>): string => settings.supervisorModel ?? SUPERVISOR_MODEL;
 
 /** ¿Se carga la configuración de Claude Code? Activado salvo que se apague [R50.3]. */
 export const loadsClaudeConfig = (settings: Pick<AppSettings, 'claudeConfig'>): boolean => settings.claudeConfig !== false;
@@ -58,6 +70,8 @@ export function validateSettings(s: unknown): FieldProblem[] {
   }
   if (s.permissions !== undefined && !(PROJECT_PERMISSIONS as readonly unknown[]).includes(s.permissions)) out.push({ field: 'permissions', message: 'Elige un nivel de permisos de la lista' });
   if (s.claudeConfig !== undefined && typeof s.claudeConfig !== 'boolean') out.push({ field: 'claudeConfig', message: '«Cargar la configuración de Claude Code» no es válido' });
+  if (s.supervisorReview !== undefined && typeof s.supervisorReview !== 'boolean') out.push({ field: 'supervisorReview', message: 'La revisión del Supervisor tiene que estar activa o no' });
+  if (s.supervisorModel !== undefined && !known(s.supervisorModel)) out.push({ field: 'supervisorModel', message: 'Elige un modelo de la lista' });
   return out;
 }
 
@@ -71,6 +85,8 @@ export function normalizeSettings(raw: unknown): AppSettings {
   if (known(raw.defaultModel)) out.defaultModel = raw.defaultModel as string;
   if (Number.isInteger(raw.maxParallel) && (raw.maxParallel as number) >= 1 && (raw.maxParallel as number) <= LIMITS.maxParallel) out.maxParallel = raw.maxParallel as number;
   if (Number.isInteger(raw.defaultMaxTokens) && (raw.defaultMaxTokens as number) > 0) out.defaultMaxTokens = raw.defaultMaxTokens as number;
+  if (typeof raw.supervisorReview === 'boolean') out.supervisorReview = raw.supervisorReview;
+  if (known(raw.supervisorModel)) out.supervisorModel = raw.supervisorModel as string;
   // Ajustes anteriores a R47.8: «Modificar sin preguntar» pasa a automático y «preguntar todos los comandos», a preguntar.
   if ((PROJECT_PERMISSIONS as readonly unknown[]).includes(raw.permissions)) out.permissions = raw.permissions as ProjectPermission;
   else if (raw.askCommands === true) out.permissions = 'ask';

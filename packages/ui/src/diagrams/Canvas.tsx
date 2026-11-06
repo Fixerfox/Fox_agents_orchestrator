@@ -1,3 +1,4 @@
+import { keepNodes } from './keepNodes';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   Background,
@@ -33,6 +34,8 @@ interface Props {
   onReject: (message: string) => void;
   /** Estado de la ejecución para pintar en vivo (R15.1). */
   live?: LiveView;
+  /** Lo que se pinta sobre el lienzo, según el nivel en pantalla [R60.32]. */
+  overlay?: (path: readonly string[]) => ReactNode;
   /** Eventos de la ejecución en pantalla: con ellos, pulsar un hilo abre su inspector [R42.6]. */
   events?: readonly RunEvent[];
   /** Añade un nodo en una posición del lienzo (menú contextual); el agente abre la galería [R21.12]. */
@@ -235,6 +238,7 @@ export function buildFlowNodes(
     const review = live?.reviews[key];
     const gitActions = live?.gitActions[key];
     const prUrl = live?.gitLinks[key];
+    const alerts = live?.alerts[key];
     const own = subtitle(n, agentNames, level);
     const sub = own !== undefined && finals.has(n.id) ? t('node.sub.final', { sub: own }) : own;
     return {
@@ -262,6 +266,7 @@ export function buildFlowNodes(
         ...(review ? { review } : {}),
         ...(gitActions ? { gitActions } : {}),
         ...(prUrl ? { prUrl } : {}),
+        ...(alerts ? { alerts } : {}),
         // Fichas con lo que hizo el paso, colgadas debajo [R54.1].
         ...((extra.stepFiles?.[key]?.length ?? 0) > 0
           ? {
@@ -315,7 +320,7 @@ export function buildFlowEdges(level: Diagram, path: readonly string[], live?: L
 const isSplitEdge = (level: Diagram, e: Diagram['edges'][number]) => isCoordinator(level.nodes.find((n) => n.id === e.from) ?? {}) && splitBranchIds(level, e.from).includes(e.to);
 
 /** Lienzo de React Flow. La sesión es la fuente de verdad; el arrastre se confirma al soltar [R14.4]. */
-export function Canvas({ session, onSelection, onReject, live, events, onAddAt, onOpenNode, onEdit, selectRequest, agentNames, onInsert, extras, agentMenu, readOnly = false, onAddSubdiagram, onOpenDiagram, onAddKnowledge, onDropKnowledge, onInsertTransform }: Props) {
+export function Canvas({ session, onSelection, onReject, live, overlay, events, onAddAt, onOpenNode, onEdit, selectRequest, agentNames, onInsert, extras, agentMenu, readOnly = false, onAddSubdiagram, onOpenDiagram, onAddKnowledge, onDropKnowledge, onInsertTransform }: Props) {
   const flow = useReactFlow();
   const [menu, setMenu] = useState<MenuTarget>();
   const closeMenu = useCallback(() => setMenu(undefined), []);
@@ -362,10 +367,7 @@ export function Canvas({ session, onSelection, onReject, live, events, onAddAt, 
   // Al cambiar los datos (p. ej. el estado en vivo) se conserva la selección y la posición que se está arrastrando.
   useEffect(
     () =>
-      setNodes((prev) => {
-        const old = new Map(prev.map((n) => [n.id, n]));
-        return derived.map((n) => (old.get(n.id)?.selected ? { ...n, selected: true } : n));
-      }),
+      setNodes((prev) => keepNodes(prev, derived, live !== undefined)),
     [derived],
   );
 
@@ -564,6 +566,7 @@ export function Canvas({ session, onSelection, onReject, live, events, onAddAt, 
       >
         <Background gap={24} size={1} color="var(--grid)" />
         <Controls showInteractive={false} />
+        {overlay?.(snap.path)}
       </ReactFlow>
       {snap.level.nodes.length <= 2 && <p className="orq-canvas__empty">{t('canvas.empty')}</p>}
       {menu && items().length > 0 && <ContextMenu x={menu.x} y={menu.y} items={items()} onClose={closeMenu} />}

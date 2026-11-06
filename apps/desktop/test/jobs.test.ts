@@ -79,7 +79,7 @@ describe('SPEC-052 · copia de lo que usa cada ejecución', () => {
 
   it('[R52.1] editar agentes y subdiagramas a mitad de una ejecución no la cambia; la siguiente usa lo nuevo', async () => {
     val(await h.invoke(CHANNELS.createProject, undefined));
-    val(await h.invoke(CHANNELS.saveSettings, { ...defaultSettings(), engine: 'claude' }));
+    val(await h.invoke(CHANNELS.saveSettings, { ...defaultSettings(), supervisorReview: false, engine: 'claude' }));
     val(await h.invoke(CHANNELS.saveAgent, { ...newAgent('pintor', 'Pintor'), instructions: 'Pinta' }));
     val(await h.invoke(CHANNELS.saveAgent, { ...newAgent('revisor', 'Revisor'), instructions: 'REVISA-VIEJO' }));
     val(await h.invoke(CHANNELS.saveAgent, { ...newAgent('otro', 'Otro'), instructions: 'OTRO-AGENTE' }));

@@ -69,6 +69,22 @@ const normalize = (file: string): string =>
 /** ¿Es `a` el mismo archivo que `b`, o está uno dentro de la carpeta del otro? */
 const crosses = (a: string, b: string): boolean => a === b || a === '' || a === '.' || b === '' || b === '.' || a.startsWith(`${b}/`) || b.startsWith(`${a}/`);
 
+/** Archivos que declara la parte que recibió una rama [R60.16]. */
+export function declaredFiles(text: string): string[] | undefined {
+  const line = text.split(/\r?\n/).map((l) => FILES.exec(l.trim())).find((m) => m !== null);
+  const files = (line?.[1] ?? '').split(',').map((f) => f.trim()).filter(Boolean);
+  return files.length > 0 ? files : undefined;
+}
+
+/** ¿Está `file` en lo declarado, o dentro de una carpeta declarada? [R60.16] */
+export function withinDeclared(file: string, declared: readonly string[]): boolean {
+  const f = normalize(file);
+  return declared.some((d) => {
+    const n = normalize(d);
+    return n === '' || n === '.' || f === n || f.startsWith(`${n}/`);
+  });
+}
+
 /** Choques entre los archivos que declara cada parte [R59.6]. */
 export function checkSplit(parts: ReadonlyMap<Id, Pick<SplitPart, 'files'>>): SplitProblem[] {
   const problems: SplitProblem[] = [];

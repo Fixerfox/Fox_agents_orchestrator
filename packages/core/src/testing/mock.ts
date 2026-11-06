@@ -9,6 +9,8 @@ export interface MockAgentScript {
   tools?: { tool: string; input?: unknown; ok?: boolean; output?: string }[];
   usage?: { inputTokens: number; outputTokens: number; costUsd?: number };
   files?: string[];
+  /** Acciones que simula que le frenaron [R60.16]. */
+  blocked?: string[];
   /** Lo que simula hacer en las ramas [R58.11]. */
   gitActions?: { branch: string; action: 'commit' | 'push' | 'pr' | 'merge' | 'delete' | 'switch'; url?: string }[];
   /** Ramas de git que simula haber tocado [R58.1]. */
@@ -106,6 +108,7 @@ export class MockAgent implements AgentAdapter {
       if (script.usage) yield { type: 'usage', ...script.usage };
       for (const path of script.files ?? []) yield { type: 'file', path };
       for (const b of script.branches ?? []) yield { type: 'branch', ...b };
+      for (const detail of script.blocked ?? []) yield { type: 'blocked', detail };
       for (const a of script.gitActions ?? []) yield { type: 'git_action', ...a };
       const text =
         typeof script.output === 'function'
@@ -133,6 +136,8 @@ export interface MockDeciderConfig {
   transform?: (req: TransformRequest) => string | Error;
   /** Paso culpable de una corrección; por defecto, el último candidato [R53.17]. */
   blame?: (req: { feedback: string; candidates: BlameCandidate[] }) => { nodeId: Id; reason: string } | Error;
+  /** Sin esto, el simulado no revisa [R60.12]. */
+  supervise?: NonNullable<Decider['supervise']>;
 }
 
 export class MockDecider implements Decider {
@@ -163,6 +168,9 @@ export class MockDecider implements Decider {
   };
 
   readonly blameCalls: { feedback: string; candidates: BlameCandidate[] }[] = [];
+  get supervise(): Decider['supervise'] {
+    return this.config.supervise;
+  }
   blame = async (request: { feedback: string; candidates: BlameCandidate[] }): Promise<{ nodeId: Id; reason: string }> => {
     this.blameCalls.push(request);
     const r = this.config.blame?.(request) ?? { nodeId: request.candidates[request.candidates.length - 1]!.nodeId, reason: 'el paso más cercano (simulado)' };

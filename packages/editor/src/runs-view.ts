@@ -256,6 +256,9 @@ export function runTimeline(events: readonly RunEvent[], now: number, opts: { se
       case 'node.retrying':
         mark(key, 'retry', e.ts, `Reintento ${e.attempt} de ${e.max}: ${e.message}`);
         break;
+      case 'supervisor.alert':
+        mark(key, 'retry', e.ts, t('sup.mark', { detail: e.detail }));
+        break;
       case 'split.rejected':
         mark(key, 'retry', e.ts, t('split.rejected', { problems: e.problems.map(describeSplitProblem).join(' ') }));
         break;
