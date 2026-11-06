@@ -3,7 +3,7 @@ import { CheckCircle2, Loader2, XCircle, Copy, X } from 'lucide-react';
 import { type ProjectApi, type RunSnapshot, summarizeRun, t, formatDuration, type MessageKey } from '@orquestador/editor';
 import { FileViewer } from './RunFiles';
 import { useRunData, type RunData } from './useRunData';
-import { type Btab, BTABS, RunTabBody } from './RunDetail';
+import { type Btab, BTABS, RunTabBody } from './RunTabs';
 
 /** Modal de una ejecución que carga sus datos: para abrirlo fuera de Ejecuciones (el Diseñador) [R44.1–R44.4]. */
 export function RunModal({ api, runId, main, now = Date.now, onClose, onPick, onOpenRuns, onExport }: { api: ProjectApi; runId: string; main: RunSnapshot; now?: () => number; onClose: () => void; onPick: (key: string) => void; onOpenRuns?: () => void; onExport: (runId: string, jsonl: string) => void }) {

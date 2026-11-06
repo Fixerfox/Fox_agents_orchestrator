@@ -16,9 +16,9 @@ import { EdgeInspector } from './EdgeInspector';
 import { OrqNode, type NodeFile, type OrqFlowNode } from './OrqNode';
 import { ResNode, type ResFlowNode, type ResNodeData } from './ResNode';
 import { OrqEdge, OrqReturnEdge, type InsertHandler } from './OrqEdge';
-import { ContextMenu, type MenuItem } from '../common/index';
+import { ContextMenu, type MenuItem } from '../common';
 import { useSession } from './useSession';
-import type { AgentLook } from '../common/index';
+import type { AgentLook } from '../common';
 import { t } from '@orquestador/editor';
 
 export interface Selection {

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { type AgentIcon, type AgentTone, AGENT_ICONS, AGENT_TONES } from '@orquestador/core';
 import { t, type MessageKey } from '@orquestador/editor';
-import { AgentAvatar, AGENT_ICON_COMPONENT } from '../common/index';
+import { AgentAvatar, AGENT_ICON_COMPONENT } from '../common';
 
 /** Elegir el icono y el tono del agente; sin icono se usa la inicial [R39.8]. */
 export function IconPicker({ name, icon, tone, onChange }: { name: string; icon: AgentIcon | undefined; tone: AgentTone | undefined; onChange: (icon: AgentIcon | undefined, tone: AgentTone | undefined) => void }) {

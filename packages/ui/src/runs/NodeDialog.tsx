@@ -3,7 +3,7 @@ import { Copy, X } from 'lucide-react';
 import type { RunEvent } from '@orquestador/core';
 import { t, transcriptItems, type LiveView, type MessageKey, type TranscriptItem } from '@orquestador/editor';
 import { PassHeader, Question } from './NodePanel';
-import { Markdown } from '../common/index';
+import { Markdown } from '../common';
 
 interface Props {
   events: readonly RunEvent[];

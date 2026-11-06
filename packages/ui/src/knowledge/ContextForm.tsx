@@ -2,11 +2,8 @@ import { useState, useMemo, useEffect } from 'react';
 import { FilePlus2, FolderOpen, Link2 } from 'lucide-react';
 import { type ContextDefinition, type AgentDefinition, newContext, slugify, type ContextKind, LIMITS } from '@orquestador/core';
 import { type ProjectApi, t, type MessageKey } from '@orquestador/editor';
-import { fieldErrors, Field, DraftStore, useDraftState, MarkdownField } from '../common/index';
-import { saveKeys, EditorHead, DeleteConfirm, UsedBy } from './editorParts';
-import { KIND_TAG } from './LibraryScreen';
-
-const SZ = { size: 16, strokeWidth: 1.5, 'aria-hidden': true } as const;
+import { fieldErrors, Field, DraftStore, useDraftState, MarkdownField } from '../common';
+import { saveKeys, EditorHead, DeleteConfirm, UsedBy, KIND_TAG, SZ } from './editorParts';
 
 export function ContextForm({ api, drafts, draftKey, original, contexts, agents, justSaved, onSaved, onDeleted, onAgentsChanged, busy = false, autoPick = false }: {
   busy?: boolean;
@@ -72,7 +69,6 @@ export function ContextForm({ api, drafts, draftKey, original, contexts, agents,
   };  useEffect(() => {
     if (autoPick) void pick('files');
   }, []);
-
 
   return (
     <form

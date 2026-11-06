@@ -1,11 +1,12 @@
 import { type ReactNode, type KeyboardEvent, useState } from 'react';
 import { Trash2, X } from 'lucide-react';
-import { type AgentDefinition } from '@orquestador/core';
+import { type AgentDefinition, type ContextKind } from '@orquestador/core';
 import { t, type ProjectApi } from '@orquestador/editor';
 
+export const KIND_TAG: Record<ContextKind, string> = { text: 'TXT', url: 'URL', file: 'DIR' };
 export const NEW = '__new__';
 
-const SZ = { size: 16, strokeWidth: 1.5, 'aria-hidden': true } as const;
+export const SZ = { size: 16, strokeWidth: 1.5, 'aria-hidden': true } as const;
 
 export const initial = (name: string) => (name.trim()[0] ?? '?').toUpperCase();
 

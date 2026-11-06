@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { BookOpen, FileText, Lock, Plug, Plus, X } from 'lucide-react';
 import { isForcedOnStep, isRequired, setRequired, t, type MessageKey } from '@orquestador/editor';
 import type { KnowledgeExtra } from '@orquestador/core';
-import { AssignPicker, type AssignItem } from '../common/index';
+import { AssignPicker, type AssignItem } from '../common';
 
 /** Lo que hay en el proyecto para añadir: skills, contextos y servidores MCP [R33.5]. */
 export interface KnowledgeCatalog {

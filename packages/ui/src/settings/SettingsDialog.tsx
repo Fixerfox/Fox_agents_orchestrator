@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, KeyRound } from 'lucide-react';
 import { MODELS, loadsClaudeConfig, projectPermission, type AppSettings, type AuthMode, type Engine, type ProjectPermission } from '@orquestador/core';
-import { PermissionPicker } from '../common/index';
+import { PermissionPicker } from '../common';
 import { t, type ConnectionResult, type MessageKey, type ProjectApi, type SettingsView, type WorkFolderView } from '@orquestador/editor';
-import { Field, fieldErrors } from '../common/index';
+import { Field, fieldErrors } from '../common';
 import { applyTheme, loadTheme, saveTheme, type Theme } from './theme';
 
 interface Props {

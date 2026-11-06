@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Download } from 'lucide-react';
 import type { RunEvent } from '@orquestador/core';
 import { AUDIT_EFFECT_LABEL, auditCounts, auditEntries, auditReport, t, type AuditEffect, type AuditGroup, type AuditReportInfo, type MessageKey } from '@orquestador/editor';
-import { downloadText } from '../common/index';
+import { downloadText } from '../common';
 
 type Labeler = (nodeId: string, nodePath?: readonly string[]) => string;
 const GROUPS: ('all' | AuditGroup)[] = ['all', 'answer', 'permission', 'confirm', 'control'];

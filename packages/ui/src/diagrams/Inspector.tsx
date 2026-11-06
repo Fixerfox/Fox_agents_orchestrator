@@ -1,12 +1,12 @@
 import { BookOpen, Copy, FileText, Trash2, Workflow } from 'lucide-react';
 import { DEFAULT_MODEL, MAX_TASK_LENGTH, MODELS, correctionCandidates, finalSteps, type Diagram, type DiagramNode, type ProjectPermission } from '@orquestador/core';
-import { PermissionPicker, permissionName } from '../common/index';
-import { AgentAvatar, AskFirstMark } from '../common/index';
+import { PermissionPicker, permissionName } from '../common';
+import { AgentAvatar, AskFirstMark } from '../common';
 import { useState, type ReactNode } from 'react';
 import { t, type ProjectApi, type EditorSession, type EditorSnapshot, type NodePatch } from '@orquestador/editor';
 import type { AgentOption } from './Palette';
 import { ExtraKnowledge, type KnowledgeCatalog } from './ExtraKnowledge';
-import { ClaudeButton, ClaudeDiff, ClaudeMenu, ClaudeStatus, useClaudeAssist, type AssistConfig } from '../common/index';
+import { ClaudeButton, ClaudeDiff, ClaudeMenu, ClaudeStatus, useClaudeAssist, type AssistConfig } from '../common';
 import type { Selection } from './Canvas';
 import { TransformPanel } from './TransformPanel';
 import { DeliverablePanel } from './DeliverablePanel';

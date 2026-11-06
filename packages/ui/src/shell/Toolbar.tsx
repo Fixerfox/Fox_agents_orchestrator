@@ -1,9 +1,9 @@
 import { type ReactNode, useState, useRef } from 'react';
 import { Cpu, MessageCircleQuestion, Play, Pause, Square, Sparkles, PanelRight, AlertTriangle, ChevronDown, FolderPlus, FolderOpen, FolderX } from 'lucide-react';
 import { type ProblemsView, type LiveView, EMPTY_LIVE, budgetRemaining, type MessageKey, t } from '@orquestador/editor';
-import { ProblemsPanel } from '../diagrams/index';
-import { type DiagramControlsProps, EditButtons } from '../diagrams/DiagramMenu';
-import { useOutside } from '../common/useOutside';
+import { ProblemsPanel } from '../diagrams';
+import { type DiagramControlsProps, EditButtons } from '../diagrams';
+import { useOutside } from '../common';
 
 interface Props extends DiagramControlsProps {
   onCloseProject?: () => void;

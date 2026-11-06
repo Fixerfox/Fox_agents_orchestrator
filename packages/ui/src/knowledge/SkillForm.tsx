@@ -2,11 +2,9 @@ import { useState, useMemo } from 'react';
 import { BookOpen } from 'lucide-react';
 import { type SkillDefinition, type AgentDefinition, newSkill, slugify, SKILL_LIMITS } from '@orquestador/core';
 import { type ProjectApi, t } from '@orquestador/editor';
-import { fieldErrors, Field, DraftStore, useDraftState, MarkdownField } from '../common/index';
-import { saveKeys, EditorHead, DeleteConfirm, UsedBy } from './editorParts';
+import { fieldErrors, Field, DraftStore, useDraftState, MarkdownField } from '../common';
+import { saveKeys, EditorHead, DeleteConfirm, UsedBy, SZ } from './editorParts';
 import { SkillRefs } from './SkillRefs';
-
-const SZ = { size: 16, strokeWidth: 1.5, 'aria-hidden': true } as const;
 
 export function SkillForm({ api, drafts, draftKey, original, skills, agents, justSaved, onSaved, onDeleted, onAgentsChanged, busy = false }: {
   busy?: boolean;

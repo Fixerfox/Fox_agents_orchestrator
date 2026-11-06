@@ -2,7 +2,7 @@ import { useRef, useState, type ClipboardEvent, type DragEvent } from 'react';
 import { FileText, FolderOpen, Image as ImageIcon, Paperclip, Play, X } from 'lucide-react';
 import { deliverableProblems, type DeliverableSpec } from '@orquestador/core';
 import { MAX_ATTACHMENT_BYTES, MAX_INPUT_FILES, deliverableLabel, t, type ProjectApi } from '@orquestador/editor';
-import { DeliverablePanel } from '../diagrams/index';
+import { DeliverablePanel } from '../diagrams';
 
 /** Archivo de la entrada: adjunto guardado en el proyecto o archivo de la carpeta de trabajo [R48.3]. */
 export type InputItem = { kind: 'attachment'; id: string; name: string; size: number; image: boolean } | { kind: 'project'; path: string; name: string; size: number; image: boolean };

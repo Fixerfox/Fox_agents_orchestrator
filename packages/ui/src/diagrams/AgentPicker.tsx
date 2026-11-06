@@ -1,4 +1,4 @@
-import { AgentAvatar, AskFirstMark } from '../common/index';
+import { AgentAvatar, AskFirstMark } from '../common';
 import { useEffect, useRef } from 'react';
 import { Bot, Plus, X } from 'lucide-react';
 import { t } from '@orquestador/editor';

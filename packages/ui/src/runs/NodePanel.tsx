@@ -3,7 +3,7 @@ import { Maximize2 } from 'lucide-react';
 import { MODELS, isApproval, type RunEvent } from '@orquestador/core';
 import { pathKey } from '@orquestador/core';
 import { filesSinceReview, questionGroup, stepFiles, t, transcriptItems, type LiveView, type MessageKey, type TranscriptItem } from '@orquestador/editor';
-import { Markdown } from '../common/index';
+import { Markdown } from '../common';
 import { StepFilesBlock } from './RunFiles';
 
 interface Props {

@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react';
 import { BookOpen, Bot, Braces, ChevronRight, Eye, FileText, GitFork, Plug, Plus, Repeat2, Search, ShieldCheck, Split, Workflow } from 'lucide-react';
 import { DRAG_TYPE } from './Canvas';
-import { ContextMenu, type MenuItem } from '../common/index';
+import { ContextMenu, type MenuItem } from '../common';
 import { t, type AgentUsage, type ExampleTemplate } from '@orquestador/editor';
 import type { AgentIcon, AgentTone, PermissionLevel } from '@orquestador/core';
-import { AgentAvatar, AskFirstMark, HandMark } from '../common/index';
+import { AgentAvatar, AskFirstMark, HandMark } from '../common';
 
 export interface AgentOption {
   id: string;

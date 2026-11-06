@@ -2,8 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { Check, FolderGit2, Loader2 } from 'lucide-react';
 import { mcpFromImport, newContext, projectPermission, slugify, type AgentDefinition, type ProjectPermission, type ContextDefinition, type ImportReport } from '@orquestador/core';
 import { t, type LiveView, type MessageKey, type ProjectApi, type WorkFolderInspection, type WorkFolderView } from '@orquestador/editor';
-import { MarkdownField } from '../common/index';
-import { permissionName } from '../common/index';
+import { MarkdownField } from '../common';
+import { permissionName } from '../common';
 
 interface Props {
   api: ProjectApi;

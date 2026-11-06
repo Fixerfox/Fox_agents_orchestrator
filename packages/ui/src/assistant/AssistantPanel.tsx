@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ArrowUp, Check, Eye, KeyRound, Loader2, MessageCircleQuestion, Search, ShieldAlert, Sparkles, Square, SquarePen, Undo2, Wand2, Workflow, X } from 'lucide-react';
 import { ASSISTANT_MAX_MESSAGES, t, type AssistantEvent, type AssistantMessage, type MessageKey, type ProjectApi } from '@orquestador/editor';
 import { isDestructive, isInteractive, isReadOnly, runAssistantTool, storeAssistantSecret, type AssistantHost, type ToolOutcome } from './assistantTools';
-import { Markdown } from '../common/index';
+import { Markdown } from '../common';
 
 /** Un elemento de la conversación: mensaje o tarjeta de acción [R29.5]. */
 export type ChatItem =

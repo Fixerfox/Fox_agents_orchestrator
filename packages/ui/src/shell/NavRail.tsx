@@ -1,6 +1,6 @@
 import { Bot, BookOpen, Clock3, FolderGit2, FolderTree, Rocket, Settings, Workflow, Waypoints } from 'lucide-react';
 import { t, type MessageKey } from '@orquestador/editor';
-import { HandMark } from '../common/index';
+import { HandMark } from '../common';
 
 export type SectionId = 'project' | 'diagrams' | 'library' | 'agents' | 'knowledge' | 'jobs' | 'runs' | 'settings';
 

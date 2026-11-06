@@ -2,8 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { FilePlus2, FolderPlus, FileText, AlertTriangle, Eye, Copy, Trash2, X } from 'lucide-react';
 import { isScriptPath } from '@orquestador/core';
 import { type ProjectApi, t } from '@orquestador/editor';
-
-const SZ = { size: 16, strokeWidth: 1.5, 'aria-hidden': true } as const;
+import { SZ } from './editorParts';
 
 type RefFile = { path: string; size: number };
 

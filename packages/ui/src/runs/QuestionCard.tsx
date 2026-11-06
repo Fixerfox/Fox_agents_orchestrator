@@ -1,7 +1,7 @@
 import { type ReactNode, useState } from 'react';
 import { type ReviewQuestion } from '@orquestador/core';
 import { t } from '@orquestador/editor';
-import { Markdown } from '../common/index';
+import { Markdown } from '../common';
 
 export function QuestionCard({ item, from, context, onAnswer, children }: { item: { text: string; options?: string[]; confirm?: { round: number }; review?: ReviewQuestion }; from: string; context?: string; onAnswer: (text: string) => void; children?: ReactNode }) {
   const [text, setText] = useState('');

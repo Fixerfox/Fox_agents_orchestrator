@@ -1,3 +1,5 @@
+import { History, MessageCircleQuestion, Radio } from 'lucide-react';
+import type { RunsSection } from './runsTypes';
 import { type Diagram } from '@orquestador/core';
 import { t, type MessageKey, type HistoryRow } from '@orquestador/editor';
 
@@ -24,3 +26,9 @@ export function nodeLabel(diagram: Diagram | undefined, nodeId: string, nodePath
   }
   return level.nodes.find((n) => n.id === nodeId)?.label ?? nodeId;
 }
+
+export const SECTIONS: { id: RunsSection; label: MessageKey; icon: typeof Radio }[] = [
+  { id: 'live', label: 'runs.sec.live', icon: Radio },
+  { id: 'inbox', label: 'runs.sec.inbox', icon: MessageCircleQuestion },
+  { id: 'history', label: 'runs.sec.history', icon: History },
+];

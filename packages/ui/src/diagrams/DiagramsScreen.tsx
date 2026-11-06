@@ -2,9 +2,9 @@ import { useCallback, useEffect, useState } from 'react';
 import { FolderPlus, MoreHorizontal, Plus, Search, Workflow } from 'lucide-react';
 import { emptyLibraryFolders, type LibraryFolders } from '@orquestador/core';
 import { t, type ProjectApi } from '@orquestador/editor';
-import { ContextMenu, type MenuItem } from '../common/index';
-import { LibraryList, type LibRow } from '../common/index';
-import { HandMark } from '../common/index';
+import { ContextMenu, type MenuItem } from '../common';
+import { LibraryList, type LibRow } from '../common';
+import { HandMark } from '../common';
 
 /**
  * Sección «Diagramas»: todos los diagramas del proyecto en carpetas, aparte del Diseñador. Pulsar uno lo abre en el

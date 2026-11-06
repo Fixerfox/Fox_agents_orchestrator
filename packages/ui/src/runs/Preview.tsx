@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { ExternalLink, FileDiff, GitCompare, Loader2, Monitor, Smartphone, Wrench, X } from 'lucide-react';
 import { t, type FilePreview, type ProjectApi } from '@orquestador/editor';
-import { Markdown } from '../common/index';
-import { fileKind, type NodeFile } from '../diagrams/index';
+import { Markdown } from '../common';
+import { fileKind, type NodeFile } from '../diagrams';
 
 /** Pide la vista previa de un archivo de un paso; `undefined` mientras carga [R54.4]. */
 export function usePreview(api: ProjectApi, runId: string | undefined, key: string, path: string): FilePreview | { error: string } | undefined {

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ArrowRight, Copy, FileText, Maximize2, Minimize2, X } from 'lucide-react';
 import { MODELS, type AgentSnapshot, type RunEvent } from '@orquestador/core';
 import { approxTokensLabel, requestKnowledge, t, type EdgeTraversal, type KnowledgeOrigin, type KnowledgeRow } from '@orquestador/editor';
-import { Markdown } from '../common/index';
+import { Markdown } from '../common';
 
 type RequestEvent = Extract<RunEvent, { type: 'agent.request' }>;
 type Tab = 'sent' | 'ctx' | 'log';

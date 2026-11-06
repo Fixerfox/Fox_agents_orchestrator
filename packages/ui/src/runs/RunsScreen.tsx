@@ -1,20 +1,14 @@
 import { useMemo, useState, useEffect } from 'react';
-import { Radio, MessageCircleQuestion, History, ChevronLeft, ChevronRight } from 'lucide-react';
-import { type MessageKey, historyRows, type HistoryGroup, type RunAction, t, type HistoryRow } from '@orquestador/editor';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { historyRows, type HistoryGroup, type RunAction, t, type HistoryRow } from '@orquestador/editor';
 import type { InboxItem } from './useRunsIndex';
 import { type RunsSection, type RunsScreenProps, type RunsNav } from './runsTypes';
 import { useNow, useDiagrams } from './useRunData';
-import { diagramLabel } from './runFormat';
+import { SECTIONS, diagramLabel } from './runFormat';
 import { RunDetail } from './RunDetail';
 import { LiveSection } from './LiveSection';
 import { InboxSection } from './InboxSection';
 import { HistorySection } from './HistorySection';
-
-export const SECTIONS: { id: RunsSection; label: MessageKey; icon: typeof Radio }[] = [
-  { id: 'live', label: 'runs.sec.live', icon: Radio },
-  { id: 'inbox', label: 'runs.sec.inbox', icon: MessageCircleQuestion },
-  { id: 'history', label: 'runs.sec.history', icon: History },
-];
 
 /** Ejecuciones: submenú con En directo, Necesitan tu respuesta e Historial, y la vista de una ejecución [R35.4–R35.12]. */
 export function RunsScreen(p: RunsScreenProps) {

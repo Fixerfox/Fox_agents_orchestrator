@@ -1,4 +1,4 @@
-import { AgentAvatar, AskFirstMark, HandMark, type AgentLook } from '../common/index';
+import { AgentAvatar, AskFirstMark, HandMark, type AgentLook } from '../common';
 import { Handle, Position, type NodeProps, type Node } from '@xyflow/react';
 import { useState, type ReactNode } from 'react';
 import { AlertTriangle, Bot, Boxes, Braces, Check, CircleDashed, CircleSlash, Eye, FileCode, FileText, GitFork, Image as ImageIcon, Loader2, MessageCircleQuestion, Minus, Play, Repeat2, ShieldCheck, Square, X } from 'lucide-react';

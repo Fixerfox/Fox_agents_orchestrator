@@ -3,9 +3,9 @@ import { CheckCircle2, XCircle, Loader2, CircleDashed, RotateCcw, Square, Copy }
 import { ReactFlowProvider } from '@xyflow/react';
 import { type Diagram, type RunEvent, pathKey, canResume } from '@orquestador/core';
 import { type LiveView, EditorSession, filesByStep, type ProjectApi, t, formatDuration, type RunSummaryView, type MessageKey, type HistoryRow } from '@orquestador/editor';
-import { Canvas } from '../diagrams/index';
+import { Canvas } from '../diagrams';
 import { ResultsPanel } from './ResultsPanel';
-import { Markdown } from '../common/index';
+import { Markdown } from '../common';
 import { money } from './runFormat';
 
 /** Lienzo de solo lectura con el diagrama de la ejecución y el estado de cada paso [R35.9]. */

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import type { RunEvent } from '@orquestador/core';
 import { lineDiff, runFiles, t, type FileKind, type ProjectApi, type RunFile, type RunFileContent, type StepFile } from '@orquestador/editor';
-import { Markdown } from '../common/index';
+import { Markdown } from '../common';
 
 type Labeler = (nodeId: string, nodePath?: readonly string[]) => string;
 

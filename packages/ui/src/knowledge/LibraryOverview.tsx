@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Folder, Plus, Sparkles } from 'lucide-react';
 import type { KindFolders } from '@orquestador/core';
 import { t, type MessageKey } from '@orquestador/editor';
-import type { LibRow } from '../common/index';
+import type { LibRow } from '../common';
 
 type Filter = 'all' | 'unused' | 'noDesc' | 'off';
 

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { t, type LiveView, type OutputFileInfo, type ProjectApi } from '@orquestador/editor';
-import { Markdown } from '../common/index';
+import { Markdown } from '../common';
 
 interface Props {
   api: ProjectApi;

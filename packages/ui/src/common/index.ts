@@ -7,4 +7,6 @@ export { Field, fieldErrors } from './fields';
 export { LibraryList, type LibRow } from './LibraryList';
 export { Markdown } from './Markdown';
 export { permissionName, PermissionPicker } from './PermissionPicker';
-export { ResizeHandle } from './ResizeHandle';
+export type { LibraryTab, LibraryTarget, OpenLibrary } from './navigation';
+export { SideResizeHandle, readSideWidth } from './sidePanel';
+export { useOutside } from './useOutside';

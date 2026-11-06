@@ -1,6 +1,6 @@
 import { canResume, deliverableProblems, newAgent, newContext, newMcpServer, newSkill, slugify, type AgentDefinition, type DeliverableItem, type DeliverableSpec, type Diagram, type McpServerDefinition } from '@orquestador/core';
 import { ASSISTANT_TOOLS, deliverableLabel, summarizeRun, t, type EditorSession, type McpView, type ProjectApi, type TerminalProgram } from '@orquestador/editor';
-import { nodeLabel } from '../runs/index';
+import { nodeLabel } from '../runs';
 
 /** Lo que la interfaz pone a disposición del asistente [R29.2]. */
 export interface AssistantHost {

@@ -1,7 +1,7 @@
 import { type ReactNode, useState, useRef } from 'react';
 import { FilePlus2, Undo2, Redo2, Save, ChevronDown, Pencil, Copy, Trash2, Workflow } from 'lucide-react';
 import { t } from '@orquestador/editor';
-import { useOutside } from '../common/useOutside';
+import { useOutside } from '../common';
 
 /** Lo que necesitan los mandos del diagrama abierto: edición, guardado y menú [R32.28][R32.38]. */
 export interface DiagramControlsProps {

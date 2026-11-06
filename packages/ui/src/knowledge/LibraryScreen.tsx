@@ -1,16 +1,12 @@
-import { useState, useRef, useEffect, useCallback, type ReactNode } from 'react';
-import { Plug, BookOpen, Bot, FileText, PackagePlus, FolderPlus, Plus, Search } from 'lucide-react';
-import { type ContextKind, type AgentDefinition, type ContextDefinition, type SkillDefinition, type LibraryFolders, emptyLibraryFolders, type LibraryKind, MODELS, newContext } from '@orquestador/core';
-import { type ProjectApi, type McpView, t, installSpecKit, hasSpecKit, type MessageKey } from '@orquestador/editor';
-import { McpForm } from './McpForm';
-import { AgentAvatar, AskFirstMark, type LibRow, LibraryList, DraftStore, useDraftVersion } from '../common/index';
-import { AgentWelcome, McpWelcome, SkillWelcome, ContextWelcome } from './McpWelcome';
-import { LibraryOverview } from './LibraryOverview';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { type ContextKind, type AgentDefinition, type ContextDefinition, type SkillDefinition, type LibraryFolders, emptyLibraryFolders, type LibraryKind, newContext } from '@orquestador/core';
+import { type ProjectApi, type McpView, t, installSpecKit, hasSpecKit } from '@orquestador/editor';
+import { DraftStore, useDraftVersion } from '../common';
 import { InstallDialog } from './InstallDialog';
-import { NEW, listOf, initial } from './editorParts';
-import { AgentForm } from './AgentForm';
-import { SkillForm } from './SkillForm';
-import { ContextForm } from './ContextForm';
+import { NEW, listOf } from './editorParts';
+import { LibraryDetail } from './LibraryDetail';
+import { LibraryListPane } from './LibraryListPane';
+import { libraryRows } from './libraryRows';
 
 export type LibrarySection = 'agents' | 'knowledge';
 
@@ -38,10 +34,6 @@ interface Props {
   /** El asistente puede trabajar (motor Claude) [R38.6]. */
   assistantReady?: boolean;
 }
-
-const SZ = { size: 16, strokeWidth: 1.5, 'aria-hidden': true } as const;
-
-export const KIND_TAG: Record<ContextKind, string> = { text: 'TXT', url: 'URL', file: 'DIR' };
 
 /**
  * Agentes y Conocimiento como pantallas completas (prototipos «Agentes A» y «Conocimiento A/B»): lista con buscador
@@ -170,41 +162,7 @@ export function LibraryScreen({ api, section, onChanged, open, onGo, drafts: sha
   };
 
   const kind: LibraryKind = tab;
-  const rowsOf = (list: { id: string; name: string }[]): LibRow[] =>
-    list.map((i) => {
-      let meta: ReactNode;
-      let tag: ReactNode;
-      let description: string | undefined = (i as { description?: string }).description?.trim() || undefined;
-      if (tab === 'agents') {
-        const a = i as AgentDefinition;
-        tag = a.icon ? <AgentAvatar name={a.name} icon={a.icon} tone={a.tone} /> : <span className="orq-lib__av">{initial(a.name)}</span>;
-        const uses = diagramUses[a.id];
-        const model = MODELS.find((m) => m.id === a.model)?.name ?? a.model;
-        const usesText = uses === undefined ? '' : uses === 0 ? ` · ${t('lib.uses.none')}` : ` · ${uses === 1 ? t('lib.uses.diagrams.one') : t('lib.uses.diagrams.many', { count: uses })}`;
-        meta = a.description.trim() === '' ? <span className="orq-lib__warn">{t('lib.noDesc')}</span> : `${model}${usesText}`;
-        if (a.askFirst)
-          meta = (
-            <>
-              <AskFirstMark size={12} /> {meta}
-            </>
-          );
-      } else {
-        const n = usedBy(tab, i.id).length;
-        tag =
-          tab === 'contexts' ? (
-            <span className="orq-lib__tag">{KIND_TAG[(i as ContextDefinition).kind]}</span>
-          ) : (
-            <span className={`orq-lib2__ic is-${tab}`}>{tab === 'mcp' ? <Plug size={14} strokeWidth={1.5} aria-hidden="true" /> : <BookOpen size={14} strokeWidth={1.5} aria-hidden="true" />}</span>
-          );
-        meta = n === 0 ? t('lib.uses.none') : n === 1 ? t('lib.usedBy.one') : t('lib.usedBy.many', { count: n });
-        if (tab === 'mcp' && !(i as McpView).enabled) meta = <span className="orq-lib__warn">{t('mcp.off')}</span>;
-        else if (tab === 'mcp' && (i as McpView).scope === 'app') meta = `${t('mcp.scope.badge')} · ${meta as string}`;
-        if (tab === 'contexts') description = undefined;
-      }
-      return { id: i.id, name: i.name, ...(description ? { description } : {}), tag, meta, unsaved: drafts.has(`${tab}:${i.id}`) };
-    });
-  const rows = rowsOf(items);
-  const TAB_ICON = { agents: Bot, contexts: FileText, skills: BookOpen, mcp: Plug } as const;
+  const rows = libraryRows(items, { tab, diagramUses, usedBy, drafts });
   const showWelcome = (tab === 'mcp' || tab === 'skills' || tab === 'contexts' || tab === 'agents') && sel === NEW && !manual && !drafts.has(`${tab}:${NEW}`);
   /** Abre la ficha nueva de un contexto con un tipo ya elegido [R38.20]. */
   const manualContext = (kind: ContextKind, pickNow = false) => {
@@ -217,169 +175,65 @@ export function LibraryScreen({ api, section, onChanged, open, onGo, drafts: sha
 
   return (
     <section className="orq-page orq-lib orq-lib2" aria-label={title}>
-      <aside className="orq-lib__list">
-        <div className="orq-lib__head">
-          <h1>{title}</h1>
-          <button type="button" className="orq-ib" aria-label={t('install.open')} title={t('install.open')} onClick={() => setInstalling(true)}>
-            <PackagePlus {...SZ} />
-          </button>
-          <button type="button" className="orq-ib" aria-label={t('lib.folder.new')} title={t('lib.folder.new')} onClick={() => setNewFolder(true)}>
-            <FolderPlus {...SZ} />
-          </button>
-          <button
-            type="button"
-            className="orq-btn orq-btn--small orq-btn--primary"
-            aria-label={t(tab === 'agents' ? 'agents.new' : tab === 'contexts' ? 'contexts.new' : tab === 'skills' ? 'skills.new' : 'mcp.new')}
-            onClick={() => (setSavedId(undefined), setManual(false), setSel(NEW))}
-          >
-            <Plus {...SZ} />
-            {t('lib.new').replace(/^\+ /, '')}
-            {drafts.has(`${tab}:${NEW}`) && <span className="orq-dot" role="img" aria-label={t('draft.unsaved')} title={t('draft.unsaved')} />}
-          </button>
-        </div>
-        {section === 'knowledge' && (
-          <div className="orq-lib2__tabs" role="tablist" aria-label={title}>
-            {(['contexts', 'skills', 'mcp'] as const).map((k) => {
-              const Icon = TAB_ICON[k];
-              return (
-                <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => switchTab(k)}>
-                  <Icon size={15} strokeWidth={1.5} aria-hidden="true" />
-                  <span>{t(`agents.tab.${k}` as MessageKey)}</span>
-                  {drafts.any(`${k}:`) && <span className="orq-dot" role="img" aria-label={t('draft.unsaved')} title={t('draft.unsaved')} />}
-                  <em>{k === 'contexts' ? contexts.length : k === 'skills' ? skills.length : mcp.length}</em>
-                </button>
-              );
-            })}
-          </div>
-        )}
-        <p className="orq-lib2__tabsub">{t(`lib.k.${tab}.sub` as MessageKey)}</p>
-        <label className="orq-pal__search">
-          <Search {...SZ} />
-          <input type="search" value={q} placeholder={t('lib.search')} aria-label={t('lib.search')} onChange={(e) => setQ(e.target.value)} />
-        </label>
-        {loadError && (
-          <p className="orq-field__error" role="alert">
-            {loadError}
-          </p>
-        )}
-        {items.length === 0 && !newFolder && folders.kinds[kind].folders.length === 0 && <p className="orq-hint">{t(tab === 'agents' ? 'agents.empty' : tab === 'contexts' ? 'contexts.empty' : tab === 'skills' ? 'skills.empty' : 'mcp.empty')}</p>}
-        <LibraryList
-          key={tab}
-          kind={kind}
-          rows={rows}
-          folders={folders.kinds[kind]}
-          query={q}
-          selected={sel}
-          onSelect={(id) => (setSavedId(undefined), setSel(id))}
-          onFolders={changeFolders}
-          creating={newFolder}
-          onCreatingDone={() => setNewFolder(false)}
-          label={t(`agents.tab.${tab}` as MessageKey)}
-        />
-      </aside>
-      <div className="orq-lib__editor">
-        {!loaded ? null : showWelcome && tab === 'agents' ? (
-          <AgentWelcome
-            ready={assistantReady}
-            onStart={(text) => (setSeed(text), setManual(true))}
-            onWrite={() => setManual(true)}
-            onInstall={() => setInstalling(true)}
-            onSpecKit={specKitComplete ? undefined : () => void addSpecKit().then(() => setSel(undefined))}
-          />
-        ) : showWelcome && tab === 'mcp' ? (
-          <McpWelcome ready={assistantReady} onAsk={(text) => onAskClaude?.(text)} onManual={() => setManual(true)} />
-        ) : showWelcome && tab === 'skills' ? (
-          <SkillWelcome
-            ready={assistantReady}
-            onAsk={(text) => onAskClaude?.(text)}
-            onWrite={() => setManual(true)}
-            onInstall={() => setInstalling(true)}
-            onSpecKit={specKitComplete ? undefined : () => void addSpecKit().then(() => setSel(undefined))}
-          />
-        ) : showWelcome && tab === 'contexts' ? (
-          <ContextWelcome ready={assistantReady} onAsk={(text) => onAskClaude?.(text)} onWrite={() => manualContext('text')} onFiles={() => manualContext('file', true)} onUrl={() => manualContext('url')} />
-        ) : sel === undefined || (sel !== NEW && current === undefined) ? (
-          <LibraryOverview
-            tab={tab}
-            rows={rows}
-            folders={folders.kinds[kind]}
-            onOpen={(id) => (setSavedId(undefined), setSel(id))}
-            onNew={() => (setSavedId(undefined), setManual(false), setSel(NEW))}
-            {...(onAskClaude && tab !== 'mcp' ? { onAsk: onAskClaude } : {})}
-            {...(onAskClaude && tab === 'mcp' ? { onAsk: () => (setSavedId(undefined), setSel(NEW)) } : {})}
-            isUnused={(id) => (tab === 'agents' ? diagramUses[id] === 0 : usedBy(tab as 'contexts' | 'skills' | 'mcp', id).length === 0)}
-            isOff={(id) => tab === 'mcp' && mcp.find((m) => m.id === id)?.enabled === false}
-            {...(specKitHere ? { specKit: { state: speckit, onAdd: () => void addSpecKit() } } : {})}
-          />
-        ) : tab === 'agents' ? (
-          <AgentForm
-            key={`${tab}:${sel}`}
-            api={api}
-            drafts={drafts}
-            draftKey={`${tab}:${sel}`}
-            original={current as AgentDefinition | undefined}
-            agents={agents}
-            contexts={contexts}
-            skills={skills}
-            mcp={mcp}
-            justSaved={savedId === sel}
-            onSaved={(id) => void changed(id)}
-            onDeleted={() => void changed(undefined)}
-            onCreateOther={createOther}
-            busy={sel !== undefined && busy?.agents.has(sel) === true}
-            {...(sel === NEW && seed ? { seed } : {})}
-            assistantReady={assistantReady}
-          />
-        ) : tab === 'mcp' ? (
-          <McpForm
-            key={`${tab}:${sel}`}
-            api={api}
-            drafts={drafts}
-            draftKey={`${tab}:${sel}`}
-            original={current as McpView | undefined}
-            servers={mcp}
-            agents={agents}
-            justSaved={savedId === sel}
-            onSaved={(id) => void changed(id)}
-            onDeleted={() => void changed(undefined)}
-            onAgentsChanged={() => void changed(sel === NEW ? undefined : sel)}
-            busy={sel !== undefined && busy?.mcp?.has(sel) === true}
-            {...(onAskClaude ? { onAskClaude } : {})}
-            {...(onOpenTerminal ? { onOpenTerminal } : {})}
-          />
-        ) : tab === 'skills' ? (
-          <SkillForm
-            key={`${tab}:${sel}`}
-            api={api}
-            drafts={drafts}
-            draftKey={`${tab}:${sel}`}
-            original={current as SkillDefinition | undefined}
-            skills={skills}
-            agents={agents}
-            justSaved={savedId === sel}
-            onSaved={(id) => void changed(id)}
-            onDeleted={() => void changed(undefined)}
-            onAgentsChanged={() => void changed(sel === NEW ? undefined : sel)}
-            busy={sel !== undefined && busy?.skills.has(sel) === true}
-          />
-        ) : (
-          <ContextForm
-            key={`${tab}:${sel}`}
-            api={api}
-            drafts={drafts}
-            draftKey={`${tab}:${sel}`}
-            original={current as ContextDefinition | undefined}
-            contexts={contexts}
-            agents={agents}
-            justSaved={savedId === sel}
-            onSaved={(id) => void changed(id)}
-            onDeleted={() => void changed(undefined)}
-            onAgentsChanged={() => void changed(sel === NEW ? undefined : sel)}
-            busy={sel !== undefined && busy?.contexts.has(sel) === true}
-            autoPick={sel === NEW && ctxPick}
-          />
-        )}
-      </div>
+      <LibraryListPane
+        title={title}
+        section={section}
+        tab={tab}
+        kind={kind}
+        drafts={drafts}
+        rows={rows}
+        itemCount={items.length}
+        counts={{ contexts: contexts.length, skills: skills.length, mcp: mcp.length }}
+        folders={folders.kinds[kind]}
+        loadError={loadError}
+        sel={sel}
+        setSel={setSel}
+        setSavedId={setSavedId}
+        setManual={setManual}
+        setInstalling={setInstalling}
+        switchTab={switchTab}
+        onFolders={changeFolders}
+        q={q}
+        setQ={setQ}
+        newFolder={newFolder}
+        setNewFolder={setNewFolder}
+      />
+      <LibraryDetail
+        api={api}
+        tab={tab}
+        drafts={drafts}
+        agents={agents}
+        contexts={contexts}
+        skills={skills}
+        mcp={mcp}
+        rows={rows}
+        folders={folders.kinds[kind]}
+        loaded={loaded}
+        showWelcome={showWelcome}
+        assistantReady={assistantReady}
+        sel={sel}
+        setSel={setSel}
+        current={current}
+        savedId={savedId}
+        setSavedId={setSavedId}
+        setManual={setManual}
+        seed={seed}
+        setSeed={setSeed}
+        ctxPick={ctxPick}
+        setInstalling={setInstalling}
+        specKitComplete={specKitComplete}
+        specKitHere={specKitHere}
+        speckit={speckit}
+        addSpecKit={addSpecKit}
+        manualContext={manualContext}
+        diagramUses={diagramUses}
+        usedBy={usedBy}
+        changed={changed}
+        createOther={createOther}
+        busy={busy}
+        onAskClaude={onAskClaude}
+        onOpenTerminal={onOpenTerminal}
+      />
       {installing && (
         <InstallDialog
           api={api}

@@ -3,8 +3,8 @@ import { AlertTriangle, CheckCircle2, Circle, ClipboardPaste, FolderClosed, Glob
 import { MCP_LIMITS, SECRET_NAME, newMcpServer, parseMcpSnippet, slugify, type AgentDefinition, type McpServerDefinition } from '@orquestador/core';
 import { t, type McpTestResult, type McpView, type ProjectApi } from '@orquestador/editor';
 import { DeleteConfirm, EditorHead, UsedBy, saveKeys } from './editorParts';
-import { DraftStore, useDraftState } from '../common/index';
-import { Field, fieldErrors } from '../common/index';
+import { DraftStore, useDraftState } from '../common';
+import { Field, fieldErrors } from '../common';
 
 type Draft = McpServerDefinition & { argsText: string };
 const toDraft = (m: McpServerDefinition): Draft => ({ ...m, argsText: (m.args ?? []).join('\n') });
