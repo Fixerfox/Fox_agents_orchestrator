@@ -1,6 +1,6 @@
-import { type Id, type KnowledgeExtra, MAX_EXTRA_ITEMS, MODELS } from '../shared';
+import { type Id, type KnowledgeExtra, MAX_EXTRA_ITEMS, MODELS, isCoordinator } from '../shared';
 import { deliverableProblems } from './deliverable-spec';
-import { correctionCandidates, returnEdges, segmentShapeOk } from './graph';
+import { correctionCandidates, returnEdges, segmentShapeOk, splitBranchIds } from './graph';
 import { CURRENT_SCHEMA_VERSION, type Diagram, type DiagramNode, type Edge, MAX_REVIEW_ROUNDS, MAX_TASK_LENGTH, REVIEW_PORTS } from './model';
 import { transformProblems } from './transform-spec';
 
@@ -79,6 +79,8 @@ export function validateDiagram(diagram: Diagram, path: Id[] = []): ValidationIs
     }
     // Confirmar antes de terminar: solo en agentes [R43.2].
     if (node.confirm !== undefined && node.kind !== 'agent') add('node-confirm-not-agent', `${node.label ?? node.id}: solo los pasos de agente confirman antes de terminar`, node.id);
+    // Un Coordinador necesita al menos dos ramas [R59.3].
+    if (isCoordinator(node) && splitBranchIds(diagram, node.id).length < 2) add('node-split-needs-two', `${node.label ?? node.id}: para repartir hacen falta al menos 2 ramas`, node.id);
   }
 
   const edgeIds = new Set<Id>();

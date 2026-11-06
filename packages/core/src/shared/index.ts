@@ -5,3 +5,4 @@ export * from './knowledge-refs';
 export * from './json';
 export * from './redact';
 export * from './preview-path';
+export * from './coordinator';

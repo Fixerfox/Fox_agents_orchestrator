@@ -110,6 +110,18 @@ export function SummaryBody({ summary: s, onPick, wide = false, onOpenDeliverabl
           </ul>
         </section>
       )}
+      {s.splitRejections.length > 0 && (
+        <section className="orq-rsum__sec" aria-label={t('rsum.split')}>
+          <h3>{t('rsum.split')}</h3>
+          <ul className="orq-rsum__list">
+            {s.splitRejections.map((r, i) => (
+              <li key={i}>
+                <strong>{r.label}</strong> · {t('split.rejected', { problems: r.problems.join(' ') })}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       {s.deliverable && <DeliverableBlock deliverable={s.deliverable} running={s.status === 'running'} {...(onOpenDeliverable ? { onOpenFile: onOpenDeliverable } : {})} />}
       {s.input && (
         <section className="orq-rsum__sec" aria-label={t('rsum.input')}>

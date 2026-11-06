@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { BookOpen, Bot, Braces, ChevronRight, Eye, FileText, GitFork, Plug, Plus, Repeat2, Search, ShieldCheck, Split, Workflow } from 'lucide-react';
+import { BookOpen, Bot, Braces, ChevronRight, Eye, FileText, GitFork, Network, Plug, Plus, Repeat2, Search, ShieldCheck, Workflow } from 'lucide-react';
 import { DRAG_TYPE } from './Canvas';
 import { ContextMenu, type MenuItem } from '../common';
 import { t, type AgentUsage, type ExampleTemplate } from '@orquestador/editor';
@@ -28,16 +28,14 @@ export interface AgentOption {
 }
 
 export type NodeSpec = { kind: 'agent'; agentId: string } | { kind: 'router' } | { kind: 'loop' } | { kind: 'review' } | { kind: 'transform' };
-type Kind = 'agent' | 'router' | 'loop' | 'review' | 'transform' | 'humanReview' | 'parallel';
+type Kind = 'agent' | 'router' | 'loop' | 'review' | 'transform' | 'humanReview' | 'coordinator';
 
 interface Props {
   agents: AgentOption[];
   examples: ExampleTemplate[];
   usage: AgentUsage[];
   /** Pulsar «Tarea de agente» abre la galería; router y bucle se añaden directamente. */
-  onAdd: (spec: { kind: 'router' } | { kind: 'loop' } | { kind: 'review'; human?: boolean } | { kind: 'transform' }) => void;
-  /** «Varios a la vez»: ramas en paralelo [R32.36]. */
-  onParallel?: () => void;
+  onAdd: (spec: { kind: 'coordinator' } | { kind: 'router' } | { kind: 'loop' } | { kind: 'review'; human?: boolean } | { kind: 'transform' }) => void;
   /** Ejecución en curso: no se añade nada [R32.37]. */
   locked?: boolean;
   onPickAgent: () => void;
@@ -69,7 +67,7 @@ const norm = (s: string) => s.toLocaleLowerCase('es').normalize('NFD').replace(/
  * Panel izquierdo de Diagramas (prototipo «Editor A»): buscador, pasos que se arrastran o se pulsan,
  * tus agentes con sus usos en este diagrama y plantillas [R21.15][R21.18][R32.21].
  */
-export function Palette({ agents, examples, usage, onAdd, onPickAgent, onAddAgent, onSelectUse, onLoadExample, onNewAgent, agentMenu, onParallel, locked = false, open = true, diagrams, currentDiagramId, runningIds = [], askingIds = [], onOpenDiagram, diagramMenu, resources }: Props) {
+export function Palette({ agents, examples, usage, onAdd, onPickAgent, onAddAgent, onSelectUse, onLoadExample, onNewAgent, agentMenu, locked = false, open = true, diagrams, currentDiagramId, runningIds = [], askingIds = [], onOpenDiagram, diagramMenu, resources }: Props) {
   const [q, setQ] = useState('');
   const [menu, setMenu] = useState<{ x: number; y: number; id: string; kind?: 'diagram' }>();
   const needle = norm(q.trim());
@@ -89,10 +87,10 @@ export function Palette({ agents, examples, usage, onAdd, onPickAgent, onAddAgen
           { kind: 'review', icon: ShieldCheck, label: t('pal.step.review'), aria: `+ ${t('palette.review')}`, hint: t('palette.review.hint') },
           // Acceso directo: una Revisión ya en modo «Lo reviso yo» [R53.16].
           { kind: 'humanReview', icon: Eye, label: t('pal.step.humanReview'), aria: `+ ${t('palette.humanReview')}`, hint: t('palette.humanReview.hint') },
-          { kind: 'parallel', icon: Split, label: t('pal.step.parallel'), aria: t('pal.step.parallel.aria'), hint: t('insert.parallel.hint') },
+          { kind: 'coordinator', icon: Network, label: t('pal.step.coordinator'), aria: `+ ${t('pal.step.coordinator')}`, hint: t('pal.step.coordinator.hint') },
         ] as const
-      ).filter((s) => s.kind !== 'parallel' || onParallel).filter((s) => needle === '' || norm(`${s.label} ${s.aria} ${s.hint}`).includes(needle)),
-    [needle, onParallel],
+      ).filter((s) => needle === '' || norm(`${s.label} ${s.aria} ${s.hint}`).includes(needle)),
+    [needle],
   );
   const usesOf = (id: string) => usage.find((u) => u.agentId === id)?.uses ?? [];
   const shownAgents = agents.filter((a) => match(`${a.name} ${a.description ?? ''}`));
@@ -259,7 +257,7 @@ export function Palette({ agents, examples, usage, onAdd, onPickAgent, onAddAgen
                   title={hint}
                   draggable
                   onDragStart={drag(kind)}
-                  onClick={() => (kind === 'agent' ? onPickAgent() : kind === 'parallel' ? onParallel?.() : kind === 'humanReview' ? onAdd({ kind: 'review', human: true }) : onAdd({ kind }))}
+                  onClick={() => (kind === 'agent' ? onPickAgent() : kind === 'humanReview' ? onAdd({ kind: 'review', human: true }) : onAdd({ kind }))}
                 >
                   <Icon {...SZ} />
                   <span>{label}</span>

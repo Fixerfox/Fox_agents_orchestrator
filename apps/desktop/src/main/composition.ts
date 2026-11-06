@@ -1,6 +1,6 @@
 import { claudePathPolicy, createClaudeEngine, type ClaudeEnvironment, type QueryFn } from '@orquestador/claude';
 import type { AppSettings, LibraryReader, Orchestrator } from '@orquestador/core';
-import { createEngineOrchestrator, snapshotLibrary, type RunPorts, type RunSnapshots } from '@orquestador/runtime';
+import { createEngineOrchestrator, snapshotLibrary, withBuiltinAgents, type RunPorts, type RunSnapshots } from '@orquestador/runtime';
 import { ProjectStore, libraryReaderOf, runRepositoryOf } from '@orquestador/store';
 import { workspaceFiles } from '@orquestador/workspace';
 
@@ -22,7 +22,7 @@ export const createProject = (root: string, init: { name: string }): Promise<Pro
 export const openProject = (root: string): Promise<ProjectStore> => ProjectStore.open(root);
 
 /** Biblioteca del proyecto, leída de la copia de la ejecución si la tiene [R52.1]. */
-const libraryOf = (ctx: Pick<OrchestratorContext, 'store' | 'snapshots'>): LibraryReader => snapshotLibrary(libraryReaderOf(ctx.store), ctx.snapshots);
+const libraryOf = (ctx: Pick<OrchestratorContext, 'store' | 'snapshots'>): LibraryReader => withBuiltinAgents(snapshotLibrary(libraryReaderOf(ctx.store), ctx.snapshots));
 
 /** Entorno del adaptador de Claude: lee agentes, contextos y skills del proyecto [R27.10] o de la copia [R52.1]. */
 export function claudeEnvironment(ctx: OrchestratorContext): ClaudeEnvironment {

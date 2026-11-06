@@ -1,3 +1,4 @@
+import { COORDINATOR_ID } from '@orquestador/core';
 import { canResume, deliverableProblems, newAgent, newContext, newMcpServer, newSkill, slugify, type AgentDefinition, type DeliverableItem, type DeliverableSpec, type Diagram, type McpServerDefinition } from '@orquestador/core';
 import { ASSISTANT_TOOLS, deliverableLabel, summarizeRun, t, type EditorSession, type McpView, type ProjectApi, type TerminalProgram } from '@orquestador/editor';
 import { nodeLabel } from '../runs';
@@ -223,6 +224,12 @@ export async function runAssistantTool(host: AssistantHost, name: string, args: 
         if (problems.length > 0) throw new Error(`Entregable no válido: ${problems.map((p) => p.message).join('; ')}`);
         session.setDeliverable(spec);
         return { ok: true, summary: t('as.tool.deliverable', { what: deliverableLabel(spec) ?? '' }), result: { deliverable: spec } };
+      }
+      case 'add_coordinator': {
+        const edgeId = edgeAfter(session.getSnapshot().level, str(args['after']));
+        const id = session.insertOnEdge(edgeId, { kind: 'agent', agentId: COORDINATOR_ID });
+        session.updateNode(id, { label: t('pal.step.coordinator'), ...(str(args['task']).trim() ? { task: str(args['task']) } : {}) });
+        return { ok: true, summary: t('as.tool.coordinator'), result: { nodeId: id } };
       }
       case 'set_task':
         session.updateNode(str(args['nodeId']), { task: str(args['task']) });

@@ -1,9 +1,10 @@
-import type { DiagramNode } from '../../diagrams';
-import { mergeExtra, stepExtra, type Id, type Payload } from '../../shared';
+import { splitBranchIds, type DiagramNode } from '../../diagrams';
+import { isCoordinator, mergeExtra, stepExtra, type Id, type Payload } from '../../shared';
 import { AgentError, type AgentQuestion, type AnsweredQuestion, type FileChange, type KnowledgeRef } from '../adapter';
 import type { Slot } from '../run/concurrency-limiter';
 import { CONFIRM_APPROVE, CONFIRM_QUESTION, composeConfirmInput, isApproval } from '../text/confirm';
 import { deliverableNotice } from '../text/deliverable-notice';
+import { composeSplitFix, describeSplitProblem, parseSplit, splitRule, type SplitBranch } from '../text/split';
 import { explainTouchedFiles } from '../text/touched-files';
 import { errorMessage, failStep, type NodeHandler, type Outcome, type StepContext } from './handler';
 
@@ -12,13 +13,34 @@ interface AgentTurn {
   slot: Slot;
   answered: AnsweredQuestion[];
   missing: KnowledgeRef[];
+  /** Intentos ya hechos, para seguir contando al repetir por el reparto [R59.8]. */
+  attempts: number;
+  base: number;
+}
+
+/** Veces que se repite un paso que no reparte bien, antes de fallar [R59.8]. */
+const MAX_SPLIT_FIXES = 2;
+const SPLIT_INVALID = 'split-invalid';
+
+/** Ramas de un paso que reparte, tal como las ve su agente [R59.4]. */
+function branchesOf(step: StepContext, node: DiagramNode): Promise<SplitBranch[]> {
+  return Promise.all(
+    splitBranchIds(step.level.diagram, node.id).map(async (id) => {
+      const n = step.nodeById.get(id);
+      // Sin ficha, la regla sigue con lo que hay: repartir no debe fallar por esto [R59.18].
+      const profile = n?.agentId ? await step.agentProfile?.(n.agentId, n.extra, step.emitter.runId).catch(() => undefined) : undefined;
+      const agent = n?.agentId ? (profile?.name ?? step.describeAgent?.(n.agentId)?.name ?? n.agentId) : undefined;
+      return { id, name: n?.label ?? id, ...(agent ? { agent } : {}), ...(profile ? { skills: profile.skills, mcp: profile.mcp, ...(profile.purpose ? { purpose: profile.purpose } : {}) } : {}), ...(n?.task ? { task: n.task } : {}) };
+    }),
+  );
 }
 
 /** Agente: intentos, preguntas al usuario y confirmación antes de terminar [R27.6][R43.5]. */
 export const agentHandler: NodeHandler = {
   kind: 'agent',
   async run(step, node, input, path) {
-    const turn: AgentTurn = { slot: { held: false }, answered: [], missing: [] };
+    const turn: AgentTurn = { slot: { held: false }, answered: [], missing: [], attempts: 0, base: 0 };
+    let fixes = 0;
     await step.limiter.acquire();
     turn.slot.held = true;
     try {
@@ -27,23 +49,37 @@ export const agentHandler: NodeHandler = {
       let current = input;
       for (let round = 1; ; round++) {
         const out = await attemptsOf(step, node, current, path, turn);
-        if (out.status !== 'succeeded' || !node.confirm || !out.output) return out;
-        // Confirmar antes de terminar: espera a que el usuario apruebe o pida cambios [R43.5].
-        let reply: string;
-        try {
-          reply = await step.limiter.whileWaiting(turn.slot, step.signal, () => step.questions.ask(node.id, path, { text: out.output!.text, options: [CONFIRM_APPROVE], confirm: { round } }));
-        } catch (err) {
+        if (out.status !== 'succeeded' || !out.output) return out;
+        if (node.confirm) {
+          // Confirmar antes de terminar: espera a que el usuario apruebe o pida cambios [R43.5].
+          let reply: string;
+          try {
+            reply = await step.limiter.whileWaiting(turn.slot, step.signal, () => step.questions.ask(node.id, path, { text: out.output!.text, options: [CONFIRM_APPROVE], confirm: { round } }));
+          } catch (err) {
+            if (step.signal.aborted) return { status: 'cancelled' };
+            return failStep(step, node, errorMessage(err), path);
+          }
           if (step.signal.aborted) return { status: 'cancelled' };
-          return failStep(step, node, errorMessage(err), path);
-        }
-        if (step.signal.aborted) return { status: 'cancelled' };
-        if (isApproval(reply)) {
+          if (!isApproval(reply)) {
+            step.emitter.emit({ type: 'confirm.decided', nodeId: node.id, round, verdict: 'changes', text: reply.trim() }, path);
+            turn.answered.push({ question: CONFIRM_QUESTION, answer: reply.trim() });
+            current = composeConfirmInput({ round, original: input, previous: out.output, request: reply.trim() });
+            continue;
+          }
           step.emitter.emit({ type: 'confirm.decided', nodeId: node.id, round, verdict: 'approved' }, path);
-          return out;
         }
-        step.emitter.emit({ type: 'confirm.decided', nodeId: node.id, round, verdict: 'changes', text: reply.trim() }, path);
-        turn.answered.push({ question: CONFIRM_QUESTION, answer: reply.trim() });
-        current = composeConfirmInput({ round, original: input, previous: out.output, request: reply.trim() });
+        if (!isCoordinator(node)) return out;
+        // Se reparte lo que ya se dio por bueno; si no se puede, ninguna rama arranca [R59.8][R59.9].
+        const split = parseSplit(out.output.text, splitBranchIds(step.level.diagram, node.id));
+        if (split.ok) return out;
+        step.emitter.emit({ type: 'split.rejected', nodeId: node.id, attempt: turn.attempts, problems: split.problems }, path);
+        if (fixes >= MAX_SPLIT_FIXES) {
+          step.failRun(SPLIT_INVALID);
+          return failStep(step, node, `${SPLIT_INVALID}: ${split.problems.map(describeSplitProblem).join(' ')}`, path);
+        }
+        fixes++;
+        turn.base = turn.attempts;
+        current = composeSplitFix(input, split.problems);
       }
     } finally {
       if (turn.slot.held) step.limiter.release();
@@ -57,7 +93,8 @@ async function attemptsOf(step: StepContext, node: DiagramNode, input: Payload, 
   const { maxAttempts } = step.retry;
   for (let attempt = 1; ; attempt++) {
     try {
-      return await attemptAgent(step, node, input, attempt, path, turn);
+      turn.attempts = turn.base + attempt;
+      return await attemptAgent(step, node, input, turn.attempts, path, turn);
     } catch (err) {
       if (step.signal.aborted) return { status: 'cancelled' };
       const retriable = err instanceof AgentError && err.retriable;
@@ -84,6 +121,7 @@ async function attemptAgent(step: StepContext, node: DiagramNode, input: Payload
   const extra = mergeExtra(step.rootExtra, own);
   const hasExtra = Object.keys(extra).length > 0;
   const deliverable = deliverableNotice(step.deliverable, step.finalIds, node.id, path);
+  const split = isCoordinator(node) ? splitRule(await branchesOf(step, node)) : undefined;
   const origin = {
     ...(step.rootExtra && Object.keys(mergeExtra(step.rootExtra)).length > 0 ? { diagram: mergeExtra(step.rootExtra) } : {}),
     ...(own && Object.keys(own).length > 0 ? { node: own } : {}),
@@ -98,6 +136,7 @@ async function attemptAgent(step: StepContext, node: DiagramNode, input: Payload
       ...(task ? { task } : {}),
       ...(node.model ? { model: node.model } : {}),
       ...(node.confirm ? { confirm: true } : {}),
+      ...(split ? { split } : {}),
       ...(deliverable ? { deliverable } : {}),
       ...(hasExtra ? { extra: origin } : {}),
       ...(snapshot ? { snapshot } : {}),
@@ -117,7 +156,7 @@ async function attemptAgent(step: StepContext, node: DiagramNode, input: Payload
       answered.push({ question: q.text, answer });
       return answer;
     });
-  const request = { nodeId: node.id, agentId, runId: step.emitter.runId, input, ...(task ? { task } : {}), ...(node.model ? { model: node.model } : {}), ...(node.confirm ? { confirm: true } : {}), ...(deliverable ? { deliverable } : {}), ...(hasExtra ? { extra } : {}), ...(missing.length > 0 ? { missing } : {}), attempt, ask, previousAnswers: [...answered] };
+  const request = { nodeId: node.id, agentId, runId: step.emitter.runId, input, ...(task ? { task } : {}), ...(node.model ? { model: node.model } : {}), ...(node.confirm ? { confirm: true } : {}), ...(split ? { split } : {}), ...(deliverable ? { deliverable } : {}), ...(hasExtra ? { extra } : {}), ...(missing.length > 0 ? { missing } : {}), attempt, ask, previousAnswers: [...answered] };
 
   for await (const ev of adapter.run(request, step.signal)) {
     await step.gate.wait(step.signal);

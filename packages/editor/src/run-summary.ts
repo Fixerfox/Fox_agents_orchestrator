@@ -1,4 +1,4 @@
-import type { DeliverableItemResult, NodeStatus, RunEvent } from '@orquestador/core';
+import { describeSplitProblem, type DeliverableItemResult, type NodeStatus, type RunEvent } from '@orquestador/core';
 import { branchesOf } from './branches';
 import { t } from './i18n';
 
@@ -42,6 +42,8 @@ export interface RunSummaryView {
   files: string[];
   /** Ramas de git en las que se actuó y qué pasos lo hicieron [R58.10]. */
   branches: { name: string; created: boolean; deleted: boolean; prUrl?: string; steps: { label: string; actions: string[] }[] }[];
+  /** Repartos rechazados: quién y por qué [R59.14]. */
+  splitRejections: { label: string; problems: string[] }[];
   errors: { label: string; message: string }[];
   finalOutput?: string;
   /** Paso donde falló, si falló. */
@@ -63,6 +65,7 @@ export function summarizeRun(events: readonly RunEvent[], labelOf: (nodeId: stri
   const questions = new Map<string, { label: string; text: string; answer?: string }>();
   const files: string[] = [];
   const errors: { label: string; message: string }[] = [];
+  const splitRejections: RunSummaryView['splitRejections'] = [];
   const usage = { inputTokens: 0, outputTokens: 0, costUsd: 0 };
   let status: RunSummaryView['status'] = 'running';
   let reason: string | undefined;
@@ -117,6 +120,9 @@ export function summarizeRun(events: readonly RunEvent[], labelOf: (nodeId: stri
       case 'error':
         if (e.nodeId) step(e as { nodeId: string; nodePath?: string[] }).error = e.message;
         errors.push({ label: e.nodeId ? labelOf(e.nodeId, e.nodePath ?? []) : '', message: e.message });
+        break;
+      case 'split.rejected':
+        splitRejections.push({ label: labelOf(e.nodeId, e.nodePath ?? []), problems: e.problems.map(describeSplitProblem) });
         break;
       case 'review.decided':
         reviews.set(key(e.nodePath, e.nodeId), { label: labelOf(e.nodeId, e.nodePath ?? []), round: e.round, max: e.max, verdict: e.verdict, ...(e.reason ? { reason: e.reason } : {}) });
@@ -177,6 +183,7 @@ export function summarizeRun(events: readonly RunEvent[], labelOf: (nodeId: stri
     questions: [...questions.values()],
     files,
     branches: branchesOf(events).list.map((b) => ({ name: b.name, created: b.created, deleted: b.deleted, ...(b.prUrl ? { prUrl: b.prUrl } : {}), steps: b.steps.map((s) => ({ label: labelOf(s.nodeId, s.nodePath), actions: s.actions })) })),
+    splitRejections,
     errors,
     ...(finalOutput !== undefined ? { finalOutput: cut(finalOutput, maxText * 10) } : {}),
     ...(failed ? { failedAt: failed.label } : {}),

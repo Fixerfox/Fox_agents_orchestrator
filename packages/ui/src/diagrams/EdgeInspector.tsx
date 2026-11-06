@@ -294,6 +294,16 @@ function Context({ cur, req, toName, names, full = false }: { cur: EdgeTraversal
           <span className="orq-hint">{t('edgeInspect.noTask')}</span>
         )}
       </dd>
+      {req.split && (
+        <>
+          <dt>{t('edgeInspect.split')}</dt>
+          <dd>
+            <div className="orq-einsp__doc">
+              <Markdown text={req.split} />
+            </div>
+          </dd>
+        </>
+      )}
       <dt>{t('edgeInspect.skills')}</dt>
       <dd>{list('skill')}</dd>
       <dt>{t('edgeInspect.contexts')}</dt>

@@ -16,7 +16,10 @@ El hito indica cuándo debe estar cubierto por tests. `npm run spec:check` exige
 ## Índice
 | Spec | Título | Hito | Estado |
 |---|---|---|---|
-| [058](058-ramas-en-el-diagrama.md) | Ramas en el diagrama: el nodo enseña en amarillo la rama en la que actuó, los pasos de cada rama van rodeados con rayas amarillas y el resumen las destaca | M8g | Implementada |
+| [061](061-memoria-de-la-ejecucion.md) | Memoria de la ejecución: un diario corto que escribe el Guardián y los agentes leen como contexto de fondo | M12 | Borrador |
+| [060](060-guardian-de-ejecucion.md) | Guardián de la ejecución: servicio interno que frena con reglas lo que se sale de los límites y revisa con un modelo barato y configurable si cada paso hizo lo pedido, con su sección en el Resumen | M12 | Borrador |
+| [059](059-repartir-entre-ramas.md) | Repartir el trabajo entre ramas en paralelo: el paso de origen divide su trabajo con `## Común` y `## Para <id>`, y cada rama recibe solo lo suyo | M8h | Implementada |
+| [058](058-ramas-en-el-diagrama.md) | Ramas en el diagrama: los pasos de cada rama van rodeados con rayas amarillas, el nodo marca commit, push, PR y demás, y el resumen las destaca | M8g | Implementada |
 | [057](057-crear-agente-por-pasos.md) | Crear un agente por pasos: bienvenida «¿Qué agente necesitas?» con ideas, el asistente redacta el primer borrador, cuatro pasos (qué hace, qué sabe, qué puede hacer, revisar) y una ficha por secciones para editar | M8g | Implementada |
 | [056](056-arquitectura-hexagonal.md) | Arquitectura hexagonal con contextos (DDD ligero): matriz de dependencias comprobada, puertos en `core`, composición en `apps/desktop`, un handler por tipo de nodo, `RunCtx` y `RunService` repartidos, contrato y UI por contexto | M11a–M11d | Borrador |
 | [055](055-cambios-por-comandos.md) | Archivos que cambian los comandos: un script o un build ejecutado con Bash también aparece en «Archivos» (con un comando, sin copia) | M8g | Implementada |

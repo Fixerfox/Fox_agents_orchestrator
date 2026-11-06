@@ -52,7 +52,7 @@ describe('SPEC-021 · panel izquierdo de Diagramas (prototipo «Editor A»)', ()
     await userEvent.click(screen.getByRole('button', { name: 'Borrar búsqueda' }));
     // Agente, Router, Bucle y Revisión [R34.22].
     // Agente, Router, Bucle, Revisión y Transformar [R37.11], y la Revisión humana [R53.16].
-    expect(screen.getAllByRole('button', { name: /^\+ / })).toHaveLength(6);
+    expect(screen.getAllByRole('button', { name: /^\+ / })).toHaveLength(7);
   });
 
   it('[R21.18] los pasos se arrastran al lienzo con su tipo', () => {
@@ -71,9 +71,9 @@ describe('SPEC-021 · panel izquierdo de Diagramas (prototipo «Editor A»)', ()
     expect(Object.values(data)).toEqual(['transform']);
   });
 
-  it('[R53.16][R32.36] «Revisión humana» y «Varios a la vez» también se arrastran', () => {
-    palette({ onParallel: vi.fn() });
-    for (const [name, kind] of [['+ Revisión humana', 'humanReview'], ['+ Varios a la vez', 'parallel']] as const) {
+  it('[R53.16] «Revisión humana» también se arrastra', () => {
+    palette();
+    for (const [name, kind] of [['+ Revisión humana', 'humanReview']] as const) {
       const data: Record<string, string> = {};
       const button = screen.getAllByRole('button').find((b) => b.getAttribute('aria-label')?.startsWith(name))!;
       expect(button.getAttribute('draggable')).toBe('true');

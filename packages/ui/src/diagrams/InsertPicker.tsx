@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Bot, Braces, GitFork, Plus, Repeat2, Search, ShieldCheck, Split } from 'lucide-react';
+import { Bot, Braces, GitFork, Plus, Repeat2, Search, ShieldCheck } from 'lucide-react';
 import { t } from '@orquestador/editor';
 import type { AgentOption } from './Palette';
 
@@ -11,8 +11,6 @@ interface Props {
   at: { x: number; y: number };
   onPick: (choice: InsertChoice) => void;
   onCreate?: () => void;
-  /** «Varios a la vez…» [R32.36]. */
-  onParallel?: () => void;
   onClose: () => void;
 }
 
@@ -20,7 +18,7 @@ const SZ = { size: 16, strokeWidth: 1.5, 'aria-hidden': true } as const;
 const norm = (s: string) => s.toLocaleLowerCase('es').normalize('NFD').replace(/\p{M}/gu, '');
 
 /** Buscador de pasos al pulsar «+» en una conexión: agentes del proyecto, router y bucle [R32.8]. */
-export function InsertPicker({ agents, at, onPick, onCreate, onParallel, onClose }: Props) {
+export function InsertPicker({ agents, at, onPick, onCreate, onClose }: Props) {
   const [q, setQ] = useState('');
   const box = useRef<HTMLDivElement>(null);
   const query = norm(q.trim());
@@ -97,15 +95,6 @@ export function InsertPicker({ agents, at, onPick, onCreate, onParallel, onClose
               <span>{label}</span>
             </button>
           ))}
-          {onParallel && (query === '' || norm(t('insert.parallel')).includes(query)) && (
-            <button type="button" className="orq-insert__opt" onClick={onParallel}>
-              <Split {...SZ} />
-              <span>
-                <strong>{t('insert.parallel')}</strong>
-                <span className="orq-hint">{t('insert.parallel.hint')}</span>
-              </span>
-            </button>
-          )}
         </>
       )}
       {shownAgents.length === 0 && steps.length === 0 && <p className="orq-hint orq-insert__none">{t('insert.empty', { q: q.trim() })}</p>}

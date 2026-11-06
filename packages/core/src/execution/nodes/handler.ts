@@ -1,6 +1,6 @@
 import type { DeliverableSpec, Diagram, DiagramNode, Edge, ReturnInfo } from '../../diagrams';
 import type { Id, KnowledgeExtra, Payload } from '../../shared';
-import type { AgentAdapter, AgentSnapshot, Decider } from '../adapter';
+import type { AgentAdapter, AgentProfile, AgentSnapshot, Decider } from '../adapter';
 import type { BudgetTracker } from '../run/budget-tracker';
 import type { ConcurrencyLimiter } from '../run/concurrency-limiter';
 import type { PauseGate } from '../run/pause-gate';
@@ -45,6 +45,8 @@ export interface RunServices {
   decider: Decider;
   getAdapter(agentId: Id): AgentAdapter;
   describeAgent?(agentId: Id): AgentSnapshot | undefined;
+  /** Ficha de un agente, con lo enchufado a su paso [R59.18]. */
+  agentProfile?(agentId: Id, extra: KnowledgeExtra | undefined, runId: Id): Promise<AgentProfile | undefined>;
   resolveTemplate?(templateId: Id, version: number | 'latest', runId?: Id): Promise<Diagram> | Diagram;
   maxDepth: number;
   /** Diagrama principal (etiquetas y entrada para componer el entregable). */

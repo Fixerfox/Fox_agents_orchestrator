@@ -3,7 +3,6 @@ import { t, type EditorSession, type EditorSnapshot } from '@orquestador/editor'
 import { AssignPicker, type OpenLibrary } from '../common';
 import { AgentPicker } from './AgentPicker';
 import { InsertPicker, type InsertChoice } from './InsertPicker';
-import { ParallelDialog } from './ParallelDialog';
 import type { Designer } from './useDesigner';
 import type { DesignerSelection } from './useDesignerSelection';
 import type { ProjectCatalog } from './useProjectCatalog';
@@ -22,7 +21,7 @@ interface Props {
 /** Diálogos que abre el Diseñador: insertar, conocimiento de un paso, ramas en paralelo y elegir agente. */
 export function DesignerDialogs({ session, snap, sel, lib, designer, projectOpen, guard, openLibrary }: Props) {
   const { agents } = lib;
-  const { inserting, setInserting, parallelAt, setParallelAt, picker, setPicker } = designer;
+  const { inserting, setInserting, picker, setPicker } = designer;
   const { select } = sel;
   return (
     <>
@@ -40,33 +39,9 @@ export function DesignerDialogs({ session, snap, sel, lib, designer, projectOpen
             setInserting(undefined);
             guard(() => select(session.insertOnEdge(edgeId, choice)));
           }}
-          onParallel={() => {
-            const edgeId = inserting.edgeId;
-            setInserting(undefined);
-            setParallelAt(edgeId);
-          }}
         />
       )}
       {designer.portPick && <PortPicker session={session} snap={snap} lib={lib} designer={designer} guard={guard} openLibrary={openLibrary} pick={designer.portPick} />}
-      {parallelAt && (
-        <ParallelDialog
-          agents={agents}
-          between={(() => {
-            const e = snap.level.edges.find((x) => x.id === parallelAt);
-            const name = (id?: string) => snap.level.nodes.find((n) => n.id === id)?.label ?? id ?? '';
-            return e ? { from: name(e.from), to: name(e.to) } : undefined;
-          })()}
-          onClose={() => setParallelAt(undefined)}
-          onInsert={(spec) => {
-            const edgeId = parallelAt;
-            setParallelAt(undefined);
-            guard(() => {
-              const r = session.insertParallel(edgeId, spec);
-              select(r.joinId ?? r.ids[0]!);
-            });
-          }}
-        />
-      )}
       {picker && (
         <AgentPicker
           agents={agents}

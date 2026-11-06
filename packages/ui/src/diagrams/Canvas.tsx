@@ -10,7 +10,7 @@ import {
   type NodeChange,
 } from '@xyflow/react';
 import { Braces, Copy, GitFork, LogIn, Pencil, Repeat2, ShieldCheck, Trash2, Bot, Workflow } from 'lucide-react';
-import { MODELS, finalSteps, returnEdges, type Diagram, type KnowledgeExtra, type ReviewPort, type RunEvent } from '@orquestador/core';
+import { MODELS, finalSteps, returnEdges, type Diagram, type KnowledgeExtra, type ReviewPort, type RunEvent, isCoordinator, splitBranchIds } from '@orquestador/core';
 import { deliverableLabel, edgeTraversals, isForcedOnStep, isRequired, knowledgeKey, setRequired, transformSubtitle, type EditorSession, type LiveView } from '@orquestador/editor';
 import { EdgeInspector } from './EdgeInspector';
 import { OrqNode, type NodeFile, type OrqFlowNode } from './OrqNode';
@@ -36,9 +36,7 @@ interface Props {
   /** Eventos de la ejecución en pantalla: con ellos, pulsar un hilo abre su inspector [R42.6]. */
   events?: readonly RunEvent[];
   /** Añade un nodo en una posición del lienzo (menú contextual); el agente abre la galería [R21.12]. */
-  onAddAt?: (kind: 'agent' | 'router' | 'loop' | 'review' | 'transform', position: { x: number; y: number }, opts?: { human?: boolean }) => void;
-  /** «Varios a la vez» soltado en el lienzo: sobre una conexión, en ella; si no, en la de siempre [R32.36]. */
-  onDropParallel?: (edgeId: string | undefined) => void;
+  onAddAt?: (kind: 'agent' | 'router' | 'loop' | 'review' | 'transform' | 'coordinator', position: { x: number; y: number }, opts?: { human?: boolean }) => void;
   /** «Insertar transformación» en el menú de una conexión [R37.11]. */
   onInsertTransform?: (edgeId: string) => void;
   /** Doble clic en un nodo que no es un bucle: abre su ventana de ejecución [R15.12]. */
@@ -83,14 +81,15 @@ const edgeTypes = { orq: OrqEdge, orqReturn: OrqReturnEdge };
 export const DRAG_TYPE = 'application/x-orquestador-node';
 
 /** Subtítulo de la tarjeta: agente asignado, o modo del router o del bucle [R21.5]. */
-function subtitle(n: Diagram['nodes'][number], agentNames: Readonly<Record<string, string>>): string | undefined {
+function subtitle(n: Diagram['nodes'][number], agentNames: Readonly<Record<string, string>>, level: Diagram): string | undefined {
   if (n.kind === 'agent') {
     if (!n.agentId) return undefined;
     const agent = agentNames[n.agentId] ?? n.agentId;
     // Un paso con modelo propio lo enseña junto al agente [R40.5].
     const sub = n.model ? t('node.sub.model', { agent, model: MODELS.find((m) => m.id === n.model)?.name ?? n.model }) : agent;
     // Confirma antes de terminar [R43.3].
-    return n.confirm ? t('node.sub.confirm', { sub }) : sub;
+    const confirmed = n.confirm ? t('node.sub.confirm', { sub }) : sub;
+    return isCoordinator(n) ? t('node.sub.split', { sub: confirmed, n: splitBranchIds(level, n.id).length }) : confirmed;
   }
   if (n.kind === 'subdiagram') return n.subdiagram ? t('sub.sub', { name: agentNames[`diagram:${n.subdiagram.templateId}`] ?? n.subdiagram.templateId }) : undefined;
   if (n.kind === 'router') return t(n.router?.mode === 'rules' ? 'node.sub.router.rules' : 'node.sub.router.ai');
@@ -236,7 +235,7 @@ export function buildFlowNodes(
     const review = live?.reviews[key];
     const gitActions = live?.gitActions[key];
     const prUrl = live?.gitLinks[key];
-    const own = subtitle(n, agentNames);
+    const own = subtitle(n, agentNames, level);
     const sub = own !== undefined && finals.has(n.id) ? t('node.sub.final', { sub: own }) : own;
     return {
       id: n.id,
@@ -291,7 +290,7 @@ export function buildFlowEdges(level: Diagram, path: readonly string[], live?: L
     const active = live?.status === 'running' && traversed && (target === 'running' || target === 'queued' || target === 'waiting_input');
     const skipped = live !== undefined && live.status !== 'running' && live.status !== 'idle' && !traversed;
     // Salidas de una revisión: clase por puerto; el retorno va discontinuo, por debajo y sin «+» [R34.21].
-    const classes = [e.port ? `orq-edge--${e.port}` : '', back.has(e.id) ? 'orq-edge--return' : '', traversed ? 'is-traversed' : '', active ? 'is-active' : '', skipped ? 'is-skipped' : ''].filter(Boolean).join(' ');
+    const classes = [e.port ? `orq-edge--${e.port}` : '', back.has(e.id) ? 'orq-edge--return' : '', isSplitEdge(level, e) ? 'orq-edge--split' : '', traversed ? 'is-traversed' : '', active ? 'is-active' : '', skipped ? 'is-skipped' : ''].filter(Boolean).join(' ');
     const max = level.nodes.find((n) => n.id === e.from)?.review?.maxRounds ?? 1;
     const base: FlowEdge = {
       id: e.id,
@@ -312,8 +311,11 @@ export function buildFlowEdges(level: Diagram, path: readonly string[], live?: L
 }
 
 
+/** Conexión hacia una rama de un paso que reparte [R59.13]. */
+const isSplitEdge = (level: Diagram, e: Diagram['edges'][number]) => isCoordinator(level.nodes.find((n) => n.id === e.from) ?? {}) && splitBranchIds(level, e.from).includes(e.to);
+
 /** Lienzo de React Flow. La sesión es la fuente de verdad; el arrastre se confirma al soltar [R14.4]. */
-export function Canvas({ session, onSelection, onReject, live, events, onAddAt, onDropParallel, onOpenNode, onEdit, selectRequest, agentNames, onInsert, extras, agentMenu, readOnly = false, onAddSubdiagram, onOpenDiagram, onAddKnowledge, onDropKnowledge, onInsertTransform }: Props) {
+export function Canvas({ session, onSelection, onReject, live, events, onAddAt, onOpenNode, onEdit, selectRequest, agentNames, onInsert, extras, agentMenu, readOnly = false, onAddSubdiagram, onOpenDiagram, onAddKnowledge, onDropKnowledge, onInsertTransform }: Props) {
   const flow = useReactFlow();
   const [menu, setMenu] = useState<MenuTarget>();
   const closeMenu = useCallback(() => setMenu(undefined), []);
@@ -434,7 +436,7 @@ export function Canvas({ session, onSelection, onReject, live, events, onAddAt, 
       if (!node) return [];
       const fixed = node.kind === 'entry' || node.kind === 'output';
       const id = node.id;
-      const am = node.kind === 'agent' && node.agentId ? agentMenu?.(node.agentId, id) : undefined;
+      const am = node.kind === 'agent' && node.agentId && !isCoordinator(node) ? agentMenu?.(node.agentId, id) : undefined;
       const sub = node.kind === 'subdiagram' && node.subdiagram && onOpenDiagram ? [{ id: 'sub-open', label: t('sub.open'), icon: <Workflow size={16} />, onSelect: () => onOpenDiagram(node.subdiagram!.templateId) }] : [];
       if (readOnly && sub.length > 0) return sub;
       // En ejecución solo se puede consultar: abrir el agente y su conocimiento [R32.37].
@@ -497,9 +499,8 @@ export function Canvas({ session, onSelection, onReject, live, events, onAddAt, 
           onAddSubdiagram?.(raw.slice('diagram:'.length), flow.screenToFlowPosition({ x: e.clientX, y: e.clientY }));
           return;
         }
-        if (raw === 'parallel') {
-          const edge = (e.target as HTMLElement).closest('.react-flow__edge');
-          onDropParallel?.(edge?.getAttribute('data-id') ?? edge?.getAttribute('data-testid')?.replace(/^rf__edge-/, '') ?? undefined);
+        if (raw === 'coordinator') {
+          onAddAt?.('coordinator', flow.screenToFlowPosition({ x: e.clientX, y: e.clientY }));
           return;
         }
         if (raw === 'humanReview') {

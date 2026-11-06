@@ -43,6 +43,14 @@ export interface AgentSnapshot {
   mcpServers?: string[];
 }
 
+/** Ficha corta de un agente para quien reparte el trabajo [R59.18]. */
+export interface AgentProfile {
+  name: string;
+  purpose?: string;
+  skills: string[];
+  mcp: string[];
+}
+
 export interface AgentQuestion {
   text: string;
   options?: string[];
@@ -96,6 +104,8 @@ export interface AgentRequest {
   model?: string;
   /** El paso confirma antes de terminar: el agente acaba con un resumen detallado [R43.4]. */
   confirm?: boolean;
+  /** Regla de reparto: el trabajo de este paso se divide entre sus ramas [R59.4]. */
+  split?: string;
   /** Qué se entregará al final: contrato completo (pasos finales) o una línea de objetivo [R46.4]. */
   deliverable?: { role: 'final' | 'goal'; text: string };
   /** Número de intento (1 = primero). */

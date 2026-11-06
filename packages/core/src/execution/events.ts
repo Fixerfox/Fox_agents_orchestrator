@@ -3,6 +3,7 @@ import { type Id, type KnowledgeExtra, type KnowledgeKind, type Payload, redactS
 import type { AgentSnapshot, AnsweredQuestion, FileChange, FileVia, KnowledgeVia, QuestionKind, ReviewQuestion } from './adapter';
 import type { DeliverableItemResult, DeliverableLinks } from './deliverable';
 import type { NodeStatus, RunStatus } from './run-types';
+import type { SplitProblem } from './text/split';
 
 export type EventBody =
   | { type: 'run.started'; diagramId: Id; /** Ejecución que esta reanuda [R41.1]. */ resumedFrom?: string; /** Ejecución que esta corrige [R53.8]. */ correctedFrom?: string; /** Entregable efectivo [R46.3]. */ deliverable?: DeliverableSpec }
@@ -25,6 +26,8 @@ export type EventBody =
       model?: string;
       /** El paso confirma antes de terminar [R43.4]. */
       confirm?: boolean;
+      /** Regla de reparto que recibe este paso [R59.4]. */
+      split?: string;
       /** Aviso del entregable que recibe este paso [R46.4]. */
       deliverable?: { role: 'final' | 'goal'; text: string };
       /** Lo añadido por el diagrama y por el paso, para saber de dónde vino cada cosa [R33.4]. */
@@ -90,7 +93,9 @@ export type EventBody =
       mode: 'ai' | 'rules';
       reason: string;
     }
-  | { type: 'edge.traversed'; edgeId: Id; fromNodeId: Id; toNodeId: Id }
+  | { type: 'edge.traversed'; edgeId: Id; fromNodeId: Id; toNodeId: Id; /** La parte enviada, si el origen reparte [R59.7]. */ input?: Payload }
+  /** El paso no repartió bien su trabajo y se repite [R59.8]. */
+  | { type: 'split.rejected'; nodeId: Id; attempt: number; problems: SplitProblem[] }
   | {
       type: 'loop.iteration';
       loopId: Id;
