@@ -319,7 +319,7 @@ export function transcriptItems(events: readonly RunEvent[], nodeId: Id, nodePat
         items.push({ kind: 'error', message: e.message });
         break;
       case 'agent.usage':
-        if (e.source === 'supervisor') break;
+        if (e.source) break;
         sawUsage = true;
         usage.inputTokens += e.inputTokens;
         usage.outputTokens += e.outputTokens;

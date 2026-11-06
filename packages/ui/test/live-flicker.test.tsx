@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 import './setup';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import type { Diagram } from '@orquestador/core';
@@ -10,6 +12,14 @@ import { useRunData } from '../src/runs/useRunData';
 type Node = Parameters<typeof keepNodes>[0][number];
 const node = (data: Record<string, unknown>, more: Record<string, unknown> = {}): Node => ({ id: 'a', type: 'orq', position: { x: 0, y: 0 }, data: { kind: 'agent', label: 'Paso', problems: [], ...data }, ...more }) as unknown as Node;
 const measured = { width: 200, height: 84 };
+
+describe('SPEC-044 · el aviso en un lienzo estrecho', () => {
+  it('[R44.7] los botones pasan debajo y el texto conserva su ancho', () => {
+    const css = readFileSync(join(__dirname, '../src/styles.css'), 'utf8');
+    expect(css).toMatch(/\.orq-done \{[^}]*flex-wrap: wrap/);
+    expect(css).toMatch(/\.orq-done__text \{ flex: 1 1 220px/);
+  });
+});
 
 describe('SPEC-015 · el lienzo no parpadea', () => {
   it('[R15.15] un nodo que cambia conserva su medida: sin ella, React Flow lo oculta', () => {

@@ -60,7 +60,7 @@ export function applyRules(state: RuleState, e: RunEvent, budget: RunOptions['bu
       return times >= MAX_REJECTIONS ? alert(e.nodeId, 'retry-loop', 'Repitió el reparto hasta el máximo.') : [];
     }
     case 'agent.usage': {
-      if (e.source === 'supervisor') return [];
+      if (e.source) return [];
       const key = pathKey(path, e.nodeId);
       const spent = state.spent.get(key) ?? { tokens: 0, costUsd: 0 };
       spent.tokens += e.inputTokens + e.outputTokens;

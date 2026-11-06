@@ -79,8 +79,8 @@ export type EventBody =
       inputTokens: number;
       outputTokens: number;
       costUsd?: number;
-      /** Gasto del Supervisor, no del paso [R60.30]. */
-      source?: 'supervisor';
+      /** Gasto de una pieza interna, no del paso [R60.30][R34.28]. */
+      source?: 'supervisor' | 'judge';
     }
   /** Archivo escrito por el paso; `change` dice si es nuevo o modificado (los adaptadores que no lo saben lo omiten) [R45.2]. */
   | { type: 'file.produced'; nodeId: Id; path: string; change?: FileChange; /** [R55.3] */ via?: FileVia }
