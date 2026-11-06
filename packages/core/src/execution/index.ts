@@ -10,3 +10,4 @@ export { Orchestrator, type OrchestratorDeps, type PendingQuestion, type RunHand
 export { matchCandidate, proposeCorrectionWith } from './corrections';
 export { CONFIRM_APPROVE, composeConfirmInput, isApproval } from './text/confirm';
 export { explainTouchedFiles } from './text/touched-files';
+export { checkSplit, composeSplitFix, describeSplitProblem, parseSplit, splitInputs, splitRule, type SplitBranch, type SplitPart, type SplitProblem, type SplitResult } from './text/split';

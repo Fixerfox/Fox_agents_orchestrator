@@ -1,3 +1,4 @@
+import { COORDINATOR_ID } from '@orquestador/core';
 import {
   CURRENT_SCHEMA_VERSION,
   mergeExtra,
@@ -194,7 +195,8 @@ export function updateNode(root: Diagram, path: readonly Id[], id: Id, patch: No
       const next: DiagramNode = { ...n };
       if (patch.label !== undefined) next.label = patch.label;
       if (patch.agentId !== undefined) {
-        if (n.kind !== 'agent') throw ERR('invalid');
+        // El Coordinador no se cambia ni otro paso se convierte en él [R59.19].
+        if (n.kind !== 'agent' || n.agentId === COORDINATOR_ID || patch.agentId === COORDINATOR_ID) throw ERR('invalid');
         next.agentId = patch.agentId;
       }
       if (patch.task !== undefined) {

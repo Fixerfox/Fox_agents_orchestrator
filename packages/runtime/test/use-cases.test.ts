@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  COORDINATOR_ID,
   MemoryLibrary,
   MemoryRunRepository,
   MemoryWorkspaceFiles,
@@ -8,12 +9,14 @@ import {
   Orchestrator,
   defaultSettings,
   memoryEngine,
+  newAgent,
+  newSkill,
   memoryPathPolicy,
   type AppSettings,
   type Diagram,
   type RunEvent,
 } from '@orquestador/core';
-import { RunError, RunService, RunSnapshots, createEngineOrchestrator, jobsOf, snapshotLibrary, takeSnapshot, type RunPorts } from '../src';
+import { RunError, RunService, RunSnapshots, createEngineOrchestrator, jobsOf, snapshotLibrary, takeSnapshot, withBuiltinAgents, type RunPorts } from '../src';
 
 const D: Diagram = {
   id: 'd',
@@ -120,6 +123,50 @@ describe('SPEC-056 · casos de uso: otro motor', () => {
     };
     await orch.start(d, 'x').result;
     expect(route.routeCalls).toHaveLength(1);
+  });
+
+  it('[R59.18] quien reparte conoce a cada rama por su ficha, con lo enchufado al paso', async () => {
+    const library = new MemoryLibrary();
+    library.agentList = [{ ...newAgent('a', 'Ana'), description: 'Escribe la web', skillIds: ['diseno'], mcpIds: ['figma'] }];
+    library.skillList = [{ ...newSkill('diseno', 'Diseño web') }, { ...newSkill('marca', 'Guía de marca') }];
+    const body = '## Para a\nArchivos: a\nuno\n## Para b\nArchivos: b\ndos';
+    const agent = new MockAgent({ [COORDINATOR_ID]: { output: body } });
+    const d: Diagram = {
+      ...D,
+      nodes: [D.nodes[0]!, { id: 'o', kind: 'agent', agentId: COORDINATOR_ID }, { ...D.nodes[1]!, extra: { skillIds: ['marca'] } }, D.nodes[2]!, D.nodes[3]!],
+      edges: [{ id: 'y1', from: 'entry', to: 'o' }, { id: 'y2', from: 'o', to: 'a' }, { id: 'y3', from: 'o', to: 'b' }, { id: 'y4', from: 'a', to: 'output' }, { id: 'y5', from: 'b', to: 'output' }],
+    };
+    const orch = createEngineOrchestrator({ library, settings: settingsWith('otro') }, [memoryEngine('otro', { adapter: agent })]);
+    expect((await orch.start(d, 'x').result).status).toBe('succeeded');
+    const rule = agent.callsOf(COORDINATOR_ID)[0]!.split!;
+    expect(rule).toContain('`a` · Analista · agente: Ana · para qué sirve: Escribe la web · skills: Diseño web, Guía de marca · MCP: figma · tarea: sin tarea');
+    // Un agente que no está en la biblioteca no rompe el reparto.
+    expect(rule).toContain('`b` · Builder · agente: b · tarea: sin tarea');
+  });
+
+  it('[R59.19] el Coordinador es de la app: siempre está y gana a uno del proyecto', async () => {
+    const library = new MemoryLibrary();
+    library.agentList = [{ ...newAgent(COORDINATOR_ID, 'Falso'), instructions: 'otra cosa' }, newAgent('a', 'Ana')];
+    const agents = await withBuiltinAgents(library).agents();
+    expect(agents.map((a) => a.name)).toEqual(['Ana', 'Coordinador']);
+    expect(agents.at(-1)!.instructions).toContain('sin hacerlo');
+    expect((await withBuiltinAgents(new MemoryLibrary()).agents()).map((a) => a.id)).toEqual([COORDINATOR_ID]);
+  });
+
+  it('[R59.18] si no se puede leer la biblioteca, la regla sigue con el id', async () => {
+    const library = new MemoryLibrary();
+    library.agents = async () => {
+      throw new Error('disco');
+    };
+    const agent = new MockAgent({ [COORDINATOR_ID]: { output: '## Para a\nArchivos: a\nuno\n## Para b\nArchivos: b\ndos' } });
+    const d: Diagram = {
+      ...D,
+      nodes: [D.nodes[0]!, { id: 'o', kind: 'agent', agentId: COORDINATOR_ID }, D.nodes[1]!, D.nodes[2]!, D.nodes[3]!],
+      edges: [{ id: 'y1', from: 'entry', to: 'o' }, { id: 'y2', from: 'o', to: 'a' }, { id: 'y3', from: 'o', to: 'b' }, { id: 'y4', from: 'a', to: 'output' }, { id: 'y5', from: 'b', to: 'output' }],
+    };
+    const orch = createEngineOrchestrator({ library, settings: settingsWith('otro') }, [memoryEngine('otro', { adapter: agent })]);
+    expect((await orch.start(d, 'x').result).status).toBe('succeeded');
+    expect(agent.callsOf(COORDINATOR_ID)[0]!.split).toContain('`a` · Analista · agente: a · tarea: sin tarea');
   });
 
   it('[R53.5] la propuesta de a qué paso volver es la del motor activo', async () => {

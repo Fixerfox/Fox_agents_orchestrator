@@ -60,7 +60,8 @@ export function edgeTraversals(events: readonly RunEvent[], edge: EdgeRef, path:
       const isReturn = rejection !== undefined;
         // En modo veredicto la revisión no da motivo: las correcciones son lo que le llegó (la salida del revisor).
       const feedback = rejection?.reason ? { text: rejection.reason, files: [] } : (lastInput ?? lastOutput);
-      const sent: Payload | undefined = isReturn ? feedback : lastOutput;
+      // Si el origen reparte, por esta conexión solo salió su parte [R59.7].
+      const sent: Payload | undefined = isReturn ? feedback : (e.input ?? lastOutput);
       rejection = undefined;
       const t: EdgeTraversal = { n: out.length + 1, seq: e.seq, ts: e.ts, kind: isReturn ? 'return' : 'output', ...(sent ? { sent } : {}), combined: false, state: 'waiting', requests: [] };
       out.push(t);

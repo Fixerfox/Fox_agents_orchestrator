@@ -89,6 +89,13 @@ export function segmentShapeOk(forward: readonly Edge[], info: ReturnInfo): bool
 }
 
 /** Tipos de paso a los que se puede volver para corregir [R53.2][R53.7]. */
+/** Pasos entre los que reparte un paso: sus destinos, sin salidas ni retornos [R59.2]. */
+export function splitBranchIds(d: Pick<Diagram, 'nodes' | 'edges'>, id: Id): Id[] {
+  const returns = returnEdges(d);
+  const kindOf = new Map(d.nodes.map((n) => [n.id, n.kind]));
+  return [...new Set(d.edges.filter((e) => e.from === id && !returns.has(e.id) && kindOf.get(e.to) !== 'output').map((e) => e.to))];
+}
+
 export const CORRECTABLE_KINDS: ReadonlySet<string> = new Set(['agent', 'transform', 'subdiagram']);
 
 /** Ids de un nivel en orden del flujo (aristas hacia delante); los que no se pueden ordenar van al final en su orden. */

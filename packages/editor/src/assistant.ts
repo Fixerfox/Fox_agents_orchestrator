@@ -84,6 +84,11 @@ export const ASSISTANT_TOOLS: readonly AssistantToolSpec[] = [
     description: 'Añade al diagrama abierto un paso con un agente, después del paso indicado (o justo antes de Salida). Devuelve el id del paso.',
     params: { agentId: s('Id del agente'), task: s('Qué tiene que hacer en este paso', true), after: s('Id del paso tras el que va (por defecto, antes de Salida)', true) },
   },
+  {
+    name: 'add_coordinator',
+    description: 'Añade un Coordinador detrás de un paso: una pieza fija de la app que divide el trabajo entre los pasos que salen de él, y cada uno recibe solo su parte. Conéctalo después con `connect` a al menos 2 pasos. Solo el Coordinador reparte: de cualquier otro paso con varias salidas, todas reciben lo mismo.',
+    params: { after: s('Id del paso tras el que va'), task: s('Tarea del Coordinador', true) },
+  },
   { name: 'set_task', description: 'Cambia la tarea de un paso del diagrama abierto.', params: { nodeId: s('Id del paso'), task: s('Tarea') } },
   {
     name: 'set_deliverable',

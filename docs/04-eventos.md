@@ -20,7 +20,8 @@ interface EventBase { runId: Id; seq: number; ts: string; type: string; nodePath
 | `tool.result` | `nodeId, tool, ok, output?` | Resultado de la herramienta |
 | `agent.usage` | `nodeId, inputTokens, outputTokens, costUsd?` | Consumo |
 | `route.decided` | `fromNodeId, chosen: nodeId[], mode: 'ai'\|'rules', reason` | Un nodo de enrutado elige destinos |
-| `edge.traversed` | `edgeId, fromNodeId, toNodeId` | Se recorre una conexión (para resaltar la ruta) |
+| `edge.traversed` | `edgeId, fromNodeId, toNodeId, input?` | Se recorre una conexión (para resaltar la ruta); `input` es la parte enviada si el origen reparte (SPEC-059) |
+| `split.rejected` | `nodeId, attempt, problems` | El paso no repartió bien su trabajo y se repite (SPEC-059) |
 | `loop.iteration` | `loopId, n, max, verdict?, reason?` | Cada vuelta de un bucle y veredicto del evaluador |
 | `permission.requested` | `nodeId, action, detail` | Una acción pide confirmación en la UI |
 | `permission.resolved` | `nodeId, allowed` | El usuario responde |

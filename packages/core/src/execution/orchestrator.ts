@@ -1,6 +1,6 @@
-import { finalSteps, forwardEdges, returnEdges, validateDiagram, type Diagram, type DiagramNode, type Edge, type ReturnInfo } from '../diagrams';
-import type { Id, Payload } from '../shared';
-import type { AgentAdapter, AgentSnapshot, Decider } from './adapter';
+import { finalSteps, forwardEdges, returnEdges, splitBranchIds, validateDiagram, type Diagram, type DiagramNode, type Edge, type ReturnInfo } from '../diagrams';
+import { isCoordinator, type Id, type KnowledgeExtra, type Payload } from '../shared';
+import type { AgentAdapter, AgentProfile, AgentSnapshot, Decider } from './adapter';
 import { proposeCorrectionWith } from './corrections';
 import { EventBus, type RunEvent } from './events';
 import { errorMessage, type DiagramOutcome, type Outcome, type ReviewLevel, type RunServices, type StepContext } from './nodes/handler';
@@ -17,12 +17,15 @@ import { RunAbort } from './run/run-abort';
 import { RunEmitter } from './run/run-emitter';
 import type { NodeStatus, RunOptions, RunStatus } from './run-types';
 import { mergeInputs } from './text/merge-inputs';
+import { splitInputs } from './text/split';
 
 export interface OrchestratorDeps {
   getAdapter(agentId: Id): AgentAdapter;
   decider: Decider;
   /** Foto de la configuración del agente para dejarla en el log. */
   describeAgent?(agentId: Id): AgentSnapshot | undefined;
+  /** Ficha de un agente para quien reparte [R59.18]. */
+  agentProfile?(agentId: Id, extra: KnowledgeExtra | undefined, runId: Id): Promise<AgentProfile | undefined>;
   /** `runId`: un subdiagrama se lee de la copia que se hizo al lanzar la ejecución [R52.1]. */
   resolveTemplate?(templateId: Id, version: number | 'latest', runId?: Id): Promise<Diagram> | Diagram;
   sleep?(ms: number, signal: AbortSignal): Promise<void>;
@@ -91,6 +94,7 @@ export class Orchestrator {
       decider: this.deps.decider,
       getAdapter: (agentId) => this.deps.getAdapter(agentId),
       ...(this.deps.describeAgent ? { describeAgent: (agentId: Id) => this.deps.describeAgent!(agentId) } : {}),
+      ...(this.deps.agentProfile ? { agentProfile: (agentId: Id, extra: KnowledgeExtra | undefined, run: Id) => this.deps.agentProfile!(agentId, extra, run) } : {}),
       ...(this.deps.resolveTemplate ? { resolveTemplate: (id: Id, version: number | 'latest', run?: Id) => this.deps.resolveTemplate!(id, version, run) } : {}),
       maxDepth: options.maxDepth ?? 8,
       root: diagram,
@@ -207,6 +211,8 @@ async function executeDiagram(run: RunServices, nodes: NodeRegistry, diagram: Di
     for (const e of outgoing.get(id) ?? []) edgeState.set(e.id, 'dead');
   };
 
+  const partsOf = (node: DiagramNode, payload: Payload) => (isCoordinator(node) ? splitInputs(payload, splitBranchIds(diagram, node.id)) : undefined);
+
   const apply = (node: DiagramNode, outcome: Outcome) => {
     status.set(node.id, outcome.status);
     emitter.emit({ type: 'node.finished', nodeId: node.id, status: outcome.status, ...(outcome.output ? { output: outcome.output } : {}) }, path);
@@ -221,14 +227,17 @@ async function executeDiagram(run: RunServices, nodes: NodeRegistry, diagram: Di
       repeat(node, outcome.back, outcome.output);
       return;
     }
+    // Quien reparte manda a cada rama lo suyo; las salidas reciben el texto entero [R59.2][R59.7].
+    const parts = partsOf(node, outcome.output);
     for (const e of outgoing.get(node.id) ?? []) {
       if (outcome.chosen && !outcome.chosen.has(e.id)) {
         edgeState.set(e.id, 'dead');
         continue;
       }
       edgeState.set(e.id, 'delivered');
-      edgePayload.set(e.id, outcome.output);
-      emitter.emit({ type: 'edge.traversed', edgeId: e.id, fromNodeId: e.from, toNodeId: e.to }, path);
+      const part = parts?.get(e.to);
+      edgePayload.set(e.id, part ?? outcome.output);
+      emitter.emit({ type: 'edge.traversed', edgeId: e.id, fromNodeId: e.from, toNodeId: e.to, ...(part ? { input: part } : {}) }, path);
     }
   };
 
@@ -280,7 +289,8 @@ async function executeDiagram(run: RunServices, nodes: NodeRegistry, diagram: Di
   const runNode = (node: DiagramNode, nodeInput: Payload): Promise<Outcome> => {
     // Reanudar: lo que ya terminó bien en la anterior no se repite, la primera vez que se llega a ello [R41.1].
     const reused = path.length === 0 && REUSABLE.has(node.kind) ? run.cache.takeReused(node.id) : undefined;
-    if (reused) {
+    // Lo reutilizado se reparte otra vez; si ya no cumple el formato, el paso se ejecuta de nuevo [R59.9].
+    if (reused && (!isCoordinator(node) || partsOf(node, reused))) {
       emitter.emit({ type: 'node.started', nodeId: node.id, input: nodeInput }, path);
       emitter.emit({ type: 'node.reused', nodeId: node.id, fromRunId: run.cache.reuseFrom! }, path);
       return Promise.resolve({ status: 'succeeded', output: reused });

@@ -55,7 +55,6 @@ export function DesignerScreen(p: Props) {
         onAdd={(spec) => designer.onAdd(spec)}
         onPickAgent={() => designer.setPicker({})}
         onAddAgent={(agentId) => designer.onAdd({ kind: 'agent', agentId })}
-        onParallel={designer.openParallel}
         resources={[
           ...catalog.skills.map((k) => ({ kind: 'skillIds' as const, id: k.id, name: k.name })),
           ...catalog.contexts.map((c) => ({ kind: 'contextIds' as const, id: c.id, name: c.name })),
@@ -123,7 +122,6 @@ export function DesignerScreen(p: Props) {
             onOpenDiagram={(id) => void doc.openDiagram(id)}
             onEdit={designer.focusField}
             onAddAt={(kind, at, opts) => (kind === 'agent' ? designer.setPicker({ at }) : designer.onAdd(kind === 'review' && opts?.human ? { kind, human: true } : { kind }, at))}
-            onDropParallel={(edgeId) => (edgeId ? designer.setParallelAt(edgeId) : designer.openParallel())}
             onInsert={designer.onInsert}
             onInsertTransform={(edgeId: string) => p.guard(() => sel.select(session.insertOnEdge(edgeId, { kind: 'transform' })))}
           />

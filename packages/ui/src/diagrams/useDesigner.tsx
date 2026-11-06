@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type MutableRefObject } from 'react';
 import { BookOpen, Bot, Copy, FileText, Pencil, Plug, Plus, Replace, Sparkles, Trash2, Workflow } from 'lucide-react';
 import { SPECKIT_TEMPLATE_ID, agentUsage, installSpecKit, instantiateTemplate, t, type EditorSession, type EditorSnapshot, type ExampleTemplate, type NewNodeSpec, type ProjectApi } from '@orquestador/editor';
+import { COORDINATOR_ID } from '@orquestador/core';
 import type { MenuItem, OpenLibrary } from '../common';
 import type { AgentMenu } from './Canvas';
 import { isTypingTarget, shortcutFor } from './shortcuts';
@@ -27,7 +28,7 @@ interface Options {
   showRight: () => void;
 }
 
-export type AddSpec = { kind: 'agent'; agentId: string } | { kind: 'router' } | { kind: 'loop' } | { kind: 'review'; human?: boolean } | { kind: 'transform' };
+export type AddSpec = { kind: 'coordinator' } | { kind: 'agent'; agentId: string } | { kind: 'router' } | { kind: 'loop' } | { kind: 'review'; human?: boolean } | { kind: 'transform' };
 
 /** Acciones del Diseñador sobre el diagrama abierto: añadir pasos, menús, atajos y los diálogos que abren. */
 export function useDesigner({ api, session, snap, doc, sel, catalog: lib, projectRef, lastInput, active, fail, guard, openLibrary, askAssistant, showRight }: Options) {
@@ -36,19 +37,8 @@ export function useDesigner({ api, session, snap, doc, sel, catalog: lib, projec
   const { diagramList, save, openDiagram, discardOk, freshDiagram, duplicateDiagram, deleteDiagram, deleteOther, requestRename } = doc;
   const [inserting, setInserting] = useState<{ edgeId: string; at: { x: number; y: number } }>();
   const onInsert = useCallback((edgeId: string, at: { x: number; y: number }) => setInserting({ edgeId, at }), []);
-  /** Conexión donde se insertan ramas en paralelo [R32.36]. */
-  const [parallelAt, setParallelAt] = useState<string>();
-  /** Desde la paleta: la conexión seleccionada o, si no, la única que llega a Salida [R32.36]. */
-  const openParallel = () => {
-    const level = session.getSnapshot().level;
-    const chosen = selRef.current.edges.length === 1 ? selRef.current.edges[0] : undefined;
-    const toOutput = level.edges.filter((e) => level.nodes.find((n) => n.id === e.to)?.kind === 'output');
-    const edgeId = chosen ?? (toOutput.length === 1 ? toOutput[0]!.id : undefined);
-    if (!edgeId) return fail(t('parallel.noEdge'));
-    setParallelAt(edgeId);
-  };
   const agentNames = useMemo(
-    () => ({ ...Object.fromEntries(agents.map((a) => [a.id, a.name])), ...Object.fromEntries(diagramList.map((d) => [`diagram:${d.id}`, d.name])) }),
+    () => ({ [COORDINATOR_ID]: t('pal.step.coordinator'), ...Object.fromEntries(agents.map((a) => [a.id, a.name])), ...Object.fromEntries(diagramList.map((d) => [`diagram:${d.id}`, d.name])) }),
     [agents, diagramList],
   );
   const [examples, setExamples] = useState<ExampleTemplate[]>([]);
@@ -90,7 +80,8 @@ export function useDesigner({ api, session, snap, doc, sel, catalog: lib, projec
     const n = session.getSnapshot().level.nodes.length;
     const position = at ?? { x: 60 + (n % 6) * 40, y: 60 + (n % 6) * 40 };
     guard(() => {
-      const id = session.addNode({ ...spec, position } as NewNodeSpec);
+      const real = spec.kind === 'coordinator' ? { kind: 'agent' as const, agentId: COORDINATOR_ID, label: t('pal.step.coordinator') } : spec;
+      const id = session.addNode({ ...real, position } as NewNodeSpec);
       select(id);
     });
   };
@@ -185,7 +176,7 @@ export function useDesigner({ api, session, snap, doc, sel, catalog: lib, projec
       if (projectRef.current !== undefined) void save();
     });
   };
-  return { inserting, setInserting, onInsert, parallelAt, setParallelAt, openParallel, agentNames, examples, picker, setPicker, usage, undo, redo, onAdd, diagramMenu, portPick, setPortPick, addExtra, addSubdiagram, agentMenuFor, focusField, extras, loadExample };
+  return { inserting, setInserting, onInsert, agentNames, examples, picker, setPicker, usage, undo, redo, onAdd, diagramMenu, portPick, setPortPick, addExtra, addSubdiagram, agentMenuFor, focusField, extras, loadExample };
 }
 
 export type Designer = ReturnType<typeof useDesigner>;

@@ -1,5 +1,5 @@
 import { BookOpen, Copy, FileText, Trash2, Workflow } from 'lucide-react';
-import { DEFAULT_MODEL, MAX_TASK_LENGTH, MODELS, correctionCandidates, finalSteps, type Diagram, type DiagramNode, type ProjectPermission } from '@orquestador/core';
+import { DEFAULT_MODEL, MAX_TASK_LENGTH, MODELS, correctionCandidates, finalSteps, type Diagram, type DiagramNode, type ProjectPermission, COORDINATOR_ID, coordinatorAgent } from '@orquestador/core';
 import { PermissionPicker, permissionName } from '../common';
 import { AgentAvatar, AskFirstMark } from '../common';
 import { useState, type ReactNode } from 'react';
@@ -125,6 +125,8 @@ function NumberField({ label, value, min, onCommit }: { label: string; value: nu
   );
 }
 
+const COORDINATOR = coordinatorAgent();
+
 export function Inspector({ session, snap, selection, agents, onError, onEditAgent, onSelect, onChangeAgent, api, files, catalog, onCreateKnowledge, diagramNames, onOpenDiagram, events, liveCard }: Props) {
   const guard = (fn: () => void) => {
     try {
@@ -139,7 +141,7 @@ export function Inspector({ session, snap, selection, agents, onError, onEditAge
   const node = nodeId !== undefined ? level.nodes.find((n) => n.id === nodeId) : undefined;
   const edge = edgeId !== undefined ? level.edges.find((e) => e.id === edgeId) : undefined;
   const patch = (id: string, p: NodePatch) => guard(() => session.updateNode(id, p));
-  const agentOf = (id: string | undefined) => agents.find((a) => a.id === id);
+  const agentOf = (id: string | undefined): AgentOption | undefined => (id === COORDINATOR_ID ? COORDINATOR : agents.find((a) => a.id === id));
   const incoming = node ? level.edges.filter((e) => e.to === node.id).map((e) => level.nodes.find((n) => n.id === e.from)).filter((n) => n !== undefined).map((n) => (n.kind === 'entry' ? 'entrada' : (n.label ?? n.id))) : [];
 
   return (
@@ -229,9 +231,11 @@ export function Inspector({ session, snap, selection, agents, onError, onEditAge
                     )}
                   </div>
                   <div className="orq-agentcard__acts">
-                    <button type="button" className="orq-btn orq-btn--small" aria-label={t('insp.agent.change')} onClick={() => onChangeAgent?.(node.id)}>
-                      {t('inspector.agent.change')}
-                    </button>
+                    {node.agentId !== COORDINATOR_ID && (
+                      <button type="button" className="orq-btn orq-btn--small" aria-label={t('insp.agent.change')} onClick={() => onChangeAgent?.(node.id)}>
+                        {t('inspector.agent.change')}
+                      </button>
+                    )}
                     {onEditAgent && node.agentId && agents.some((a) => a.id === node.agentId) && (
                       <button type="button" className="orq-btn orq-btn--small orq-btn--ghost" aria-label={t('insp.agent.edit')} onClick={() => onEditAgent(node.agentId!)}>
                         {t('insp.agent.editShort')}

@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { promptText, type QueryFn, type SdkMessage } from '@orquestador/claude';
-import { defaultSettings, newAgent, newContext, type AppSettings, type Diagram } from '@orquestador/core';
+import { COORDINATOR_ID, defaultSettings, newAgent, newContext, type AppSettings, type Diagram } from '@orquestador/core';
 import { RunService, RunSnapshots, takeSnapshot } from '@orquestador/runtime';
 import type { ProjectStore } from '@orquestador/store';
 import { claudeEnvironment, composeLibrary, composeOrchestrator, composeRunPorts, createProject, openProject, type OrchestratorContext } from '../src/main/composition';
@@ -122,6 +122,59 @@ describe('SPEC-056 · composición de la aplicación', () => {
     };
     const { events } = await composeOrchestrator(context('claude'), query).start(flow, 'Pinta').result;
     expect(events.filter((e) => e.type === 'git.branch')).toMatchObject([{ nodeId: 'p', branch: '001-feature', via: 'head' }]);
+  });
+
+  it('[R59.4][R59.7] con Claude la regla llega al prompt y cada rama recibe solo su parte', async () => {
+    const split: Diagram = {
+      id: 'reparto',
+      name: 'Reparto',
+      schemaVersion: 1,
+      nodes: [
+        { id: 'entry', kind: 'entry' },
+        { id: 'o', kind: 'agent', agentId: COORDINATOR_ID, label: 'Origen' },
+        { id: 'a', kind: 'agent', agentId: 'pintor', label: 'Parte A', task: 'Pinta el cielo' },
+        { id: 'b', kind: 'agent', agentId: 'pintor', label: 'Parte B' },
+        { id: 'output', kind: 'output' },
+      ],
+      edges: [
+        { id: 'e1', from: 'entry', to: 'o' },
+        { id: 'e2', from: 'o', to: 'a' },
+        { id: 'e3', from: 'o', to: 'b' },
+        { id: 'e4', from: 'a', to: 'output' },
+        { id: 'e5', from: 'b', to: 'output' },
+      ],
+    };
+    const seen: { prompt: string; system: string }[] = [];
+    const query: QueryFn = async function* ({ prompt, options }) {
+      const system = options.systemPrompt ? promptText(options.systemPrompt) : '';
+      seen.push({ prompt: String(prompt), system });
+      yield result(system.includes('Reparto del trabajo') ? '## Para a\n\nArchivos: cielo.png\nEL-CIELO\n\n## Para b\n\nArchivos: mar.png\nEL-MAR' : 'Hecho');
+    };
+    const { status } = await composeOrchestrator(context('claude'), query).start(split, 'Pinta').result;
+    expect(status).toBe('succeeded');
+    expect(seen[0]!.system).toContain('`a` · Parte A · agente: Pintor · skills: ninguna · MCP: ninguno · tarea: Pinta el cielo');
+    const branches = seen.slice(1);
+    expect(branches).toHaveLength(2);
+    expect(branches.every((c) => !c.system.includes('Reparto del trabajo'))).toBe(true);
+    expect(branches.filter((c) => c.prompt.includes('EL-CIELO') && !c.prompt.includes('EL-MAR'))).toHaveLength(1);
+    expect(branches.filter((c) => c.prompt.includes('EL-MAR') && !c.prompt.includes('EL-CIELO'))).toHaveLength(1);
+  });
+
+  it('[R59.19] con Claude, el Coordinador trabaja con sus instrucciones fijas', async () => {
+    const coordinated: Diagram = {
+      ...flow,
+      nodes: [flow.nodes[0]!, { id: 'c', kind: 'agent', agentId: COORDINATOR_ID, label: 'Coordinador' }, { id: 'a', kind: 'agent', agentId: 'pintor' }, { id: 'b', kind: 'agent', agentId: 'pintor' }, flow.nodes[2]!],
+      edges: [{ id: 'e1', from: 'entry', to: 'c' }, { id: 'e2', from: 'c', to: 'a' }, { id: 'e3', from: 'c', to: 'b' }, { id: 'e4', from: 'a', to: 'output' }, { id: 'e5', from: 'b', to: 'output' }],
+    };
+    const systems: string[] = [];
+    const query: QueryFn = async function* ({ options }) {
+      const system = options.systemPrompt ? promptText(options.systemPrompt) : '';
+      systems.push(system);
+      yield result(system.includes('Reparto del trabajo') ? '## Para a\n\nArchivos: a\nuno\n\n## Para b\n\nArchivos: b\ndos' : 'Hecho');
+    };
+    const { status } = await composeOrchestrator(context('claude'), query).start(coordinated, 'Pinta').result;
+    expect(status).toBe('succeeded');
+    expect(systems[0]).toContain('Eres el Coordinador');
   });
 
   it('[R56.5] con el motor simulado no se llama a Claude', async () => {

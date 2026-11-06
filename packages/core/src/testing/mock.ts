@@ -9,8 +9,9 @@ export interface MockAgentScript {
   tools?: { tool: string; input?: unknown; ok?: boolean; output?: string }[];
   usage?: { inputTokens: number; outputTokens: number; costUsd?: number };
   files?: string[];
-  /** Ramas de git que simula haber tocado [R58.1]. */
+  /** Lo que simula hacer en las ramas [R58.11]. */
   gitActions?: { branch: string; action: 'commit' | 'push' | 'pr' | 'merge' | 'delete' | 'switch'; url?: string }[];
+  /** Ramas de git que simula haber tocado [R58.1]. */
   branches?: { branch: string; via: 'head' | 'command' | 'mcp' | 'ran'; created?: boolean }[];
   latencyMs?: number;
   /** El agente se queda esperando hasta que se resuelva esta promesa (o se cancele). */
