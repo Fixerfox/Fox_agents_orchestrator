@@ -1535,11 +1535,11 @@ button:disabled { opacity: 0.4; cursor: default; }
 .orq-topbar :is(button, a, input, select, textarea, [role='button'], [role='menu'], [role='menuitem'], [role='listbox'], [role='dialog'], [tabindex], .orq-pop__panel),
 .orq-start__top :is(button, a, input, select, textarea, [role='button'], [tabindex]) { -webkit-app-region: no-drag; app-region: no-drag; }
 /* Ejecución en un modal y aviso al terminar [R44.1–R44.4] */
-.orq-done { position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 6; width: min(760px, calc(100% - 128px)); box-sizing: border-box; display: flex; align-items: center; gap: 12px; padding: 12px 12px 12px 16px; border-radius: 14px; background: var(--card); border: 1px solid color-mix(in srgb, var(--pos) 35%, var(--line)); box-shadow: var(--shadow); animation: orq-pop 200ms var(--ease); }
+.orq-done { position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 6; width: min(760px, calc(100% - 128px)); box-sizing: border-box; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 12px 12px 12px 16px; border-radius: 14px; background: var(--card); border: 1px solid color-mix(in srgb, var(--pos) 35%, var(--line)); box-shadow: var(--shadow); animation: orq-pop 200ms var(--ease); }
 .orq-done.is-failed, .orq-done.is-cancelled { border-color: color-mix(in srgb, var(--neg) 40%, var(--line)); }
 .orq-done__icon { width: 36px; height: 36px; flex: none; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: var(--pos); background: color-mix(in srgb, var(--pos) 14%, transparent); }
 .orq-done.is-failed .orq-done__icon, .orq-done.is-cancelled .orq-done__icon { color: var(--neg); background: color-mix(in srgb, var(--neg) 14%, transparent); }
-.orq-done__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.orq-done__text { flex: 1 1 220px; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .orq-done__text strong { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .orq-done__text span { font-size: 12px; color: var(--text2); }
 .orq-topbar__run.is-btn { height: 30px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--line); background: transparent; color: inherit; font: inherit; cursor: pointer; }

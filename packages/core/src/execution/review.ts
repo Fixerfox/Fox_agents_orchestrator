@@ -2,7 +2,7 @@ import type { Payload } from '../shared';
 
 /** Criterio que usa la IA cuando la revisión no tiene uno propio [R34.6]. */
 export const DEFAULT_REVIEW_CRITERIA =
-  'La entrega cumple todo lo pedido y el revisor no deja correcciones pendientes.';
+  'La entrega cumple lo pedido y no quedan fallos importantes que se puedan corregir en esta vuelta.';
 
 /** Largo máximo de cada corrección anterior en el contexto de la vuelta siguiente [R34.11]. */
 export const PREVIOUS_FEEDBACK_CLIP = 600;

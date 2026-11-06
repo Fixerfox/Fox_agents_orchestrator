@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  MockAgent,
+  MockDecider,
+  Orchestrator,
   composeRoundInput,
   parseVerdict,
   returnEdges,
@@ -27,6 +30,55 @@ function qaLoop(max = 3, mode: 'verdict' | 'ai' = 'verdict') {
   );
 }
 const codes = (d: ReturnType<typeof diagram>) => validateDiagram(d).map((i) => i.code);
+
+describe('SPEC-034 · el Juez', () => {
+  const judged = (judgeReview: NonNullable<ConstructorParameters<typeof MockDecider>[0]>['judgeReview'], judge?: () => { done: boolean; reason: string }) => {
+    const agents = new MockAgent({ dis: { output: 'hecho' }, qa: { output: 'Informe sin veredicto' } });
+    const decider = new MockDecider({ ...(judgeReview ? { judgeReview } : {}), ...(judge ? { judge } : {}) });
+    return { decider, orch: new Orchestrator({ getAdapter: () => agents, decider }) };
+  };
+
+  it('[R34.26] sin veredicto escrito decide el Juez, y queda como decisión', async () => {
+    const seen: unknown[] = [];
+    const { orch, decider } = judged((r) => (seen.push(r), Promise.resolve({ approved: true, reason: 'Sirve; queda el responsive' })));
+    const { events, status } = await orch.start(qaLoop(), 'x').result;
+    expect(status).toBe('succeeded');
+    expect(seen).toMatchObject([{ round: 1, max: 3, output: { text: 'Informe sin veredicto' } }]);
+    expect(decider.judgeCalls).toEqual([]);
+    expect(ofType(events, 'review.decided')).toMatchObject([{ verdict: 'approved', source: 'ai', reason: 'Sirve; queda el responsive' }]);
+    expect(ofType(events, 'decision')).toMatchObject([{ kind: 'judge', response: { done: true } }]);
+  });
+
+  it('[R34.26] un veredicto escrito manda: no se pregunta al Juez', async () => {
+    const seen: unknown[] = [];
+    const agents = new MockAgent({ dis: { output: 'hecho' }, qa: { output: 'VEREDICTO: APROBADO' } });
+    const orch = new Orchestrator({ getAdapter: () => agents, decider: new MockDecider({ judgeReview: (r) => (seen.push(r), Promise.resolve({ approved: false, reason: '' })) }) });
+    await orch.start(qaLoop(), 'x').result;
+    expect(seen).toEqual([]);
+  });
+
+  it('[R34.26] sin Juez en el motor, sigue decidiendo judge', async () => {
+    const { orch, decider } = judged(undefined, () => ({ done: true, reason: 'ok' }));
+    await orch.start(qaLoop(), 'x').result;
+    expect(decider.judgeCalls).toHaveLength(1);
+  });
+
+  it('[R34.27] recibe el criterio del nodo', async () => {
+    const seen: { criteria?: string }[] = [];
+    const agents = new MockAgent({ a: { output: 'x' } });
+    const d = diagram([ENTRY, agent('a'), review('rev', 2, 'ai', 'Sin faltas'), OUTPUT], [edge('entry', 'a'), edge('a', 'rev'), port('rev', 'output', 'approved')]);
+    const orch = new Orchestrator({ getAdapter: () => agents, decider: new MockDecider({ judgeReview: (r) => (seen.push(r), Promise.resolve({ approved: true, reason: '' })) }) });
+    await orch.start(d, 'x').result;
+    expect(seen[0]!.criteria).toBe('Sin faltas');
+  });
+
+  it('[R34.28] su gasto va marcado y no dispara el límite', async () => {
+    const { orch } = judged(() => Promise.resolve({ approved: true, reason: '', usage: { inputTokens: 500, outputTokens: 500, costUsd: 0.002 } }));
+    const { events, status } = await orch.start(qaLoop(), 'x', { budget: { maxTokens: 100 } }).result;
+    expect(status).toBe('succeeded');
+    expect(ofType(events, 'agent.usage').filter((e) => e.source === 'judge')).toMatchObject([{ nodeId: 'rev', costUsd: 0.002 }]);
+  });
+});
 
 describe('SPEC-034 · Revisión con retorno: modelo y validación', () => {
   it('[R34.1] la revisión con sus tres salidas y un retorno es un diagrama válido', () => {

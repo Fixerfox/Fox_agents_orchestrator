@@ -1,4 +1,4 @@
-import { AgentError, Orchestrator, supervisorModel, supervisorReviews, type AgentAdapter, type AgentEngine, type AgentProfile, type AppSettings, type Decider, type Id, type KnowledgeExtra, type LibraryReader } from '@orquestador/core';
+import { AgentError, DEFAULT_REVIEW_CRITERIA, Orchestrator, supervisorModel, supervisorReviews, type AgentAdapter, type AgentEngine, type AgentProfile, type AppSettings, type Decider, type Id, type KnowledgeExtra, type LibraryReader } from '@orquestador/core';
 import { createDemoParts } from './demo';
 
 /** Lo que el orquestador necesita saber del proyecto abierto y de Ajustes, siempre al día [R27.1]. */
@@ -34,6 +34,12 @@ export function createEngineOrchestrator(ctx: EngineContext, engines: readonly A
     route: (r, s) => pick().decider.route(r, s),
     judge: (r, s) => pick().decider.judge(r, s),
     condition: (r, s) => pick().decider.condition(r, s),
+    judgeReview: async (r, s) => {
+      const chosen = pick().decider;
+      if (chosen.judgeReview) return chosen.judgeReview(r, s);
+      const res = await chosen.judge({ prompt: r.criteria ?? DEFAULT_REVIEW_CRITERIA, output: r.output, iteration: r.round }, s);
+      return { approved: res.done, reason: res.reason };
+    },
     // Sin `blame` falla a propósito: `blameStep` lo trata como no saber y propone el último paso [R53.5].
     blame: (r, s) => {
       const chosen = pick().decider;

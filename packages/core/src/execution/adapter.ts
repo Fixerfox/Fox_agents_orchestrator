@@ -164,6 +164,22 @@ export interface RouteCandidate {
   label: string;
 }
 
+/** Lo que juzga el Juez de una revisión [R34.26]. */
+export interface JudgeRequest {
+  /** Criterio escrito en el nodo, si lo hay. */
+  criteria?: string;
+  output: Payload;
+  round: number;
+  max: number;
+}
+
+/** Decisión del Juez [R34.26][R34.28]. */
+export interface JudgeVerdict {
+  approved: boolean;
+  reason: string;
+  usage?: { inputTokens: number; outputTokens: number; costUsd?: number };
+}
+
 /** Decisiones que toma la IA fuera de los agentes de trabajo: enrutado, condiciones y evaluador de bucles. */
 export interface Decider {
   route(
@@ -180,6 +196,8 @@ export interface Decider {
   ): Promise<boolean>;
   /** Qué paso tiene que rehacer el trabajo según las correcciones del usuario. Opcional [R53.5][R53.17]. */
   blame?(request: { feedback: string; candidates: BlameCandidate[] }, signal: AbortSignal): Promise<{ nodeId: Id; reason: string }>;
+  /** Decide una revisión sin veredicto escrito. Opcional: sin él, se usa `judge` [R34.26]. */
+  judgeReview?(request: JudgeRequest, signal: AbortSignal): Promise<JudgeVerdict>;
   /** ¿Lo que hizo un paso corresponde a lo pedido? [R60.12] */
   supervise?(request: SupervisorReview, signal: AbortSignal): Promise<SupervisorVerdict>;
   /** Nodo «Transformar» con Claude: devuelve el texto convertido. Opcional: sin él, el nodo falla [R37.6]. */

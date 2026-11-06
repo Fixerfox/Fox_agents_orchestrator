@@ -1452,7 +1452,7 @@ export const es = {
   'hreview.files.more': 'y {count} más',
   'insp.review.criteria': 'Criterio para aprobar',
   'insp.review.criteria.ph': 'Ej.: respeta la paleta y el tamaño pedidos, sin correcciones pendientes',
-  'insp.review.howto': 'Pide al agente revisor que termine con «VEREDICTO: APROBADO» o «VEREDICTO: RECHAZADO» y las correcciones. Si no lo escribe, decide Claude con el criterio.',
+  'insp.review.howto': 'Pide al agente revisor que termine con «VEREDICTO: APROBADO» o «VEREDICTO: RECHAZADO» y las correcciones. Si no lo escribe, decide el Juez, con sentido común y este criterio si lo hay.',
   'insp.review.ports': '✓ Aprobado sigue adelante. ✗ Rechazado: conéctalo a un paso anterior para repetirlo con las correcciones. ⏱ Agotado: por dónde salir al llegar al máximo.',
   'insp.sees.review': 'Claude verá: lo que dijo el revisor, la vuelta en la que va y el criterio, y responderá si se aprueba.',
   'insp.sees.review.back': 'Al volver atrás, el paso recibe su entrada original, su entrega anterior, las correcciones y la vuelta en la que va.',

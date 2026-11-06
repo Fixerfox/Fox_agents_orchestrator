@@ -31,6 +31,8 @@ export interface AppSettings {
 
 /** Modelo del Supervisor si no se elige otro [R60.14]. */
 export const SUPERVISOR_MODEL = 'claude-haiku-5-5';
+/** Modelo fijo del Juez de las revisiones: no se configura [R34.26]. */
+export const JUDGE_MODEL = 'claude-haiku-5-5';
 
 /** ¿Revisa con IA el Supervisor? Activado salvo que se apague [R60.14]. */
 export const supervisorReviews = (settings: Pick<AppSettings, 'supervisorReview'>): boolean => settings.supervisorReview !== false;
