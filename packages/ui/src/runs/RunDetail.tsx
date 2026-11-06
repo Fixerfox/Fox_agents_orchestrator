@@ -30,6 +30,12 @@ export function RunDetail(
   const [picked, setPicked] = useState<string | undefined>(p.nav.step);
   /** Modal de la ejecución y la pestaña con la que se abre: «Resumen» si ya terminó y «Cronograma» mientras corre [R44.5]. */
   const [modal, setModal] = useState<Btab>();
+  /** El modal se abrió desde la tarjeta del Supervisor [R60.36]. */
+  const [toSupervisor, setToSupervisor] = useState(false);
+  const openSupervisor = useCallback(() => {
+    setToSupervisor(true);
+    setModal('summary');
+  }, []);
   /** Fichero abierto en el visor [R45.10]. */
   const [viewing, setViewing] = useState<string>();
   /** Ventana «Pedir corrección», con el paso desde el que se abrió [R53.13]. */
@@ -120,7 +126,7 @@ export function RunDetail(
         <div className="orq-run__left">
           <div className="orq-run__canvas">
             {diagram ? (
-              <RunCanvas diagram={diagram} live={live} events={d.events} agentNames={p.agentNames} onSelect={setPicked} onOpenFile={openPreview} previewCard={previewCard} />
+              <RunCanvas diagram={diagram} live={live} events={d.events} agentNames={p.agentNames} label={label} onSupervisor={openSupervisor} onSelect={setPicked} onOpenFile={openPreview} previewCard={previewCard} />
             ) : (
               <p className="orq-runs2__empty">{diagram === null ? t('runs.noDiagram') : t('runs.loading')}</p>
             )}
@@ -141,7 +147,7 @@ export function RunDetail(
           )}
         </aside>
       </div>
-      {modal && <RunModalView data={d} api={p.api} runId={p.runId} initialTab={modal} onClose={() => setModal(undefined)} onPick={(k) => (setModal(undefined), setPicked(k))} onExport={p.onExport} />}
+      {modal && <RunModalView data={d} api={p.api} runId={p.runId} initialTab={modal} focusSupervisor={toSupervisor} onClose={() => (setModal(undefined), setToSupervisor(false))} onPick={(k) => (setModal(undefined), setPicked(k))} onExport={p.onExport} />}
       {previewing && (
         // Vista previa en grande: archivos del paso, comparar con la anterior, ver cambios y pedir corrección [R54.5].
         <PreviewDialog

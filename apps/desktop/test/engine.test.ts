@@ -65,7 +65,7 @@ const val = <T,>(r: unknown) => {
   if (!x.ok) throw new Error(JSON.stringify(x.error));
   return x.value as T;
 };
-const setEngine = async (engine: AppSettings['engine'], extra: Partial<AppSettings> = {}) => val(await h.invoke(CHANNELS.saveSettings, { ...defaultSettings(), engine, ...extra }));
+const setEngine = async (engine: AppSettings['engine'], extra: Partial<AppSettings> = {}) => val(await h.invoke(CHANNELS.saveSettings, { ...defaultSettings(), supervisorReview: false, engine, ...extra }));
 
 async function openProject() {
   val(await h.invoke(CHANNELS.createProject, undefined));

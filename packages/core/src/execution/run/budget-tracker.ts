@@ -13,10 +13,15 @@ export class BudgetTracker {
     private readonly stop: RunAbort,
   ) {}
 
-  add(inputTokens: number, outputTokens: number, costUsd = 0): void {
+  /** Suma al uso sin comprobar el límite: lo que gasta el Supervisor no corta la ejecución [R60.14]. */
+  track(inputTokens: number, outputTokens: number, costUsd = 0): void {
     this.usage.inputTokens += inputTokens;
     this.usage.outputTokens += outputTokens;
     this.usage.costUsd += costUsd;
+  }
+
+  add(inputTokens: number, outputTokens: number, costUsd = 0): void {
+    this.track(inputTokens, outputTokens, costUsd);
     if (this.hit) return;
     const { maxTokens, maxCostUsd } = this.budget ?? {};
     const tokens = this.usage.inputTokens + this.usage.outputTokens;

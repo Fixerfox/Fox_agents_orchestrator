@@ -4,7 +4,7 @@ import { AgentError, type AgentQuestion, type AnsweredQuestion, type FileChange,
 import type { Slot } from '../run/concurrency-limiter';
 import { CONFIRM_APPROVE, CONFIRM_QUESTION, composeConfirmInput, isApproval } from '../text/confirm';
 import { deliverableNotice } from '../text/deliverable-notice';
-import { composeSplitFix, describeSplitProblem, parseSplit, splitRule, type SplitBranch } from '../text/split';
+import { composeSplitFix, declaredFiles, describeSplitProblem, parseSplit, splitRule, type SplitBranch } from '../text/split';
 import { explainTouchedFiles } from '../text/touched-files';
 import { errorMessage, failStep, type NodeHandler, type Outcome, type StepContext } from './handler';
 
@@ -16,11 +16,22 @@ interface AgentTurn {
   /** Intentos ya hechos, para seguir contando al repetir por el reparto [R59.8]. */
   attempts: number;
   base: number;
+  /** Memoria al arrancar el paso: no cambia entre intentos [R60.23]. */
+  memory?: string;
+  /** Límites del paso, si los declaró el Coordinador [R60.16]. */
+  scope?: string[];
 }
 
 /** Veces que se repite un paso que no reparte bien, antes de fallar [R59.8]. */
 const MAX_SPLIT_FIXES = 2;
 const SPLIT_INVALID = 'split-invalid';
+
+/** Lo que declaró el Coordinador para esta rama; solo con el Supervisor activo [R60.16]. */
+function scopeOf(step: StepContext, node: DiagramNode, input: Payload): string[] | undefined {
+  if (!step.supervisor) return undefined;
+  const fromCoordinator = step.level.diagram.edges.some((e) => e.to === node.id && isCoordinator(step.nodeById.get(e.from) ?? {}));
+  return fromCoordinator ? declaredFiles(input.text) : undefined;
+}
 
 /** Ramas de un paso que reparte, tal como las ve su agente [R59.4]. */
 function branchesOf(step: StepContext, node: DiagramNode): Promise<SplitBranch[]> {
@@ -39,7 +50,9 @@ function branchesOf(step: StepContext, node: DiagramNode): Promise<SplitBranch[]
 export const agentHandler: NodeHandler = {
   kind: 'agent',
   async run(step, node, input, path) {
-    const turn: AgentTurn = { slot: { held: false }, answered: [], missing: [], attempts: 0, base: 0 };
+    const memory = step.supervisor?.memory();
+    const scope = scopeOf(step, node, input);
+    const turn: AgentTurn = { slot: { held: false }, answered: [], missing: [], attempts: 0, base: 0, ...(memory ? { memory } : {}), ...(scope ? { scope } : {}) };
     let fixes = 0;
     await step.limiter.acquire();
     turn.slot.held = true;
@@ -137,6 +150,8 @@ async function attemptAgent(step: StepContext, node: DiagramNode, input: Payload
       ...(node.model ? { model: node.model } : {}),
       ...(node.confirm ? { confirm: true } : {}),
       ...(split ? { split } : {}),
+      ...(turn.memory ? { memory: turn.memory } : {}),
+      ...(turn.scope ? { scope: turn.scope } : {}),
       ...(deliverable ? { deliverable } : {}),
       ...(hasExtra ? { extra: origin } : {}),
       ...(snapshot ? { snapshot } : {}),
@@ -156,7 +171,7 @@ async function attemptAgent(step: StepContext, node: DiagramNode, input: Payload
       answered.push({ question: q.text, answer });
       return answer;
     });
-  const request = { nodeId: node.id, agentId, runId: step.emitter.runId, input, ...(task ? { task } : {}), ...(node.model ? { model: node.model } : {}), ...(node.confirm ? { confirm: true } : {}), ...(split ? { split } : {}), ...(deliverable ? { deliverable } : {}), ...(hasExtra ? { extra } : {}), ...(missing.length > 0 ? { missing } : {}), attempt, ask, previousAnswers: [...answered] };
+  const request = { nodeId: node.id, agentId, runId: step.emitter.runId, input, ...(task ? { task } : {}), ...(node.model ? { model: node.model } : {}), ...(node.confirm ? { confirm: true } : {}), ...(split ? { split } : {}), ...(turn.memory ? { memory: turn.memory } : {}), ...(turn.scope ? { scope: turn.scope } : {}), ...(deliverable ? { deliverable } : {}), ...(hasExtra ? { extra } : {}), ...(missing.length > 0 ? { missing } : {}), attempt, ask, previousAnswers: [...answered] };
 
   for await (const ev of adapter.run(request, step.signal)) {
     await step.gate.wait(step.signal);
@@ -189,6 +204,9 @@ async function attemptAgent(step: StepContext, node: DiagramNode, input: Payload
           files.set(ev.path, prev === 'created' || ev.change === 'created' ? 'created' : (ev.change ?? prev));
         }
         step.emitter.emit({ type: 'file.produced', nodeId: node.id, path: ev.path, ...(ev.change ? { change: ev.change } : {}), ...(ev.via ? { via: ev.via } : {}) }, path);
+        break;
+      case 'blocked':
+        step.emitter.emit({ type: 'supervisor.alert', nodeId: node.id, rule: 'blocked', severity: 'warning', detail: ev.detail }, path);
         break;
       case 'branch':
         step.emitter.emit({ type: 'git.branch', nodeId: node.id, branch: ev.branch, via: ev.via, ...(ev.created ? { created: true } : {}) }, path);

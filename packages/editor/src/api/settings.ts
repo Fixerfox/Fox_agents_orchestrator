@@ -35,7 +35,7 @@ export function parseSettingsRequest(channel: string, payload: unknown, { bad, e
       return undefined;
     case CHANNELS.saveSettings: {
       if (!isObject(payload)) throw bad('se esperaban ajustes');
-      exact(payload, ['schemaVersion', 'authMode', 'engine', 'defaultModel', 'maxParallel', 'defaultMaxTokens', 'permissions', 'claudeConfig']);
+      exact(payload, ['schemaVersion', 'authMode', 'engine', 'defaultModel', 'maxParallel', 'defaultMaxTokens', 'permissions', 'claudeConfig', 'supervisorReview', 'supervisorModel']);
       if (typeof payload.schemaVersion !== 'number') throw bad('falta la versión');
       str(payload.authMode, 'authMode', 50);
       str(payload.engine, 'engine', 50);
@@ -44,6 +44,8 @@ export function parseSettingsRequest(channel: string, payload: unknown, { bad, e
       if (payload.defaultMaxTokens !== undefined && typeof payload.defaultMaxTokens !== 'number') throw bad('defaultMaxTokens no válido');
       if (payload.permissions !== undefined && !['ask', 'auto', 'full'].includes(payload.permissions as string)) throw bad('permissions no válido');
       if (payload.claudeConfig !== undefined && typeof payload.claudeConfig !== 'boolean') throw bad('claudeConfig no válido');
+      if (payload.supervisorReview !== undefined && typeof payload.supervisorReview !== 'boolean') throw bad('supervisorReview no válido');
+      if (payload.supervisorModel !== undefined) str(payload.supervisorModel, 'supervisorModel', 200);
       return payload as unknown as AppSettings;
     }
     case CHANNELS.setApiKey:

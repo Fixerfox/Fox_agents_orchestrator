@@ -20,5 +20,6 @@ export * from './knowledge';
 export * from './markdown';
 export * from './speckit';
 export * from './run-summary';
+export * from './supervisor-view';
 export * from './edge-inspect';
 export * from './run-audit';

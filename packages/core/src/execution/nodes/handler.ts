@@ -8,6 +8,7 @@ import type { QuestionBroker } from '../run/question-broker';
 import type { ResumeCache } from '../run/resume-cache';
 import type { RetryPolicy } from '../run/retry-policy';
 import type { RunEmitter } from '../run/run-emitter';
+import type { Supervisor } from '../run/supervisor';
 
 /** Cómo acaba un paso. */
 export interface Outcome {
@@ -39,6 +40,8 @@ export interface RunServices {
   gate: PauseGate;
   limiter: ConcurrencyLimiter;
   budget: BudgetTracker;
+  /** Vigila la ejecución, si la app lo activa [R60.1]. */
+  supervisor?: Supervisor;
   questions: QuestionBroker;
   retry: RetryPolicy;
   cache: ResumeCache;

@@ -1,4 +1,4 @@
-import { AgentError, Orchestrator, type AgentAdapter, type AgentEngine, type AgentProfile, type AppSettings, type Decider, type Id, type KnowledgeExtra, type LibraryReader } from '@orquestador/core';
+import { AgentError, Orchestrator, supervisorModel, supervisorReviews, type AgentAdapter, type AgentEngine, type AgentProfile, type AppSettings, type Decider, type Id, type KnowledgeExtra, type LibraryReader } from '@orquestador/core';
 import { createDemoParts } from './demo';
 
 /** Lo que el orquestador necesita saber del proyecto abierto y de Ajustes, siempre al día [R27.1]. */
@@ -40,6 +40,11 @@ export function createEngineOrchestrator(ctx: EngineContext, engines: readonly A
       if (!chosen.blame) throw new AgentError('El motor activo no sabe proponer a qué paso volver');
       return chosen.blame(r, s);
     },
+    supervise: (r, s) => {
+      const chosen = pick().decider;
+      if (!chosen.supervise) throw new AgentError('El motor activo no sabe revisar');
+      return chosen.supervise(r, s);
+    },
     transform: (r, s) => {
       const chosen = pick().decider;
       if (!chosen.transform) throw new AgentError('El motor activo no sabe transformar con Claude');
@@ -49,5 +54,7 @@ export function createEngineOrchestrator(ctx: EngineContext, engines: readonly A
   const getAdapter = (): AgentAdapter => pick().adapter;
   // Un subdiagrama es otro diagrama del proyecto en su última versión guardada [R33.7], o la de la copia de la
   // ejecución [R52.1].
-  return new Orchestrator({ getAdapter, decider, agentProfile: (id, extra, runId) => profileOf(ctx.library, id, extra, runId), resolveTemplate: (id, _version, runId) => ctx.library.diagram(id, runId) });
+  // El Supervisor va siempre; revisa con IA si está activa y el motor sabe hacerlo [R60.12][R60.14].
+  const supervisor = { review: () => supervisorReviews(ctx.settings()) && pick().decider.supervise !== undefined, model: () => supervisorModel(ctx.settings()) };
+  return new Orchestrator({ getAdapter, decider, supervisor, agentProfile: (id, extra, runId) => profileOf(ctx.library, id, extra, runId), resolveTemplate: (id, _version, runId) => ctx.library.diagram(id, runId) });
 }

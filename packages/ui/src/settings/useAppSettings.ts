@@ -11,6 +11,8 @@ const toSettings = (v: SettingsView): AppSettings => ({
   maxParallel: v.maxParallel,
   ...(v.defaultMaxTokens !== undefined ? { defaultMaxTokens: v.defaultMaxTokens } : {}),
   ...(v.permissions ? { permissions: v.permissions } : {}),
+  ...(v.supervisorReview !== undefined ? { supervisorReview: v.supervisorReview } : {}),
+  ...(v.supervisorModel !== undefined ? { supervisorModel: v.supervisorModel } : {}),
 });
 
 /** Ajustes de la aplicación y carpeta de trabajo del proyecto; `section` hace que la carpeta se relea al navegar. */

@@ -63,6 +63,8 @@ export interface LiveView {
   gitActions: RunBranches['actions'];
   /** PR o merge request que creó cada paso [R58.15]. */
   gitLinks: RunBranches['links'];
+  /** Avisos del Supervisor de cada paso [R60.9]. */
+  alerts: Record<string, string[]>;
   needsAttention: boolean;
 }
 
@@ -81,6 +83,7 @@ export const EMPTY_LIVE: LiveView = {
   branches: {},
   gitActions: {},
   gitLinks: {},
+  alerts: {},
   needsAttention: false,
 };
 
@@ -89,7 +92,7 @@ const textOf = (p: Payload | undefined): string | undefined => (p ? p.text : und
 /** Estado visible de una ejecución, reconstruido solo con sus eventos (vivo o replay). */
 export function deriveLive(events: readonly RunEvent[]): LiveView {
   if (events.length === 0) return EMPTY_LIVE;
-  const v: LiveView = { ...EMPTY_LIVE, knowledge: {}, status: 'running', nodeStatus: {}, edges: new Set(), loops: {}, reviews: {}, exhausted: [], usage: { inputTokens: 0, outputTokens: 0, costUsd: 0 }, pending: [], produced: [] };
+  const v: LiveView = { ...EMPTY_LIVE, knowledge: {}, status: 'running', nodeStatus: {}, edges: new Set(), loops: {}, reviews: {}, exhausted: [], usage: { inputTokens: 0, outputTokens: 0, costUsd: 0 }, pending: [], produced: [], alerts: {} };
   const open = new Map<string, PendingItem>();
   // Orden en que empezó cada paso y se recorrió cada conexión, para reiniciar la vuelta al volver atrás [R38.18].
   const startedAt = new Map<string, number>();
@@ -191,6 +194,12 @@ export function deriveLive(events: readonly RunEvent[]): LiveView {
       case 'workspace.conflict':
         v.needsAttention = true;
         break;
+      case 'supervisor.alert':
+        if (e.nodeId !== undefined) {
+          const key = pathKey(np, e.nodeId);
+          v.alerts[key] = [...(v.alerts[key] ?? []), e.detail];
+        }
+        break;
       default:
         break;
     }
@@ -234,7 +243,7 @@ export function budgetRemaining(live: LiveView, limits: BudgetLimits): { tokens?
 
 export type TranscriptItem =
   /** `pass` solo aparece cuando el nodo se ejecutó más de una vez [R15.14]. */
-  | { kind: 'input'; attempt: number; pass?: number; agentId: Id; text: string; config?: unknown; model?: string }
+  | { kind: 'input'; attempt: number; pass?: number; agentId: Id; text: string; config?: unknown; model?: string; /** La memoria que recibió [R60.37]. */ memory?: string }
   /** Empieza la pasada `n` (≥ 2); `by` y `reason`, si la devolvió una revisión [R15.14]. */
   | { kind: 'pass'; n: number; by?: Id; reason?: string }
   | { kind: 'text'; text: string }
@@ -276,7 +285,7 @@ export function transcriptItems(events: readonly RunEvent[], nodeId: Id, nodePat
         returned = undefined;
         break;
       case 'agent.request':
-        items.push({ kind: 'input', attempt: e.attempt, pass: Math.max(1, pass), agentId: e.agentId, text: e.input.text, ...(e.snapshot ? { config: e.snapshot } : {}), ...(e.model ? { model: e.model } : {}) });
+        items.push({ kind: 'input', attempt: e.attempt, pass: Math.max(1, pass), agentId: e.agentId, text: e.input.text, ...(e.snapshot ? { config: e.snapshot } : {}), ...(e.model ? { model: e.model } : {}), ...(e.memory ? { memory: e.memory } : {}) });
         break;
       case 'token.stream': {
         const last = items[items.length - 1];
@@ -310,6 +319,7 @@ export function transcriptItems(events: readonly RunEvent[], nodeId: Id, nodePat
         items.push({ kind: 'error', message: e.message });
         break;
       case 'agent.usage':
+        if (e.source === 'supervisor') break;
         sawUsage = true;
         usage.inputTokens += e.inputTokens;
         usage.outputTokens += e.outputTokens;

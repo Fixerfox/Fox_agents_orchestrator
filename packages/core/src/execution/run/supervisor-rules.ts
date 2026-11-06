@@ -1,0 +1,94 @@
+import type { Id } from '../../shared';
+import { pathKey } from '../replay';
+import type { RunEvent } from '../events';
+import type { RunOptions } from '../run-types';
+import { declaredFiles, withinDeclared } from '../text/split';
+
+/** Lo que detecta una regla [R60.1]. */
+export interface SupervisorAlert {
+  nodeId: Id;
+  path: readonly Id[];
+  rule: 'undeclared-file' | 'empty-output' | 'unexpected-branch' | 'retry-loop' | 'budget-burn';
+  detail: string;
+}
+
+/** Lo que las reglas recuerdan de la ejecución [R60.2]. */
+export interface RuleState {
+  declared: Map<string, string[]>;
+  agents: Set<string>;
+  branch?: string;
+  rejected: Map<string, number>;
+  spent: Map<string, { tokens: number; costUsd: number }>;
+}
+
+export const newRuleState = (): RuleState => ({ declared: new Map(), agents: new Set(), rejected: new Map(), spent: new Map() });
+
+/** Veces que un Coordinador puede rechazar su reparto: la primera y sus 2 repeticiones [R59.8]. */
+const MAX_REJECTIONS = 3;
+
+/** Reglas del Supervisor: solo miran eventos, nunca llaman al motor [R60.2]. */
+export function applyRules(state: RuleState, e: RunEvent, budget: RunOptions['budget']): SupervisorAlert[] {
+  const path = e.nodePath ?? [];
+  const alert = (nodeId: Id, rule: SupervisorAlert['rule'], detail: string): SupervisorAlert[] => [{ nodeId, path, rule, detail }];
+  switch (e.type) {
+    case 'edge.traversed': {
+      const files = e.input ? declaredFiles(e.input.text) : undefined;
+      if (files) state.declared.set(pathKey(path, e.toNodeId), files);
+      return [];
+    }
+    case 'agent.request':
+      state.agents.add(pathKey(path, e.nodeId));
+      return [];
+    case 'file.produced': {
+      const declared = state.declared.get(pathKey(path, e.nodeId));
+      return declared && !withinDeclared(e.path, declared) ? alert(e.nodeId, 'undeclared-file', `Tocó ${e.path}, que no estaba entre sus archivos (${declared.join(', ')}).`) : [];
+    }
+    case 'node.finished':
+      return e.status === 'succeeded' && state.agents.has(pathKey(path, e.nodeId)) && !e.output?.text.trim() ? alert(e.nodeId, 'empty-output', 'Terminó bien, pero sin entregar nada.') : [];
+    case 'git.branch': {
+      const before = state.branch;
+      state.branch = e.branch;
+      const explained = e.created === true || e.via === 'head';
+      return !explained && before !== undefined && before !== e.branch ? alert(e.nodeId, 'unexpected-branch', `Actuó en la rama ${e.branch} y se venía trabajando en ${before}.`) : [];
+    }
+    case 'node.retrying':
+      return e.attempt + 1 >= e.max ? alert(e.nodeId, 'retry-loop', `Agotó sus reintentos: ${e.message}`) : [];
+    case 'split.rejected': {
+      const key = pathKey(path, e.nodeId);
+      const times = (state.rejected.get(key) ?? 0) + 1;
+      state.rejected.set(key, times);
+      return times >= MAX_REJECTIONS ? alert(e.nodeId, 'retry-loop', 'Repitió el reparto hasta el máximo.') : [];
+    }
+    case 'agent.usage': {
+      if (e.source === 'supervisor') return [];
+      const key = pathKey(path, e.nodeId);
+      const spent = state.spent.get(key) ?? { tokens: 0, costUsd: 0 };
+      spent.tokens += e.inputTokens + e.outputTokens;
+      spent.costUsd += e.costUsd ?? 0;
+      state.spent.set(key, spent);
+      const burned = (budget?.maxTokens !== undefined && spent.tokens > budget.maxTokens / 2) || (budget?.maxCostUsd !== undefined && spent.costUsd > budget.maxCostUsd / 2);
+      return burned ? alert(e.nodeId, 'budget-burn', 'Este paso ha gastado más de la mitad del presupuesto.') : [];
+    }
+    default:
+      return [];
+  }
+}
+
+/** La rama de git de una ejecución y quién creó cada una [R60.26]. */
+export interface BranchMemory {
+  branch?: string;
+  creators: Map<string, string>;
+}
+
+export const newBranchMemory = (): BranchMemory => ({ creators: new Map() });
+
+export function rememberBranch(memory: BranchMemory, e: Extract<RunEvent, { type: 'git.branch' }>, label: string): void {
+  if (e.created && !memory.creators.has(e.branch)) memory.creators.set(e.branch, label);
+  if (e.via !== 'ran' || memory.branch === undefined) memory.branch = e.branch;
+}
+
+export function branchMemoryLine(memory: BranchMemory): string {
+  if (memory.branch === undefined) return '';
+  const by = memory.creators.get(memory.branch);
+  return `Rama de git: ${memory.branch}${by ? ` (creada por ${by})` : ''}`;
+}

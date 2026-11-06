@@ -12,7 +12,7 @@ export function RunModal({ api, runId, main, now = Date.now, onClose, onPick, on
 }
 
 /** El modal amplio con la cabecera de la ejecución y sus mismas pestañas [R44.1]. */
-export function RunModalView({ data: d, api, runId, initialTab = 'summary', onClose, onPick, onOpenRuns, onExport }: { data: RunData; api: ProjectApi; runId: string; initialTab?: Btab; onClose: () => void; onPick: (key: string) => void; onOpenRuns?: () => void; onExport: (runId: string, jsonl: string) => void }) {
+export function RunModalView({ data: d, api, runId, initialTab = 'summary', onClose, onPick, onOpenRuns, onExport, focusSupervisor = false }: { focusSupervisor?: boolean; data: RunData; api: ProjectApi; runId: string; initialTab?: Btab; onClose: () => void; onPick: (key: string) => void; onOpenRuns?: () => void; onExport: (runId: string, jsonl: string) => void }) {
   const ref = useRef<HTMLDivElement>(null);
   const [tab, setTab] = useState<Btab>(initialTab);
   const [viewing, setViewing] = useState<string>();
@@ -79,7 +79,7 @@ export function RunModalView({ data: d, api, runId, initialTab = 'summary', onCl
           ))}
         </div>
         <div className="orq-detail__body" role="tabpanel" aria-label={t(`runs.btab.${tab}` as MessageKey)}>
-          {d.ready ? <RunTabBody tab={tab} data={d} api={api} runId={runId} onPick={onPick} onExport={onExport} wide onOpenFile={setViewing} onOpenDeliverable={(path) => (setOpenPath(path), setTab('result'))} openPath={openPath} /> : <p className="orq-hint">{d.snap?.error ?? t('runs.loading')}</p>}
+          {d.ready ? <RunTabBody focusSupervisor={focusSupervisor} tab={tab} data={d} api={api} runId={runId} onPick={onPick} onExport={onExport} wide onOpenFile={setViewing} onOpenDeliverable={(path) => (setOpenPath(path), setTab('result'))} openPath={openPath} /> : <p className="orq-hint">{d.snap?.error ?? t('runs.loading')}</p>}
         </div>
       </div>
       {viewing !== undefined && <FileViewer api={api} runId={runId} events={d.events} path={viewing} labelOf={d.label} onClose={() => setViewing(undefined)} />}

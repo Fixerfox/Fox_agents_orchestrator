@@ -28,6 +28,10 @@ export type EventBody =
       confirm?: boolean;
       /** Regla de reparto que recibe este paso [R59.4]. */
       split?: string;
+      /** Memoria que recibe este paso [R60.25]. */
+      memory?: string;
+      /** Archivos a los que se limita [R60.16]. */
+      scope?: string[];
       /** Aviso del entregable que recibe este paso [R46.4]. */
       deliverable?: { role: 'final' | 'goal'; text: string };
       /** Lo añadido por el diagrama y por el paso, para saber de dónde vino cada cosa [R33.4]. */
@@ -75,6 +79,8 @@ export type EventBody =
       inputTokens: number;
       outputTokens: number;
       costUsd?: number;
+      /** Gasto del Supervisor, no del paso [R60.30]. */
+      source?: 'supervisor';
     }
   /** Archivo escrito por el paso; `change` dice si es nuevo o modificado (los adaptadores que no lo saben lo omiten) [R45.2]. */
   | { type: 'file.produced'; nodeId: Id; path: string; change?: FileChange; /** [R55.3] */ via?: FileVia }
@@ -82,6 +88,16 @@ export type EventBody =
   | { type: 'git.branch'; nodeId: Id; branch: string; via: 'head' | 'command' | 'mcp' | 'ran'; created?: boolean }
   /** El paso hizo esto en una rama [R58.11]. */
   | { type: 'git.action'; nodeId: Id; branch: string; action: 'commit' | 'push' | 'pr' | 'merge' | 'delete' | 'switch'; /** PR o merge request [R58.14]. */ url?: string }
+  /** El Supervisor detecta algo o frena una acción [R60.1]. */
+  | { type: 'supervisor.alert'; nodeId?: Id; rule: string; severity: 'info' | 'warning'; detail: string }
+  /** Entrada de la memoria de la ejecución [R60.18]. */
+  | { type: 'supervisor.note'; nodeId: Id; text: string; files: string[]; /** Salió de una revisión con IA [R60.29]. */ reviewed?: boolean }
+  /** El Supervisor empieza a vigilar [R60.28]. */
+  | { type: 'supervisor.started'; review: boolean; model?: string }
+  /** Empieza a revisar un paso con IA [R60.29]. */
+  | { type: 'supervisor.reviewing'; nodeId: Id }
+  /** Revisiones que no se pudieron hacer [R60.13][R60.15]. */
+  | { type: 'supervisor.skipped'; count: number; reason: 'timeout' | 'failed' }
   | { type: 'workspace.merged'; nodeId: Id; files: string[] }
   | { type: 'workspace.conflict'; nodeIds: Id[]; files: string[] }
   | { type: 'iteration.snapshot'; loopId: Id; n: number; path: string }

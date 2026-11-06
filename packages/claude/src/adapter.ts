@@ -9,7 +9,7 @@ import { buildSystemPrompt, buildUserPrompt, claudeCodePrompt } from './prompt';
 import type { PermissionResult, QueryFn } from './sdk-types';
 import { createMcpPolicy, sdkMcpConfig, type ResolvedMcp } from './mcp';
 import { KnowledgeTracker, describeKnowledge, planKnowledge } from './knowledge';
-import { agentTools, createWritePolicy, guardedPolicy, summarizeFolder, type WritePolicyDeps } from './workfolder';
+import { agentTools, createWritePolicy, withScope, guardedPolicy, summarizeFolder, type WritePolicyDeps } from './workfolder';
 import { CommandWatch } from './changes';
 import { classifyCommand } from './commands';
 
@@ -90,8 +90,11 @@ export class ClaudeAdapter implements AgentAdapter {
     const branches = new BranchTracker(root);
     /** El agente ha preguntado y tiene respuesta en este intento [R39.4]. */
     let asked = false;
+    /** Acciones frenadas, para el Supervisor [R60.16]. */
+    const blocked: string[] = [];
     const note: WritePolicyDeps['note'] = (e) => {
       if (e.kind !== 'denied' && touched.get(e.path) !== 'created') touched.set(e.path, e.kind);
+      if (e.kind === 'denied') blocked.push(`${e.path}: ${e.reason ?? 'denegado'}`);
       this.env.onFileEvent?.(request.nodeId, e);
     };
     try {
@@ -108,7 +111,7 @@ export class ClaudeAdapter implements AgentAdapter {
           root,
           withMcp(
             mcpPolicy,
-            createWritePolicy({
+            withScope(request.scope, root, note, createWritePolicy({
             root,
             level,
             appDirs: [...new Set([path.join(root, '.orquestador'), path.join(this.env.projectRoot, '.orquestador')])],
@@ -120,7 +123,7 @@ export class ClaudeAdapter implements AgentAdapter {
             onAsked: () => {
               asked = true;
             },
-          }),
+          })),
           ),
         ),
       );
@@ -143,6 +146,7 @@ export class ClaudeAdapter implements AgentAdapter {
           buildSystemPrompt(agent, contexts, skills, summary ?? { text: '(carpeta del proyecto)' }, plan, {
             ...(request.confirm ? { confirm: true } : {}),
             ...(request.split ? { split: request.split } : {}),
+            ...(request.memory ? { memory: request.memory } : {}),
             ...(request.deliverable ? { deliverable: request.deliverable } : {}),
             level,
           }),
@@ -178,6 +182,7 @@ export class ClaudeAdapter implements AgentAdapter {
           yield ev;
           if (ev.type === 'tool_result') {
             yield* branches.settled(ev.tool, ev.ok, ev.output);
+            for (const detail of blocked.splice(0)) yield { type: 'blocked', detail };
             yield* touchedFiles(root, touched, sent, false);
             if (ev.tool === 'Bash') yield* commandFiles(await watch.closing('done', ev.id), touched, sent);
             else if (ev.tool === 'Agent' || ev.tool === 'Task') yield* commandFiles(await watch.closing('flush'), touched, sent);

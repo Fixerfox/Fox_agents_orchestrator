@@ -28,6 +28,11 @@ interface EventBase { runId: Id; seq: number; ts: string; type: string; nodePath
 | `file.produced` | `nodeId, path, change?: 'created' \| 'modified'` | Un agente crea o modifica un archivo; se emite al terminar la herramienta que lo escribió, también si luego el paso falla (SPEC-045) |
 | `git.branch` | `nodeId, branch, via: 'head' \| 'command' \| 'mcp' \| 'ran', created?` | El paso creó una rama o actuó en ella (SPEC-058) |
 | `git.action` | `nodeId, branch, action: 'commit' \| 'push' \| 'pr' \| 'merge' \| 'delete' \| 'switch', url?` | El paso hizo eso en esa rama; `url` es la de la PR (SPEC-058) |
+| `supervisor.alert` | `nodeId?, rule, severity, detail` | El Supervisor detecta algo o bloquea una acción (SPEC-060) |
+| `supervisor.started` | `review, model?` | El Supervisor empieza a vigilar la ejecución (SPEC-060) |
+| `supervisor.reviewing` | `nodeId` | Empieza a revisar un paso con IA (SPEC-060) |
+| `supervisor.note` | `nodeId, text, files, reviewed?` | Entrada de la memoria de la ejecución (SPEC-060) |
+| `supervisor.skipped` | `count, reason: 'timeout' \| 'failed'` | Revisiones que no se pudieron hacer (SPEC-060) |
 | `node.retrying` | `nodeId, attempt, max, delayMs, message` | Reintento automático tras error temporal |
 | `workspace.merged` | `nodeId, files` | Cambios de un agente fusionados en el proyecto |
 | `workspace.conflict` | `nodeIds, files` | Conflicto entre agentes paralelos; requiere atención |
