@@ -122,6 +122,24 @@ describe('SPEC-056 · casos de uso: otro motor', () => {
     expect(route.routeCalls).toHaveLength(1);
   });
 
+  it('[R53.5] la propuesta de a qué paso volver es la del motor activo', async () => {
+    const elegido = new MockDecider({ blame: () => ({ nodeId: 'a', reason: 'el plan' }) });
+    const otro = new MockDecider({ blame: () => ({ nodeId: 'b', reason: 'no' }) });
+    const orch = createEngineOrchestrator({ library: new MemoryLibrary(), settings: settingsWith('uno') }, [memoryEngine('uno', { adapter: new MockAgent(), decider: elegido }), memoryEngine('dos', { decider: otro })]);
+    const { events } = await orch.start(D, 'x').result;
+    expect((await orch.proposeCorrection({ diagram: D, events, text: 'Cambia el plan' })).proposal).toEqual({ nodeId: 'a', reason: 'el plan' });
+    expect(elegido.blameCalls[0]!.feedback).toBe('Cambia el plan');
+    expect(otro.blameCalls).toEqual([]);
+  });
+
+  it('[R53.5] un motor que no sabe proponer deja el último paso, sin fallar', async () => {
+    const decider = new MockDecider();
+    const bare = { route: decider.route, judge: decider.judge, condition: decider.condition };
+    const orch = createEngineOrchestrator({ library: new MemoryLibrary(), settings: settingsWith('otro') }, [memoryEngine('otro', { decider: bare })]);
+    const { events } = await orch.start(D, 'x').result;
+    expect((await orch.proposeCorrection({ diagram: D, events, text: 'x' })).proposal.nodeId).toBe('b');
+  });
+
   it('[R56.4] un motor que no transforma deja el mismo error que no saber hacerlo', async () => {
     const decider = new MockDecider();
     const bare = { route: decider.route, judge: decider.judge, condition: decider.condition };

@@ -20,6 +20,12 @@ export function createEngineOrchestrator(ctx: EngineContext, engines: readonly A
     route: (r, s) => pick().decider.route(r, s),
     judge: (r, s) => pick().decider.judge(r, s),
     condition: (r, s) => pick().decider.condition(r, s),
+    // Sin `blame` falla a propósito: `blameStep` lo trata como no saber y propone el último paso [R53.5].
+    blame: (r, s) => {
+      const chosen = pick().decider;
+      if (!chosen.blame) throw new AgentError('El motor activo no sabe proponer a qué paso volver');
+      return chosen.blame(r, s);
+    },
     transform: (r, s) => {
       const chosen = pick().decider;
       if (!chosen.transform) throw new AgentError('El motor activo no sabe transformar con Claude');

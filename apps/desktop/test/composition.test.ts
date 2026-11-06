@@ -58,6 +58,59 @@ describe('SPEC-056 · composición de la aplicación', () => {
     expect(prompts.join('\n')).toContain('PINTA-ORIGINAL');
   });
 
+  it('[R53.5] la revisión humana vuelve al paso que propone Claude, no al último', async () => {
+    const reviewed: Diagram = {
+      id: 'revisado',
+      name: 'Revisado',
+      schemaVersion: 1,
+      nodes: [
+        { id: 'entry', kind: 'entry' },
+        { id: 'a', kind: 'agent', agentId: 'pintor', label: 'Plan' },
+        { id: 'b', kind: 'agent', agentId: 'pintor', label: 'Obra' },
+        { id: 'rev', kind: 'review', label: 'Revisión', review: { maxRounds: 3, mode: 'human' } },
+        { id: 'output', kind: 'output' },
+      ],
+      edges: [
+        { id: 'e1', from: 'entry', to: 'a' },
+        { id: 'e2', from: 'a', to: 'b' },
+        { id: 'e3', from: 'b', to: 'rev' },
+        { id: 'e4', from: 'rev', to: 'output', port: 'approved' },
+        { id: 'e5', from: 'rev', to: 'output', port: 'exhausted' },
+      ],
+    };
+    const query: QueryFn = async function* ({ prompt }) {
+      yield result(String(prompt).includes('Elige el paso') ? '{"nodeId":"a","reason":"el plan"}' : 'Hecho');
+    };
+    const handle = composeOrchestrator(context('claude'), query).start(reviewed, 'Pinta');
+    const answers = ['Cambia el plan', 'lo propuesto', 'Aprobar'];
+    handle.bus.subscribe((e) => {
+      if (e.type === 'agent.question') setTimeout(() => handle.answer(e.questionId, answers.shift()!), 0);
+    });
+    const { events, status } = await handle.result;
+    expect(status).toBe('succeeded');
+    expect(events.find((e) => e.type === 'correction.routed')).toMatchObject({ targetId: 'a', reason: 'el plan' });
+    expect(events.filter((e) => e.type === 'node.started' && e.nodeId === 'a')).toHaveLength(2);
+  });
+
+  it('[R53.10] corregir una ejecución terminada propone el paso que dice Claude', async () => {
+    await store.diagrams.save({
+      ...flow,
+      nodes: [flow.nodes[0]!, { id: 'p', kind: 'agent', agentId: 'pintor', label: 'Plan' }, { id: 'q', kind: 'agent', agentId: 'pintor', label: 'Obra' }, flow.nodes[2]!],
+      edges: [
+        { id: 'e1', from: 'entry', to: 'p' },
+        { id: 'e2', from: 'p', to: 'q' },
+        { id: 'e3', from: 'q', to: 'output' },
+      ],
+    });
+    const query: QueryFn = async function* ({ prompt }) {
+      yield result(String(prompt).includes('Elige el paso') ? '{"nodeId":"p","reason":"el plan"}' : 'Hecho');
+    };
+    const svc = new RunService(composeRunPorts(store), composeOrchestrator(context('claude'), query));
+    const { runId } = await svc.start({ diagramId: 'flujo', order: 'Pinta' });
+    await svc.settled(runId);
+    expect((await svc.proposeCorrection(runId, 'Cambia el plan')).proposal).toEqual({ nodeId: 'p', reason: 'el plan' });
+  });
+
   it('[R56.5] con el motor simulado no se llama a Claude', async () => {
     let calls = 0;
     const query: QueryFn = async function* () {
