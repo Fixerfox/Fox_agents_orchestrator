@@ -1,0 +1,426 @@
+{
+  "name": "revision-humana",
+  "order": "global",
+  "diagram": {
+    "id": "revision-humana",
+    "name": "revision-humana",
+    "schemaVersion": 1,
+    "nodes": [
+      {
+        "id": "entry",
+        "kind": "entry"
+      },
+      {
+        "id": "a",
+        "kind": "agent",
+        "agentId": "a",
+        "label": "Analista"
+      },
+      {
+        "id": "b",
+        "kind": "agent",
+        "agentId": "b",
+        "label": "Builder"
+      },
+      {
+        "id": "rev",
+        "kind": "review",
+        "label": "rev",
+        "review": {
+          "maxRounds": 3,
+          "mode": "human"
+        }
+      },
+      {
+        "id": "output",
+        "kind": "output"
+      }
+    ],
+    "edges": [
+      {
+        "id": "entry->a",
+        "from": "entry",
+        "to": "a"
+      },
+      {
+        "id": "a->b",
+        "from": "a",
+        "to": "b"
+      },
+      {
+        "id": "b->rev",
+        "from": "b",
+        "to": "rev"
+      },
+      {
+        "id": "rev->output:approved",
+        "from": "rev",
+        "to": "output",
+        "port": "approved"
+      },
+      {
+        "id": "rev->output:x",
+        "from": "rev",
+        "to": "output",
+        "port": "exhausted"
+      }
+    ]
+  },
+  "runs": [
+    [
+      {
+        "type": "run.started",
+        "diagramId": "revision-humana",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.queued",
+        "nodeId": "entry",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.started",
+        "nodeId": "entry",
+        "input": {
+          "text": "pedido inicial",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "node.finished",
+        "nodeId": "entry",
+        "status": "succeeded",
+        "output": {
+          "text": "pedido inicial",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "edge.traversed",
+        "edgeId": "entry->a",
+        "fromNodeId": "entry",
+        "toNodeId": "a",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.queued",
+        "nodeId": "a",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.started",
+        "nodeId": "a",
+        "input": {
+          "text": "pedido inicial",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "agent.request",
+        "nodeId": "a",
+        "agentId": "a",
+        "attempt": 1,
+        "input": {
+          "text": "pedido inicial",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "node.finished",
+        "nodeId": "a",
+        "status": "succeeded",
+        "output": {
+          "text": "plan",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "edge.traversed",
+        "edgeId": "a->b",
+        "fromNodeId": "a",
+        "toNodeId": "b",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.queued",
+        "nodeId": "b",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.started",
+        "nodeId": "b",
+        "input": {
+          "text": "plan",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "agent.request",
+        "nodeId": "b",
+        "agentId": "b",
+        "attempt": 1,
+        "input": {
+          "text": "plan",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "node.finished",
+        "nodeId": "b",
+        "status": "succeeded",
+        "output": {
+          "text": "obra",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "edge.traversed",
+        "edgeId": "b->rev",
+        "fromNodeId": "b",
+        "toNodeId": "rev",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.queued",
+        "nodeId": "rev",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.started",
+        "nodeId": "rev",
+        "input": {
+          "text": "obra",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "agent.question",
+        "nodeId": "rev",
+        "questionId": "q-1",
+        "text": "obra",
+        "options": [
+          "Aprobar"
+        ],
+        "review": {
+          "round": 1,
+          "max": 3,
+          "phase": "feedback"
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "agent.answer",
+        "nodeId": "rev",
+        "questionId": "q-1",
+        "text": "Cambia el plan",
+        "runId": "run-1"
+      },
+      {
+        "type": "agent.question",
+        "nodeId": "rev",
+        "questionId": "q-2",
+        "text": "Propuesta: volver a **Analista**. el plan",
+        "options": [
+          "Analista",
+          "Builder"
+        ],
+        "review": {
+          "round": 1,
+          "max": 3,
+          "phase": "route",
+          "proposal": "a",
+          "reason": "el plan",
+          "candidates": [
+            {
+              "nodeId": "a",
+              "label": "Analista"
+            },
+            {
+              "nodeId": "b",
+              "label": "Builder"
+            }
+          ]
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "agent.answer",
+        "nodeId": "rev",
+        "questionId": "q-2",
+        "text": "Builder",
+        "runId": "run-1"
+      },
+      {
+        "type": "correction.routed",
+        "nodeId": "rev",
+        "round": 1,
+        "targetId": "b",
+        "reason": "",
+        "by": "user",
+        "runId": "run-1"
+      },
+      {
+        "type": "review.decided",
+        "nodeId": "rev",
+        "round": 1,
+        "max": 3,
+        "verdict": "rejected",
+        "source": "human",
+        "returnTo": "b",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.finished",
+        "nodeId": "rev",
+        "status": "succeeded",
+        "output": {
+          "text": "Cambia el plan",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "node.queued",
+        "nodeId": "b",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.started",
+        "nodeId": "b",
+        "input": {
+          "text": "plan\n\n---\n\n## Revisión humana · vuelta 2 de 3\n\nEl usuario revisó la entrega anterior y pide cambios. Corrige lo que se indica y entrega de nuevo el trabajo completo.\n\n### Tu entrega anterior\n\nobra\n\n### Correcciones pedidas\n\nCambia el plan",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "agent.request",
+        "nodeId": "b",
+        "agentId": "b",
+        "attempt": 1,
+        "input": {
+          "text": "plan\n\n---\n\n## Revisión humana · vuelta 2 de 3\n\nEl usuario revisó la entrega anterior y pide cambios. Corrige lo que se indica y entrega de nuevo el trabajo completo.\n\n### Tu entrega anterior\n\nobra\n\n### Correcciones pedidas\n\nCambia el plan",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "node.finished",
+        "nodeId": "b",
+        "status": "succeeded",
+        "output": {
+          "text": "obra",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "edge.traversed",
+        "edgeId": "b->rev",
+        "fromNodeId": "b",
+        "toNodeId": "rev",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.queued",
+        "nodeId": "rev",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.started",
+        "nodeId": "rev",
+        "input": {
+          "text": "obra",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "agent.question",
+        "nodeId": "rev",
+        "questionId": "q-3",
+        "text": "obra",
+        "options": [
+          "Aprobar"
+        ],
+        "review": {
+          "round": 2,
+          "max": 3,
+          "phase": "feedback"
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "agent.answer",
+        "nodeId": "rev",
+        "questionId": "q-3",
+        "text": "Aprobar",
+        "runId": "run-1"
+      },
+      {
+        "type": "review.decided",
+        "nodeId": "rev",
+        "round": 2,
+        "max": 3,
+        "verdict": "approved",
+        "source": "human",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.finished",
+        "nodeId": "rev",
+        "status": "succeeded",
+        "output": {
+          "text": "obra",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "edge.traversed",
+        "edgeId": "rev->output:approved",
+        "fromNodeId": "rev",
+        "toNodeId": "output",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.queued",
+        "nodeId": "output",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.started",
+        "nodeId": "output",
+        "input": {
+          "text": "obra",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "node.finished",
+        "nodeId": "output",
+        "status": "succeeded",
+        "output": {
+          "text": "obra",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "run.finished",
+        "status": "succeeded",
+        "runId": "run-1"
+      }
+    ]
+  ]
+}

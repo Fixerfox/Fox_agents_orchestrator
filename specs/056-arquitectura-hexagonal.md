@@ -1,6 +1,6 @@
 # SPEC-056 · Arquitectura hexagonal con contextos (DDD ligero) y responsabilidades separadas
 
-**Estado:** Borrador · **Hito:** M11a, M11b, M11c, M11d · **Paquetes:** todos
+**Estado:** En curso · **Hito:** M11a, M11b, M11c, M11d · **Paquetes:** todos
 
 ## Propósito
 El 05/11 el usuario pidió una arquitectura que escale («hexagonal no está mal», «DDD ligero») y que no haya clases monolíticas. Revisión del código (05/11, 23:20):
@@ -71,7 +71,7 @@ Esta spec no añade funcionalidad. Cambia la estructura para que añadir un tipo
   - `WorkspaceFiles`: lo que `runtime` toma hoy de `workspace` (`manifestOf`, `resolveInside`).
 - **R56.4** [M11a] `runtime` solo depende de `core`. `RunService`, `jobsOf`, `takeSnapshot` y el orquestador por motor reciben puertos. `createEngineOrchestrator(ctx, engines: AgentEngine[])` elige el motor por `settings().engine` en cada paso, como hoy (R27.1), y ya no construye `ClaudeAdapter`.
 - **R56.5** [M11a] `apps/desktop/src/main/composition.ts` es el único lugar que crea `ProjectStore`, `ClaudeAdapter` y `ClaudeDecider` y los conecta con los puertos (incluido el actual `claudeEnvironment`). `store` implementa `RunRepository` y `LibraryReader`, y `workspace` implementa `WorkspaceFiles`. `claude` exporta `createClaudeEngine(env, query): AgentEngine` y su `PathPolicy`.
-- **R56.6** [M11a] Grabación de referencia: 14 diagramas en `packages/runtime/test/fixtures/golden/`. Son lineal; paralelo con agente que junta; router por reglas y con IA; bucle por veces y con evaluador; revisión con retorno por IA; revisión humana («Lo reviso yo»); subdiagrama; transformar; confirmar antes de terminar; entregable; reanudar una ejecución parada. Se ejecutan con `MockAgent`, reloj e ids deterministas, y la secuencia normalizada de eventos (decisión 8) es igual a la grabada. Se graba antes del primer cambio de estructura y no se regraba en esta spec.
+- **R56.6** [M11a] Grabación de referencia: 14 diagramas en `packages/runtime/test/fixtures/golden/`. Son lineal; paralelo con agente que junta; router por reglas y con IA; bucle por veces y con evaluador; revisión con retorno por IA; revisión humana («Lo reviso yo»); subdiagrama; transformar; confirmar antes de terminar; entregable; reanudar una ejecución parada; corregir una ejecución terminada. Se ejecutan con `MockAgent`, reloj e ids deterministas, y la secuencia normalizada de eventos (decisión 8) es igual a la grabada. Se graba antes del primer cambio de estructura y no se regraba en esta spec.
 - **R56.7** [M11a] `eslint.config.js` replica la matriz de R56.1 y R56.2 con `no-restricted-imports` por paquete, y `npm run check` incluye el test de arquitectura.
 
 ### B · Contextos (M11b)

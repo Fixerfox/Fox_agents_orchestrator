@@ -1,0 +1,268 @@
+{
+  "name": "transformar",
+  "order": "global",
+  "diagram": {
+    "id": "transformar",
+    "name": "transformar",
+    "schemaVersion": 1,
+    "nodes": [
+      {
+        "id": "entry",
+        "kind": "entry"
+      },
+      {
+        "id": "a",
+        "kind": "agent",
+        "agentId": "a",
+        "label": "a"
+      },
+      {
+        "id": "reglas",
+        "kind": "transform",
+        "label": "reglas",
+        "transform": {
+          "mode": "rules",
+          "format": "markdown",
+          "template": "# {{entrada}}"
+        }
+      },
+      {
+        "id": "ia",
+        "kind": "transform",
+        "label": "ia",
+        "transform": {
+          "mode": "ai",
+          "format": "json",
+          "instructions": "Saca un objeto",
+          "maxAttempts": 2
+        }
+      },
+      {
+        "id": "output",
+        "kind": "output"
+      }
+    ],
+    "edges": [
+      {
+        "id": "entry->a",
+        "from": "entry",
+        "to": "a"
+      },
+      {
+        "id": "a->reglas",
+        "from": "a",
+        "to": "reglas"
+      },
+      {
+        "id": "reglas->ia",
+        "from": "reglas",
+        "to": "ia"
+      },
+      {
+        "id": "ia->output",
+        "from": "ia",
+        "to": "output"
+      }
+    ]
+  },
+  "runs": [
+    [
+      {
+        "type": "run.started",
+        "diagramId": "transformar",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.queued",
+        "nodeId": "entry",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.started",
+        "nodeId": "entry",
+        "input": {
+          "text": "pedido inicial",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "node.finished",
+        "nodeId": "entry",
+        "status": "succeeded",
+        "output": {
+          "text": "pedido inicial",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "edge.traversed",
+        "edgeId": "entry->a",
+        "fromNodeId": "entry",
+        "toNodeId": "a",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.queued",
+        "nodeId": "a",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.started",
+        "nodeId": "a",
+        "input": {
+          "text": "pedido inicial",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "agent.request",
+        "nodeId": "a",
+        "agentId": "a",
+        "attempt": 1,
+        "input": {
+          "text": "pedido inicial",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "node.finished",
+        "nodeId": "a",
+        "status": "succeeded",
+        "output": {
+          "text": "texto base",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "edge.traversed",
+        "edgeId": "a->reglas",
+        "fromNodeId": "a",
+        "toNodeId": "reglas",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.queued",
+        "nodeId": "reglas",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.started",
+        "nodeId": "reglas",
+        "input": {
+          "text": "texto base",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "transform.done",
+        "nodeId": "reglas",
+        "mode": "rules",
+        "format": "markdown",
+        "attempts": 1,
+        "ok": true,
+        "runId": "run-1"
+      },
+      {
+        "type": "node.finished",
+        "nodeId": "reglas",
+        "status": "succeeded",
+        "output": {
+          "text": "# texto base",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "edge.traversed",
+        "edgeId": "reglas->ia",
+        "fromNodeId": "reglas",
+        "toNodeId": "ia",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.queued",
+        "nodeId": "ia",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.started",
+        "nodeId": "ia",
+        "input": {
+          "text": "# texto base",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "node.retrying",
+        "nodeId": "ia",
+        "attempt": 1,
+        "max": 2,
+        "delayMs": 0,
+        "message": "La respuesta no contiene JSON",
+        "runId": "run-1"
+      },
+      {
+        "type": "transform.done",
+        "nodeId": "ia",
+        "mode": "ai",
+        "format": "json",
+        "attempts": 2,
+        "ok": true,
+        "runId": "run-1"
+      },
+      {
+        "type": "node.finished",
+        "nodeId": "ia",
+        "status": "succeeded",
+        "output": {
+          "text": "{\n  \"ok\": true\n}",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "edge.traversed",
+        "edgeId": "ia->output",
+        "fromNodeId": "ia",
+        "toNodeId": "output",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.queued",
+        "nodeId": "output",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.started",
+        "nodeId": "output",
+        "input": {
+          "text": "{\n  \"ok\": true\n}",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "node.finished",
+        "nodeId": "output",
+        "status": "succeeded",
+        "output": {
+          "text": "{\n  \"ok\": true\n}",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "run.finished",
+        "status": "succeeded",
+        "runId": "run-1"
+      }
+    ]
+  ]
+}

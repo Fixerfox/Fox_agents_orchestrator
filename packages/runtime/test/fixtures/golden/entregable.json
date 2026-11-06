@@ -1,0 +1,339 @@
+{
+  "name": "entregable",
+  "order": "global",
+  "diagram": {
+    "id": "entregable",
+    "name": "entregable",
+    "schemaVersion": 1,
+    "nodes": [
+      {
+        "id": "entry",
+        "kind": "entry"
+      },
+      {
+        "id": "a",
+        "kind": "agent",
+        "agentId": "a",
+        "label": "a"
+      },
+      {
+        "id": "b",
+        "kind": "agent",
+        "agentId": "b",
+        "label": "b"
+      },
+      {
+        "id": "output",
+        "kind": "output"
+      }
+    ],
+    "edges": [
+      {
+        "id": "entry->a",
+        "from": "entry",
+        "to": "a"
+      },
+      {
+        "id": "a->b",
+        "from": "a",
+        "to": "b"
+      },
+      {
+        "id": "b->output",
+        "from": "b",
+        "to": "output"
+      }
+    ],
+    "deliverable": {
+      "items": [
+        {
+          "kind": "links"
+        },
+        {
+          "kind": "summary"
+        },
+        {
+          "kind": "json"
+        },
+        {
+          "kind": "custom",
+          "title": "Cómo arrancarlo",
+          "instructions": "Pasos"
+        }
+      ],
+      "notify": "all"
+    }
+  },
+  "runs": [
+    [
+      {
+        "type": "run.started",
+        "diagramId": "entregable",
+        "deliverable": {
+          "items": [
+            {
+              "kind": "links"
+            },
+            {
+              "kind": "summary"
+            },
+            {
+              "kind": "json"
+            },
+            {
+              "kind": "custom",
+              "title": "Cómo arrancarlo",
+              "instructions": "Pasos"
+            }
+          ],
+          "notify": "all"
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "node.queued",
+        "nodeId": "entry",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.started",
+        "nodeId": "entry",
+        "input": {
+          "text": "pedido inicial",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "node.finished",
+        "nodeId": "entry",
+        "status": "succeeded",
+        "output": {
+          "text": "pedido inicial",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "edge.traversed",
+        "edgeId": "entry->a",
+        "fromNodeId": "entry",
+        "toNodeId": "a",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.queued",
+        "nodeId": "a",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.started",
+        "nodeId": "a",
+        "input": {
+          "text": "pedido inicial",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "agent.request",
+        "nodeId": "a",
+        "agentId": "a",
+        "attempt": 1,
+        "input": {
+          "text": "pedido inicial",
+          "files": []
+        },
+        "deliverable": {
+          "role": "goal",
+          "text": "Objetivo final de la ejecución: se entregará la lista de archivos creados o modificados y los enlaces (URLs) que se generen; un resumen en Markdown de lo hecho; datos en JSON; una sección «Cómo arrancarlo»: Pasos."
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "token.stream",
+        "nodeId": "a",
+        "text": "Hola ",
+        "runId": "run-1"
+      },
+      {
+        "type": "token.stream",
+        "nodeId": "a",
+        "text": "mundo",
+        "runId": "run-1"
+      },
+      {
+        "type": "tool.called",
+        "nodeId": "a",
+        "tool": "Write",
+        "input": {
+          "file": "a.txt"
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "tool.result",
+        "nodeId": "a",
+        "tool": "Write",
+        "ok": true,
+        "output": "ok",
+        "runId": "run-1"
+      },
+      {
+        "type": "agent.usage",
+        "nodeId": "a",
+        "inputTokens": 10,
+        "outputTokens": 5,
+        "costUsd": 0.01,
+        "runId": "run-1"
+      },
+      {
+        "type": "file.produced",
+        "nodeId": "a",
+        "path": "a.txt",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.finished",
+        "nodeId": "a",
+        "status": "succeeded",
+        "output": {
+          "text": "[a] pedido inicial\n\nArchivos tocados (registrados por el orquestador):\n- a.txt",
+          "files": [
+            "a.txt"
+          ]
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "edge.traversed",
+        "edgeId": "a->b",
+        "fromNodeId": "a",
+        "toNodeId": "b",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.queued",
+        "nodeId": "b",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.started",
+        "nodeId": "b",
+        "input": {
+          "text": "[a] pedido inicial\n\nArchivos tocados (registrados por el orquestador):\n- a.txt",
+          "files": [
+            "a.txt"
+          ]
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "agent.request",
+        "nodeId": "b",
+        "agentId": "b",
+        "attempt": 1,
+        "input": {
+          "text": "[a] pedido inicial\n\nArchivos tocados (registrados por el orquestador):\n- a.txt",
+          "files": [
+            "a.txt"
+          ]
+        },
+        "deliverable": {
+          "role": "final",
+          "text": "Al terminar esta ejecución se entregará al usuario:\n- la lista de archivos creados o modificados y los enlaces (URLs) que se generen\n- un resumen en Markdown de lo hecho\n- datos en JSON\n- una sección «Cómo arrancarlo»: Pasos"
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "node.finished",
+        "nodeId": "b",
+        "status": "succeeded",
+        "output": {
+          "text": "cierre",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "edge.traversed",
+        "edgeId": "b->output",
+        "fromNodeId": "b",
+        "toNodeId": "output",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.queued",
+        "nodeId": "output",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.started",
+        "nodeId": "output",
+        "input": {
+          "text": "cierre",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "deliverable.done",
+        "nodeId": "output",
+        "ok": true,
+        "fileName": "entregable",
+        "markdown": "# Entregable\n\n## Enlaces\n\nRutas relativas a la carpeta del proyecto:\n\n- `a.txt`\n\n## Resumen\n\nEjecución simulada: 2 pasos y 1 archivo creados o cambiados.\n\n## Datos (JSON)\n\n```json\n{}\n```\n\n## Cómo arrancarlo\n\nSección «Cómo arrancarlo» generada por el motor simulado.\n",
+        "json": "{}",
+        "links": {
+          "files": [
+            {
+              "path": "a.txt"
+            }
+          ],
+          "urls": []
+        },
+        "items": [
+          {
+            "kind": "links",
+            "title": "Enlaces",
+            "ok": true,
+            "attempts": 0
+          },
+          {
+            "kind": "summary",
+            "title": "Resumen",
+            "ok": true,
+            "attempts": 1
+          },
+          {
+            "kind": "json",
+            "title": "Datos (JSON)",
+            "ok": true,
+            "attempts": 1
+          },
+          {
+            "kind": "custom",
+            "title": "Cómo arrancarlo",
+            "ok": true,
+            "attempts": 1
+          }
+        ],
+        "runId": "run-1"
+      },
+      {
+        "type": "node.finished",
+        "nodeId": "output",
+        "status": "succeeded",
+        "output": {
+          "text": "# Entregable\n\n## Enlaces\n\nRutas relativas a la carpeta del proyecto:\n\n- `a.txt`\n\n## Resumen\n\nEjecución simulada: 2 pasos y 1 archivo creados o cambiados.\n\n## Datos (JSON)\n\n```json\n{}\n```\n\n## Cómo arrancarlo\n\nSección «Cómo arrancarlo» generada por el motor simulado.\n",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "run.finished",
+        "status": "succeeded",
+        "runId": "run-1"
+      }
+    ]
+  ]
+}
