@@ -1,11 +1,11 @@
 import { type ReactNode, useMemo, useState } from 'react';
-import { CheckCircle2, XCircle, Loader2, CircleDashed, RotateCcw, Square, Copy } from 'lucide-react';
+import { CheckCircle2, XCircle, Loader2, CircleDashed, RotateCcw, Square, Copy, GitBranch } from 'lucide-react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { type Diagram, type RunEvent, pathKey, canResume } from '@orquestador/core';
 import { type LiveView, EditorSession, filesByStep, type ProjectApi, t, formatDuration, type RunSummaryView, type MessageKey, type HistoryRow } from '@orquestador/editor';
 import { Canvas } from '../diagrams';
 import { ResultsPanel } from './ResultsPanel';
-import { Markdown } from '../common';
+import { Markdown, PrLink } from '../common';
 import { money } from './runFormat';
 
 /** Lienzo de solo lectura con el diagrama de la ejecución y el estado de cada paso [R35.9]. */
@@ -91,6 +91,25 @@ export function SummaryBody({ summary: s, onPick, wide = false, onOpenDeliverabl
         {icon(s.status)}
         <strong>{s.headline}</strong>
       </p>
+      {s.branches.length > 0 && (
+        <section className="orq-rsum__branches" aria-label={t('rsum.branches')}>
+          <h3>{t('rsum.branches')}</h3>
+          <ul>
+            {s.branches.map((b) => (
+              <li key={b.name}>
+                <strong className="orq-rsum__branch">
+                  <GitBranch size={14} aria-hidden="true" />
+                  <span>{b.name}</span>
+                </strong>
+                {b.created && <span className="orq-tag">{t('rsum.branch.new')}</span>}
+                {b.deleted && <span className="orq-tag">{t('rsum.branch.deleted')}</span>}
+                {b.prUrl && <PrLink url={b.prUrl} />}
+                <span className="orq-hint">{b.steps.map((s) => (s.actions.length > 0 ? `${s.label} (${s.actions.map((a) => t(`git.action.${a}` as MessageKey)).join(', ')})` : s.label)).join(' · ')}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       {s.deliverable && <DeliverableBlock deliverable={s.deliverable} running={s.status === 'running'} {...(onOpenDeliverable ? { onOpenFile: onOpenDeliverable } : {})} />}
       {s.input && (
         <section className="orq-rsum__sec" aria-label={t('rsum.input')}>

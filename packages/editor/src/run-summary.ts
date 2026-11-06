@@ -1,4 +1,5 @@
 import type { DeliverableItemResult, NodeStatus, RunEvent } from '@orquestador/core';
+import { branchesOf } from './branches';
 import { t } from './i18n';
 
 /**
@@ -39,6 +40,8 @@ export interface RunSummaryView {
   reviews: RunReviewSummary[];
   questions: { label: string; text: string; answer?: string }[];
   files: string[];
+  /** Ramas de git en las que se actuó y qué pasos lo hicieron [R58.10]. */
+  branches: { name: string; created: boolean; deleted: boolean; prUrl?: string; steps: { label: string; actions: string[] }[] }[];
   errors: { label: string; message: string }[];
   finalOutput?: string;
   /** Paso donde falló, si falló. */
@@ -173,6 +176,7 @@ export function summarizeRun(events: readonly RunEvent[], labelOf: (nodeId: stri
     reviews: [...reviews.values()],
     questions: [...questions.values()],
     files,
+    branches: branchesOf(events).list.map((b) => ({ name: b.name, created: b.created, deleted: b.deleted, ...(b.prUrl ? { prUrl: b.prUrl } : {}), steps: b.steps.map((s) => ({ label: labelOf(s.nodeId, s.nodePath), actions: s.actions })) })),
     errors,
     ...(finalOutput !== undefined ? { finalOutput: cut(finalOutput, maxText * 10) } : {}),
     ...(failed ? { failedAt: failed.label } : {}),

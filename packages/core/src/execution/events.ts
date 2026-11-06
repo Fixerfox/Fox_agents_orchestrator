@@ -75,6 +75,10 @@ export type EventBody =
     }
   /** Archivo escrito por el paso; `change` dice si es nuevo o modificado (los adaptadores que no lo saben lo omiten) [R45.2]. */
   | { type: 'file.produced'; nodeId: Id; path: string; change?: FileChange; /** [R55.3] */ via?: FileVia }
+  /** El paso creó una rama de git o actuó en ella [R58.1]. */
+  | { type: 'git.branch'; nodeId: Id; branch: string; via: 'head' | 'command' | 'mcp' | 'ran'; created?: boolean }
+  /** El paso hizo esto en una rama [R58.11]. */
+  | { type: 'git.action'; nodeId: Id; branch: string; action: 'commit' | 'push' | 'pr' | 'merge' | 'delete' | 'switch'; /** PR o merge request [R58.14]. */ url?: string }
   | { type: 'workspace.merged'; nodeId: Id; files: string[] }
   | { type: 'workspace.conflict'; nodeIds: Id[]; files: string[] }
   | { type: 'iteration.snapshot'; loopId: Id; n: number; path: string }

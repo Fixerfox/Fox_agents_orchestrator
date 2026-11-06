@@ -9,6 +9,9 @@ export interface MockAgentScript {
   tools?: { tool: string; input?: unknown; ok?: boolean; output?: string }[];
   usage?: { inputTokens: number; outputTokens: number; costUsd?: number };
   files?: string[];
+  /** Ramas de git que simula haber tocado [R58.1]. */
+  gitActions?: { branch: string; action: 'commit' | 'push' | 'pr' | 'merge' | 'delete' | 'switch'; url?: string }[];
+  branches?: { branch: string; via: 'head' | 'command' | 'mcp' | 'ran'; created?: boolean }[];
   latencyMs?: number;
   /** El agente se queda esperando hasta que se resuelva esta promesa (o se cancele). */
   waitFor?: Promise<void>;
@@ -101,6 +104,8 @@ export class MockAgent implements AgentAdapter {
       for (const r of required) yield { type: 'knowledge', ...r, via: 'inline', required: true };
       if (script.usage) yield { type: 'usage', ...script.usage };
       for (const path of script.files ?? []) yield { type: 'file', path };
+      for (const b of script.branches ?? []) yield { type: 'branch', ...b };
+      for (const a of script.gitActions ?? []) yield { type: 'git_action', ...a };
       const text =
         typeof script.output === 'function'
           ? script.output(request, answers)

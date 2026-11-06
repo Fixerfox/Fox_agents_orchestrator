@@ -1,6 +1,7 @@
 import { CheckCircle2, Loader2, X, XCircle } from 'lucide-react';
 import type { RunEvent } from '@orquestador/core';
 import { formatDuration, summarizeRun, t } from '@orquestador/editor';
+import { PrLink } from '../common';
 
 const money = (usd: number) => `${usd.toFixed(3).replace('.', ',')} $`;
 
@@ -24,6 +25,9 @@ export function RunDoneBanner({ events, labelOf, onSummary, onOpenRuns, onClose,
           {s.files.length > 0 ? ` · ${s.files.length === 1 ? t('rsum.files.one') : t('rsum.files.many', { count: s.files.length })}` : ''}
         </span>
       </div>
+      {s.branches.flatMap((b) => (b.prUrl ? [b.prUrl] : [])).map((url) => (
+        <PrLink key={url} url={url} className="orq-btn orq-btn--small" />
+      ))}
       {onOpenRuns && (
         <button type="button" className="orq-btn orq-btn--small" onClick={onOpenRuns}>
           {t('rmodal.toRuns')}

@@ -16,6 +16,7 @@ El hito indica cuándo debe estar cubierto por tests. `npm run spec:check` exige
 ## Índice
 | Spec | Título | Hito | Estado |
 |---|---|---|---|
+| [058](058-ramas-en-el-diagrama.md) | Ramas en el diagrama: el nodo enseña en amarillo la rama en la que actuó, los pasos de cada rama van rodeados con rayas amarillas y el resumen las destaca | M8g | Implementada |
 | [057](057-crear-agente-por-pasos.md) | Crear un agente por pasos: bienvenida «¿Qué agente necesitas?» con ideas, el asistente redacta el primer borrador, cuatro pasos (qué hace, qué sabe, qué puede hacer, revisar) y una ficha por secciones para editar | M8g | Implementada |
 | [056](056-arquitectura-hexagonal.md) | Arquitectura hexagonal con contextos (DDD ligero): matriz de dependencias comprobada, puertos en `core`, composición en `apps/desktop`, un handler por tipo de nodo, `RunCtx` y `RunService` repartidos, contrato y UI por contexto | M11a–M11d | Borrador |
 | [055](055-cambios-por-comandos.md) | Archivos que cambian los comandos: un script o un build ejecutado con Bash también aparece en «Archivos» (con un comando, sin copia) | M8g | Implementada |

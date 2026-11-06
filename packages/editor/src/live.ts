@@ -1,3 +1,4 @@
+import { branchesOf, type RunBranches } from './branches';
 import type { KnowledgeState } from './knowledge';
 import { pathKey, type Id, type NodeStatus, type Payload, type ReviewQuestion, type RunEvent, type RunStatus } from '@orquestador/core';
 
@@ -56,6 +57,12 @@ export interface LiveView {
   /** Texto de salida de la ejecución (nodo `output` raíz). */
   finalOutput?: string;
   produced: { nodeId: Id; path: string; nodePath: Id[] }[];
+  /** Ramas de git de cada paso, por orden de uso [R58.6]. */
+  branches: Record<string, string[]>;
+  /** Lo que hizo cada paso en las ramas: commit, push… [R58.12]. */
+  gitActions: RunBranches['actions'];
+  /** PR o merge request que creó cada paso [R58.15]. */
+  gitLinks: RunBranches['links'];
   needsAttention: boolean;
 }
 
@@ -71,6 +78,9 @@ export const EMPTY_LIVE: LiveView = {
   usage: { inputTokens: 0, outputTokens: 0, costUsd: 0 },
   pending: [],
   produced: [],
+  branches: {},
+  gitActions: {},
+  gitLinks: {},
   needsAttention: false,
 };
 
@@ -186,6 +196,10 @@ export function deriveLive(events: readonly RunEvent[]): LiveView {
     }
   }
   v.pending = [...open.values()];
+  const git = branchesOf(events);
+  v.branches = git.byStep;
+  v.gitActions = git.actions;
+  v.gitLinks = git.links;
   return v;
 }
 

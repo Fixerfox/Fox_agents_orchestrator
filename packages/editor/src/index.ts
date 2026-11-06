@@ -15,6 +15,7 @@ export * from './runs-view';
 export * from './jobs';
 export * from './assistant';
 export * from './transform-view';
+export * from './branches';
 export * from './knowledge';
 export * from './markdown';
 export * from './speckit';
