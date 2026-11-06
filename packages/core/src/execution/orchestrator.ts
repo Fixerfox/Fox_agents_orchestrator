@@ -1,49 +1,12 @@
-import {
-  AgentError,
-  type AgentAdapter,
-  type AgentQuestion,
-  type AgentSnapshot,
-  type AnsweredQuestion,
-  type BlameCandidate,
-  type KnowledgeRef,
-  type Decider,
-  type ReviewQuestion,
-  type FileChange,
-} from './adapter';
+import { type DeliverableSpec, type Diagram, type DiagramNode, type Edge, type ReturnInfo, correctionCandidates, deliverableFileName, finalSteps, forwardEdges, returnEdges, segmentOf, validateDiagram } from '../diagrams';
+import { type Id, type KnowledgeExtra, type Payload, mergeExtra, stepExtra } from '../shared';
+import { type AgentAdapter, AgentError, type AgentQuestion, type AgentSnapshot, type AnsweredQuestion, type BlameCandidate, type Decider, type FileChange, type KnowledgeRef, type ReviewQuestion } from './adapter';
+import { DELIVERABLE_ATTEMPTS, type DeliverableItemResult, type DeliverableLinks, collectLinks, deliverableBrief, deliverableContext, deliverableGoal, deliverableInstructions, deliverableMarkdown, itemTitle, linksMarkdown } from './deliverable';
 import { EventBus, type RunEvent } from './events';
-import {
-  mergeExtra,
-  stepExtra,
-  type DeliverableSpec,
-  type Diagram,
-  type DiagramNode,
-  type Edge,
-  type Id,
-  type KnowledgeExtra,
-  type NodeStatus,
-  type Payload,
-  type RunOptions,
-  type RunStatus,
-} from './types';
-import { validateDiagram } from './validation';
-import { applyTransformRules, checkFormat, transformAttempts } from './transform';
-import {
-  collectLinks,
-  DELIVERABLE_ATTEMPTS,
-  deliverableBrief,
-  deliverableContext,
-  deliverableFileName,
-  deliverableGoal,
-  deliverableInstructions,
-  deliverableMarkdown,
-  finalSteps,
-  itemTitle,
-  linksMarkdown,
-  type DeliverableItemResult,
-  type DeliverableLinks,
-} from './deliverable';
-import { composeRoundInput, correctionCandidates, DEFAULT_REVIEW_CRITERIA, forwardEdges, parseVerdict, returnEdges, segmentOf, type ReturnInfo } from './review';
 import { composeCorrectionInput, correctionTargets, resumePlan } from './resume';
+import { DEFAULT_REVIEW_CRITERIA, composeRoundInput, parseVerdict } from './review';
+import type { NodeStatus, RunOptions, RunStatus } from './run-types';
+import { applyTransformRules, checkFormat, transformAttempts } from './transform';
 
 export interface OrchestratorDeps {
   getAdapter(agentId: Id): AgentAdapter;

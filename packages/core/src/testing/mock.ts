@@ -1,15 +1,5 @@
-import {
-  AgentError,
-  type AgentAdapter,
-  type AgentRequest,
-  type AgentStreamEvent,
-  type BlameCandidate,
-  type Decider,
-  type RouteCandidate,
-  type TransformRequest,
-} from './adapter';
-import { simulateTransform } from './transform';
-import { KNOWLEDGE_KIND_OF, KNOWLEDGE_LIST_KEYS, type Id, type Payload } from './types';
+import { type AgentAdapter, AgentError, type AgentRequest, type AgentStreamEvent, type BlameCandidate, type Decider, type RouteCandidate, type TransformRequest, simulateTransform } from '../execution';
+import { type Id, KNOWLEDGE_KIND_OF, KNOWLEDGE_LIST_KEYS, type Payload } from '../shared';
 
 export interface MockAgentScript {
   output?: string | ((req: AgentRequest, answers: string[]) => string);

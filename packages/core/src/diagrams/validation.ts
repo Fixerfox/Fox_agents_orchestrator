@@ -1,8 +1,8 @@
-import { MODELS } from './agents';
-import { transformProblems } from './transform';
-import { deliverableProblems } from './deliverable';
-import { correctionCandidates, returnEdges, segmentShapeOk } from './review';
-import { CURRENT_SCHEMA_VERSION, MAX_REVIEW_ROUNDS, REVIEW_PORTS, MAX_EXTRA_ITEMS, MAX_TASK_LENGTH, type Diagram, type DiagramNode, type Edge, type Id, type KnowledgeExtra } from './types';
+import { type Id, type KnowledgeExtra, MAX_EXTRA_ITEMS, MODELS } from '../shared';
+import { deliverableProblems } from './deliverable-spec';
+import { correctionCandidates, returnEdges, segmentShapeOk } from './graph';
+import { CURRENT_SCHEMA_VERSION, type Diagram, type DiagramNode, type Edge, MAX_REVIEW_ROUNDS, MAX_TASK_LENGTH, REVIEW_PORTS } from './model';
+import { transformProblems } from './transform-spec';
 
 /** El modelo es uno de los que se pueden asignar a un agente [R40.1]. */
 export const isKnownModel = (m: unknown): m is string => MODELS.some((x) => x.id === m);

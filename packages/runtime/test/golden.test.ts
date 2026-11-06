@@ -13,7 +13,9 @@ type Normal = Record<string, unknown>;
 
 /** Quita lo que cambia en cada ejecución: la hora y el número de secuencia (decisión 8). */
 function normal(e: RunEvent): Normal {
-  const { ts: _ts, seq: _seq, ...rest } = e;
+  const rest: Normal = { ...e };
+  delete rest.ts;
+  delete rest.seq;
   return rest;
 }
 

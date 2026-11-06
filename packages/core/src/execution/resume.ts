@@ -1,6 +1,6 @@
+import { CORRECTABLE_KINDS, type Diagram, downstreamOf, flowOrder, forwardEdges } from '../diagrams';
+import type { Id, Payload } from '../shared';
 import type { RunEvent } from './events';
-import type { Diagram, Id, Payload } from './types';
-import { CORRECTABLE_KINDS, downstreamOf, flowOrder, forwardEdges } from './review';
 
 const KINDS = new Set(['agent', 'transform', 'subdiagram']);
 

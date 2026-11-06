@@ -1,27 +1,8 @@
-import type { Id } from './types';
-
-/** Modelos que se pueden asignar a un agente. */
-export const MODELS = [
-  { id: 'claude-sonnet-5-5', name: 'Sonnet 5.5' },
-  { id: 'claude-opus-5-5', name: 'Opus 5.5' },
-  { id: 'claude-haiku-5-5', name: 'Haiku 5.5' },
-] as const;
-export const DEFAULT_MODEL = 'claude-sonnet-5-5';
+import { DEFAULT_MODEL, type FieldProblem, type Id, LIMITS, MODELS, PERMISSION_LEVELS, type PermissionLevel, isRelativeInside, isSafeId } from '../shared';
 
 export const AGENT_SCHEMA_VERSION = 1;
-export const CONTEXT_SCHEMA_VERSION = 1;
-/** v2: el nivel de permisos pasa a «Sin preguntar nunca» al migrar [R51.1]. */
-export const SETTINGS_SCHEMA_VERSION = 2;
 
-export const LIMITS = {
-  name: 60,
-  description: 300,
-  instructions: 20_000,
-  contextText: 100_000,
-  contextValue: 2_000,
-  maxTurns: 200,
-  maxParallel: 16,
-} as const;
+export const CONTEXT_SCHEMA_VERSION = 1;
 
 /** Agente del proyecto [R22.1]. */
 export interface AgentDefinition {
@@ -54,9 +35,12 @@ export const AGENT_ICONS = [
   'bot', 'brain', 'code', 'bug', 'test', 'search', 'shield', 'scroll', 'pen', 'palette', 'image', 'music',
   'gamepad', 'map', 'swords', 'database', 'globe', 'wrench', 'hammer', 'rocket', 'lightbulb', 'clipboard', 'eye', 'layers',
 ] as const;
+
 export type AgentIcon = (typeof AGENT_ICONS)[number];
+
 /** Tonos del icono [R39.7]. */
 export const AGENT_TONES = ['neutral', 'amber', 'blue', 'green', 'rose', 'violet', 'teal'] as const;
+
 export type AgentTone = (typeof AGENT_TONES)[number];
 
 export type ContextKind = 'text' | 'url' | 'file';
@@ -70,61 +54,9 @@ export interface ContextDefinition {
   value: string;
 }
 
-export type AuthMode = 'claude-code' | 'api-key';
-/** Motor de los agentes: simulado (demo) o Claude real [R27.1]. */
-export type Engine = 'simulated' | 'claude';
-
-/** Ajustes globales de la app [R23.1]. Nunca incluyen secretos. */
-export interface AppSettings {
-  schemaVersion: number;
-  authMode: AuthMode;
-  engine: Engine;
-  defaultModel: string;
-  maxParallel: number;
-  defaultMaxTokens?: number;
-  /** Permisos de los agentes del proyecto [R47.8]; sin valor, «sin preguntar nunca» [R51.1]. */
-  permissions?: ProjectPermission;
-  /**
-   * Cargar la configuración de Claude Code (CLAUDE.md, `.claude` y `~/.claude`) en los agentes y el asistente
-   * [R50.3]; sin valor, activado.
-   */
-  claudeConfig?: boolean;
-}
-
-/** ¿Se carga la configuración de Claude Code? Activado salvo que se apague [R50.3]. */
-export const loadsClaudeConfig = (settings: Pick<AppSettings, 'claudeConfig'>): boolean => settings.claudeConfig !== false;
-
-/**
- * Niveles de permisos [R47.8]: solo lectura (solo para un agente), preguntar, automático (solo pregunta lo
- * delicado: borrar, salir de la carpeta, publicar fuera) y sin preguntar nunca.
- */
-export const PERMISSION_LEVELS = ['readonly', 'ask', 'auto', 'full'] as const;
-export type PermissionLevel = (typeof PERMISSION_LEVELS)[number];
-export const PROJECT_PERMISSIONS = ['ask', 'auto', 'full'] as const;
-export type ProjectPermission = (typeof PROJECT_PERMISSIONS)[number];
-/** Por defecto no se pregunta nada [R51.1]. */
-export const DEFAULT_PERMISSION: ProjectPermission = 'full';
-
-/** Nivel del proyecto [R47.8]. */
-export const projectPermission = (settings: Pick<AppSettings, 'permissions'>): ProjectPermission => settings.permissions ?? DEFAULT_PERMISSION;
-/** El del agente si lo tiene; si no, el del proyecto [R47.10]. */
-export const effectivePermission = (agent: Pick<AgentDefinition, 'permissions'>, settings: Pick<AppSettings, 'permissions'>): PermissionLevel =>
-  agent.permissions ?? projectPermission(settings);
-
-export interface FieldProblem {
-  field: string;
-  message: string;
-}
-
-export const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
-export const isSafeId = (v: unknown): v is string => typeof v === 'string' && SAFE_ID.test(v) && !v.includes('..');
-
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
-const known = (model: unknown) => MODELS.some((m) => m.id === model);
 
-export function defaultSettings(): AppSettings {
-  return { schemaVersion: SETTINGS_SCHEMA_VERSION, authMode: 'claude-code', engine: 'simulated', defaultModel: DEFAULT_MODEL, maxParallel: 4 };
-}
+const known = (model: unknown) => MODELS.some((m) => m.id === model);
 
 export function newAgent(id: Id, name: string): AgentDefinition {
   return { id, schemaVersion: AGENT_SCHEMA_VERSION, name, description: '', instructions: '', model: DEFAULT_MODEL, contextIds: [], skillIds: [] };
@@ -187,12 +119,6 @@ export function validateAgent(a: unknown, existing: { contextIds: ReadonlySet<Id
   return out;
 }
 
-/** `true` si la ruta es relativa, sin `..` y sin letra de unidad [R22.2]. */
-export function isRelativeInside(path: string): boolean {
-  if (path.length === 0 || path.startsWith('/') || path.startsWith('\\') || /^[A-Za-z]:/.test(path)) return false;
-  return !path.split(/[\\/]/).some((seg) => seg === '..');
-}
-
 export function validateContext(c: unknown): FieldProblem[] {
   if (!isObject(c)) return [{ field: 'context', message: 'El contexto no es válido' }];
   const out: FieldProblem[] = [];
@@ -220,56 +146,6 @@ export function validateContext(c: unknown): FieldProblem[] {
     out.push({ field: 'value', message: 'Escribe una ruta relativa dentro del proyecto, sin «..»' });
   }
   return out;
-}
-
-/** Valida ajustes; los que faltan se completan con los de por defecto en `normalizeSettings`. */
-export function validateSettings(s: unknown): FieldProblem[] {
-  if (!isObject(s)) return [{ field: 'settings', message: 'Los ajustes no son válidos' }];
-  const out: FieldProblem[] = [];
-  if (s.authMode !== 'claude-code' && s.authMode !== 'api-key') out.push({ field: 'authMode', message: 'Elige cómo se conecta Claude' });
-  if (s.engine !== 'simulated' && s.engine !== 'claude') out.push({ field: 'engine', message: 'Elige el motor de los agentes' });
-  if (!known(s.defaultModel)) out.push({ field: 'defaultModel', message: 'Elige un modelo de la lista' });
-  if (!(Number.isInteger(s.maxParallel) && (s.maxParallel as number) >= 1 && (s.maxParallel as number) <= LIMITS.maxParallel)) {
-    out.push({ field: 'maxParallel', message: `Los agentes en paralelo van de 1 a ${LIMITS.maxParallel}` });
-  }
-  if (s.defaultMaxTokens !== undefined && !(Number.isInteger(s.defaultMaxTokens) && (s.defaultMaxTokens as number) > 0)) {
-    out.push({ field: 'defaultMaxTokens', message: 'El límite de tokens debe ser un número entero mayor que cero' });
-  }
-  if (s.permissions !== undefined && !(PROJECT_PERMISSIONS as readonly unknown[]).includes(s.permissions)) out.push({ field: 'permissions', message: 'Elige un nivel de permisos de la lista' });
-  if (s.claudeConfig !== undefined && typeof s.claudeConfig !== 'boolean') out.push({ field: 'claudeConfig', message: '«Cargar la configuración de Claude Code» no es válido' });
-  return out;
-}
-
-/** Completa con los valores por defecto lo que falta o no es válido (para leer ajustes antiguos o dañados). */
-export function normalizeSettings(raw: unknown): AppSettings {
-  const base = defaultSettings();
-  if (!isObject(raw)) return base;
-  const out: AppSettings = { ...base };
-  if (raw.authMode === 'claude-code' || raw.authMode === 'api-key') out.authMode = raw.authMode;
-  if (raw.engine === 'simulated' || raw.engine === 'claude') out.engine = raw.engine;
-  if (known(raw.defaultModel)) out.defaultModel = raw.defaultModel as string;
-  if (Number.isInteger(raw.maxParallel) && (raw.maxParallel as number) >= 1 && (raw.maxParallel as number) <= LIMITS.maxParallel) out.maxParallel = raw.maxParallel as number;
-  if (Number.isInteger(raw.defaultMaxTokens) && (raw.defaultMaxTokens as number) > 0) out.defaultMaxTokens = raw.defaultMaxTokens as number;
-  // Ajustes anteriores a R47.8: «Modificar sin preguntar» pasa a automático y «preguntar todos los comandos», a preguntar.
-  if ((PROJECT_PERMISSIONS as readonly unknown[]).includes(raw.permissions)) out.permissions = raw.permissions as ProjectPermission;
-  else if (raw.askCommands === true) out.permissions = 'ask';
-  else if (raw.autoWrite === true) out.permissions = 'auto';
-  if (typeof raw.claudeConfig === 'boolean') out.claudeConfig = raw.claudeConfig;
-  return out;
-}
-
-/** Id único a partir de un nombre: minúsculas, sin acentos, con guiones [R22.6]. */
-export function slugify(name: string, taken: ReadonlySet<Id>, fallback = 'elemento'): Id {
-  const base =
-    name
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .slice(0, 60) || fallback;
-  if (!taken.has(base)) return base;
-  for (let n = 2; ; n++) if (!taken.has(`${base}-${n}`)) return `${base}-${n}`;
 }
 
 /** Quita un contexto de los agentes que lo usaban y devuelve solo los que cambian [R22.4]. */

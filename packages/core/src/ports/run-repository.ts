@@ -1,6 +1,6 @@
-import type { RunEvent } from '../events';
-import type { Orchestrator, RunHandle, RunResult } from '../orchestrator';
-import type { Diagram, Payload, RunOptions, RunStatus } from '../types';
+import type { Diagram } from '../diagrams';
+import type { Orchestrator, RunEvent, RunHandle, RunOptions, RunResult, RunStatus } from '../execution';
+import type { Payload } from '../shared';
 
 export interface RunMeta {
   schemaVersion: number;

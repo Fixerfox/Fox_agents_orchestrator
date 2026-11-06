@@ -1,4 +1,4 @@
-import type { AgentAdapter, Decider } from '../adapter';
+import type { AgentAdapter, Decider } from '../execution';
 
 /** Un motor de agentes completo: quien ejecuta los pasos y quien toma las decisiones [R56.3]. */
 export interface AgentEngine {

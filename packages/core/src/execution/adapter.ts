@@ -1,4 +1,5 @@
-import type { Id, KnowledgeExtra, KnowledgeKind, Payload, TransformFormat } from './types';
+import type { TransformFormat } from '../diagrams';
+import type { Id, KnowledgeExtra, KnowledgeKind, Payload } from '../shared';
 
 export type FileChange = 'created' | 'modified';
 /** Cómo se cambió: con un comando, sin pasar por las herramientas de edición ni dejar copia [R55.3]. */

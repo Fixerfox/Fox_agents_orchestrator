@@ -1,7 +1,7 @@
-import { DEFAULT_MODEL, LIMITS, MODELS, slugify, validateAgent, type AgentDefinition } from './agents';
-import { SKILL_LIMITS, parseFrontmatter, validateSkill, type SkillDefinition } from './skills';
-import { containsSecrets } from './redact';
-import { MCP_SCHEMA_VERSION, SECRET_NAME, type McpServerDefinition } from './mcp';
+import { DEFAULT_MODEL, LIMITS, MODELS, containsSecrets, slugify } from '../shared';
+import { type AgentDefinition, validateAgent } from './agents';
+import { MCP_SCHEMA_VERSION, type McpServerDefinition, SECRET_NAME } from './mcp';
+import { SKILL_LIMITS, type SkillDefinition, parseFrontmatter, validateSkill } from './skills';
 
 /** Archivo del paquete a instalar; `path` usa `/`, es relativo y no sube de nivel. */
 export interface SourceFile {

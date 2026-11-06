@@ -1,15 +1,9 @@
-export type Id = string;
+import type { Id, KnowledgeExtra } from '../shared';
 
 export const CURRENT_SCHEMA_VERSION = 1;
 
 /** Longitud máxima de la tarea de un nodo [R32.1]. */
 export const MAX_TASK_LENGTH = 20_000;
-
-/** Lo que viaja por una conexión entre nodos: texto de salida + archivos del espacio de trabajo. */
-export interface Payload {
-  text: string;
-  files: string[];
-}
 
 export type NodeKind = 'entry' | 'output' | 'agent' | 'router' | 'loop' | 'subdiagram' | 'review' | 'transform';
 
@@ -33,13 +27,16 @@ export interface TransformConfig {
 
 /** Límite de los textos de un nodo transformar [R37.2]. */
 export const MAX_TRANSFORM_TEXT = 20_000;
-export const DEFAULT_TRANSFORM_ATTEMPTS = 2;
-export const MAX_TRANSFORM_ATTEMPTS = 5;
 
+export const DEFAULT_TRANSFORM_ATTEMPTS = 2;
+
+export const MAX_TRANSFORM_ATTEMPTS = 5;
 
 /** Salidas fijas de una revisión [R34.1]. */
 export type ReviewPort = 'approved' | 'rejected' | 'exhausted';
+
 export const REVIEW_PORTS: readonly ReviewPort[] = ['approved', 'rejected', 'exhausted'];
+
 /** Tope de vueltas de una revisión [R34.1]. */
 export const MAX_REVIEW_ROUNDS = 10;
 
@@ -78,32 +75,6 @@ export interface SubdiagramConfig {
   templateId: Id;
   version: number | 'latest';
 }
-
-/**
- * Conocimiento añadido sin tocar al agente: skills, contextos y servidores MCP que valen solo para un paso
- * o para todo un diagrama [R33.1].
- */
-export interface KnowledgeExtra {
-  skillIds?: Id[];
-  contextIds?: Id[];
-  mcpIds?: Id[];
-  /** Cuáles de las listas anteriores son obligatorios en esta asignación; es un subconjunto de ellas [R36.1]. */
-  required?: KnowledgeLists;
-}
-
-/** Las tres listas de ids de un conocimiento añadido. */
-export interface KnowledgeLists {
-  skillIds?: Id[];
-  contextIds?: Id[];
-  mcpIds?: Id[];
-}
-
-/** Tipo de elemento de conocimiento [R36.13]. */
-export type KnowledgeKind = 'skill' | 'context' | 'mcp';
-export const KNOWLEDGE_LIST_KEYS = ['skillIds', 'contextIds', 'mcpIds'] as const;
-export const KNOWLEDGE_KIND_OF = { skillIds: 'skill', contextIds: 'context', mcpIds: 'mcp' } as const;
-/** Máximo de elementos de cada tipo en un conocimiento añadido [R33.2]. */
-export const MAX_EXTRA_ITEMS = 50;
 
 export interface DiagramNode {
   id: Id;
@@ -167,71 +138,4 @@ export interface DeliverableSpec {
   onMissing?: 'warn' | 'fail';
   /** Nombre del archivo sin extensión; por defecto `entregable` [R46.11]. */
   fileName?: string;
-}
-
-/**
- * Une listas de ids sin repetir, en orden [R33.3]. Lo obligatorio en cualquier parte lo es en el resultado
- * (aunque en otra sea opcional) y solo se conserva si sigue en la lista [R36.3][R36.4].
- */
-export function mergeExtra(...parts: (KnowledgeExtra | undefined)[]): KnowledgeExtra {
-  const out: KnowledgeExtra = {};
-  const required: KnowledgeLists = {};
-  for (const k of KNOWLEDGE_LIST_KEYS) {
-    const v = [...new Set(parts.flatMap((p) => p?.[k] ?? []))];
-    if (v.length === 0) continue;
-    out[k] = v;
-    const r = [...new Set(parts.flatMap((p) => p?.required?.[k] ?? []))].filter((id) => v.includes(id));
-    if (r.length > 0) required[k] = r;
-  }
-  if (Object.keys(required).length > 0) out.required = required;
-  return out;
-}
-
-/** Listas cuyo contenido es obligatorio siempre que está enchufado a un paso [R36.21]. */
-export const STEP_FORCED_KEYS = ['skillIds', 'mcpIds'] as const;
-
-/**
- * Conocimiento de un paso tal como se ejecuta: toda skill y todo MCP enchufado es obligatorio, esté o no en
- * `required`; los contextos conservan su marca [R36.21]. No cambia el diagrama guardado.
- */
-export function stepExtra(extra: KnowledgeExtra | undefined): KnowledgeExtra | undefined {
-  if (!extra) return undefined;
-  const required: KnowledgeLists = { ...extra.required };
-  for (const k of STEP_FORCED_KEYS) if ((extra[k] ?? []).length > 0) required[k] = [...new Set([...(extra.required?.[k] ?? []), ...(extra[k] ?? [])])];
-  return mergeExtra({ ...extra, required });
-}
-
-export type NodeStatus =
-  | 'idle'
-  | 'queued'
-  | 'running'
-  | 'waiting_input'
-  | 'succeeded'
-  | 'failed'
-  | 'cancelled'
-  | 'skipped';
-
-export type RunStatus = 'running' | 'succeeded' | 'failed' | 'cancelled';
-
-export interface RunOptions {
-  budget?: { maxTokens?: number; maxCostUsd?: number };
-  /** Agentes en paralelo. Por defecto 4. */
-  maxConcurrency?: number;
-  /** Profundidad máxima de anidación (bucles y subdiagramas). Por defecto 8. */
-  maxDepth?: number;
-  /** Tiempo máximo esperando la respuesta del usuario a una pregunta de un agente. Sin límite por defecto. */
-  questionTimeoutMs?: number;
-  /** Reintentos ante errores temporales: intentos totales y espera inicial (se duplica en cada intento). */
-  retry?: { maxAttempts: number; baseDelayMs: number };
-  /** Reanudar: salidas de pasos del nivel principal que no se vuelven a ejecutar, y de qué ejecución vienen [R41.1]. */
-  reuse?: {
-    fromRunId: string;
-    outputs: Record<string, Payload>;
-    /** Revisiones humanas ya aprobadas en la anterior: aprueban sin preguntar la primera vez [R53.9]. */
-    approvedReviews?: string[];
-  };
-  /** Corregir: el paso del nivel principal que recibe la corrección y su entrega anterior [R53.8]. */
-  correction?: { fromRunId: string; nodeId: string; text: string; previous: Payload; files?: string[] };
-  /** Entregable solo para esta ejecución; sustituye al del diagrama, y `null` lo quita [R46.3]. */
-  deliverable?: DeliverableSpec | null;
 }

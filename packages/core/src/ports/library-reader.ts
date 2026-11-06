@@ -1,7 +1,6 @@
-import type { AgentDefinition, ContextDefinition } from '../agents';
-import type { McpServerDefinition } from '../mcp';
-import type { SkillDefinition } from '../skills';
-import type { Diagram, Id } from '../types';
+import type { Diagram } from '../diagrams';
+import type { AgentDefinition, ContextDefinition, McpServerDefinition, SkillDefinition } from '../knowledge';
+import type { Id } from '../shared';
 
 /**
  * Lectura de la biblioteca del proyecto [R56.3]. Con `runId` se lee la copia de esa ejecución si la hay [R52.1];

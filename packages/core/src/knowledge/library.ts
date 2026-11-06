@@ -1,5 +1,4 @@
-import type { Id } from './types';
-import { isSafeId } from './agents';
+import { type Id, isSafeId } from '../shared';
 
 /**
  * Carpetas de la biblioteca del proyecto (agentes, skills, contextos, MCP y diagramas) [R38.13][R38.22]. Viven en un archivo aparte

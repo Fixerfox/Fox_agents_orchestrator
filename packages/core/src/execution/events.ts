@@ -1,7 +1,8 @@
+import type { DeliverableSpec, TransformFormat } from '../diagrams';
+import { type Id, type KnowledgeExtra, type KnowledgeKind, type Payload, redactSecrets } from '../shared';
 import type { AgentSnapshot, AnsweredQuestion, FileChange, FileVia, KnowledgeVia, QuestionKind, ReviewQuestion } from './adapter';
-import { redactSecrets } from './redact';
 import type { DeliverableItemResult, DeliverableLinks } from './deliverable';
-import type { DeliverableSpec, Id, KnowledgeExtra, KnowledgeKind, NodeStatus, Payload, RunStatus, TransformFormat } from './types';
+import type { NodeStatus, RunStatus } from './run-types';
 
 export type EventBody =
   | { type: 'run.started'; diagramId: Id; /** Ejecución que esta reanuda [R41.1]. */ resumedFrom?: string; /** Ejecución que esta corrige [R53.8]. */ correctedFrom?: string; /** Entregable efectivo [R46.3]. */ deliverable?: DeliverableSpec }

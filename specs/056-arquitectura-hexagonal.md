@@ -76,17 +76,18 @@ Esta spec no añade funcionalidad. Cambia la estructura para que añadir un tipo
 
 ### B · Contextos (M11b)
 - **R56.8** [M11b] `core/src` se organiza en contextos, cada uno con su `index.ts` público:
-  - `shared/`: ids, `Payload`, ocultar secretos, utilidades.
-  - `diagrams/`: modelo del diagrama, validación, recorrido del grafo (`forwardEdges`, `returnEdges`, `finalSteps`…).
-  - `knowledge/`: agentes, contextos, skills, MCP, biblioteca, instalación de paquetes, Spec Kit.
-  - `settings/`: ajustes, niveles de permisos, modelos.
+  - `shared/`: ids, `Payload`, ocultar secretos, utilidades y lo que varios contextos necesitan y no es de ninguno: catálogo de modelos, niveles de permisos, referencias de conocimiento (`KnowledgeExtra`) y JSON Schema. Si estuvieran en `settings` o `knowledge`, `diagrams` tendría que importarlos y R56.9 lo prohíbe.
+  - `diagrams/`: modelo del diagrama, validación (también la de la configuración de transformar y del entregable), recorrido del grafo (`forwardEdges`, `returnEdges`, `finalSteps`…).
+  - `knowledge/`: agentes, contextos, skills, MCP, biblioteca, instalación de paquetes. Spec Kit sigue en `editor`, que es donde está hoy.
+  - `settings/`: ajustes, efecto de los permisos, proyectos recientes.
   - `execution/`: orquestador, catálogo de eventos, reanudar, revisión, correcciones, transformar, entregable, replay.
-  - `ports/` y `testing/`: los de R56.3.
+  - `ports/` y `testing/`: los de R56.3. `testing/` también guarda `MockAgent` y `MockDecider`.
 - **R56.9** [M11b] Reglas entre contextos, comprobadas por el test de arquitectura:
   - `shared` no importa de ningún otro.
   - `diagrams`, `knowledge` y `settings` solo importan de `shared`.
   - `execution` puede importar de todos los anteriores.
-  - `ports` solo importa tipos.
+  - `ports` solo importa tipos; puede nombrar los de `execution` porque describe contratos del motor.
+  - `testing` puede importar de todos y nadie importa de él salvo el `index` de `core`.
   - Desde fuera de un contexto solo se importa su `index.ts`. Por ejemplo, nunca `execution/nodes/agent`.
 - **R56.10** [M11b] `@orquestador/core` exporta exactamente los mismos nombres que antes de M11b. Un test compara la lista de exportaciones con una instantánea; en esta fase no cambia ningún import fuera de `core`.
 - **R56.11** [M11b] `docs/06-contextos.md` describe cada contexto: qué hace, qué expone, de quién depende y su lenguaje común (paso, pasada, intento, entregable, enchufado, revisión, corrección…). El test de arquitectura falla si una carpeta de contexto no aparece en ese documento.

@@ -1,17 +1,9 @@
-import type { AgentAdapter, Decider } from '../adapter';
-import type { AgentDefinition, ContextDefinition } from '../agents';
-import type { RunEvent } from '../events';
-import type { McpServerDefinition } from '../mcp';
-import { MockAgent, MockDecider } from '../mock';
-import type { Orchestrator } from '../orchestrator';
-import type { AgentEngine } from '../ports/agent-engine';
-import type { LibraryReader } from '../ports/library-reader';
-import type { PathPolicy } from '../ports/path-policy';
-import type { InputFile, LoggedRun, RunMeta, RunRepository } from '../ports/run-repository';
-import type { WorkspaceFiles } from '../ports/workspace-files';
-import { safePreviewPath } from '../preview-path';
-import type { SkillDefinition } from '../skills';
-import type { Diagram, Id, Payload, RunOptions } from '../types';
+import type { Diagram } from '../diagrams';
+import { type AgentAdapter, type Decider, Orchestrator, type RunEvent, type RunOptions } from '../execution';
+import type { AgentDefinition, ContextDefinition, McpServerDefinition, SkillDefinition } from '../knowledge';
+import type { AgentEngine, InputFile, LibraryReader, LoggedRun, PathPolicy, RunMeta, RunRepository, WorkspaceFiles } from '../ports';
+import { type Id, type Payload, safePreviewPath } from '../shared';
+import { MockAgent, MockDecider } from './mock';
 
 /** Motor simulado con el `id` pedido [R56.3]. */
 export function memoryEngine(id = 'memoria', parts: { adapter?: AgentAdapter; decider?: Decider } = {}): AgentEngine {

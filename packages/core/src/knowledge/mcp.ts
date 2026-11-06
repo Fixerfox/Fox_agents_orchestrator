@@ -1,5 +1,4 @@
-import type { Id } from './types';
-import { isSafeId, type FieldProblem } from './agents';
+import { type FieldProblem, type Id, isSafeId } from '../shared';
 
 export const MCP_SCHEMA_VERSION = 1;
 

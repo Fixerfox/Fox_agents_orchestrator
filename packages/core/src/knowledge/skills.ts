@@ -1,5 +1,4 @@
-import type { Id } from './types';
-import { LIMITS, isSafeId, type FieldProblem } from './agents';
+import { type FieldProblem, type Id, LIMITS, isSafeId } from '../shared';
 
 /** Skill del proyecto [R24.1]: se guarda como `SKILL.md` en formato nativo de Claude Code. */
 export interface SkillDefinition {

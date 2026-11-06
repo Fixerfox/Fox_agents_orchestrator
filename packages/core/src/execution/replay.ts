@@ -1,5 +1,6 @@
+import type { Id } from '../shared';
 import type { RunEvent } from './events';
-import type { Id, NodeStatus, RunStatus } from './types';
+import type { NodeStatus, RunStatus } from './run-types';
 
 export interface RunState {
   status: RunStatus;
