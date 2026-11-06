@@ -16,3 +16,6 @@ export * from './resume';
 export * from './library';
 export * from './transform';
 export * from './deliverable';
+export * from './preview-path';
+export * from './ports';
+export * from './testing';

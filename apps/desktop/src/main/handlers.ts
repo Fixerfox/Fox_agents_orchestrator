@@ -26,8 +26,9 @@ import {
 } from '@orquestador/editor';
 import { draftWithClaude, isSensitivePath, runAssistantTurn, summarizeFolder, testConnection, testMcpServer, type CreateAppServer, type QueryFn } from '@orquestador/claude';
 import { TerminalError, type TerminalService } from './terminal';
-import { ApiKeyVault, MAX_ATTACHMENT_BYTES, MAX_INPUT_FILES, McpSecretVault, ProjectStore, RecentStore, SettingsStore, StoreError, readFiles, readFolder, readFolderNamed, readZipFile } from '@orquestador/store';
+import { ApiKeyVault, MAX_ATTACHMENT_BYTES, MAX_INPUT_FILES, McpSecretVault, RecentStore, SettingsStore, StoreError, readFiles, readFolder, readFolderNamed, readZipFile, type ProjectStore } from '@orquestador/store';
 import { Batcher, RunError, RunService, RunSnapshots, jobsOf } from '@orquestador/runtime';
+import { composeLibrary, composeRunPorts, createProject, openProject, type OrchestratorContext } from './composition';
 
 /** Documentos guía de la raíz de la carpeta del proyecto que se ofrecen como contexto común [R32.16]. */
 const GUIDE_DOCS = ['CLAUDE.md', 'TRABAJO.md', 'AGENTS.md'] as const;
@@ -45,16 +46,7 @@ async function readSmall(p: string, max: number): Promise<string | undefined> {
   }
 }
 
-export interface OrchestratorContext {
-  store: ProjectStore;
-  projectRoot: string;
-  settings(): AppSettings;
-  apiKey(): Promise<string | undefined>;
-  /** Secretos de un servidor MCP del proyecto [R30.4]. */
-  mcpSecrets?(id: string, scope?: 'project' | 'app'): Promise<Record<string, string>>;
-  /** Copias de lo que usa cada ejecución [R52.1]. */
-  snapshots?: RunSnapshots;
-}
+export type { OrchestratorContext };
 
 export interface DesktopDeps {
   /** Los proyectos nuevos traen Spec Kit (skills y agentes en la carpeta «Spec Kit») [R38.15]. La app lo activa. */
@@ -181,7 +173,7 @@ export class DesktopHandlers {
     this.settings = (await this.deps.settings?.load()) ?? defaultSettings();
     // Copias de lo que usa cada ejecución, compartidas por el motor y el servicio [R52.1].
     const snapshots = new RunSnapshots();
-    this.runs = new RunService(store, this.deps.createOrchestrator({
+    this.runs = new RunService(composeRunPorts(store), this.deps.createOrchestrator({
         store,
         snapshots,
         projectRoot: root,
@@ -226,7 +218,7 @@ export class DesktopHandlers {
       case CHANNELS.createProject: {
         const root = await this.deps.pickFolder('create');
         if (!root) return null;
-        const created = await ProjectStore.create(root, { name: basename(root) || 'Proyecto' });
+        const created = await createProject(root, { name: basename(root) || 'Proyecto' });
         // Los proyectos nuevos traen Spec Kit preinstalado (skills y agentes en la carpeta «Spec Kit») [R38.15].
         if (this.deps.preinstallSpecKit) await installSpecKitInto(specKitTarget(created)).catch(() => undefined);
         return this.setProject(root, created);
@@ -234,7 +226,7 @@ export class DesktopHandlers {
       case CHANNELS.openProject: {
         const root = await this.deps.pickFolder('open');
         if (!root) return null;
-        return this.setProject(root, await ProjectStore.open(root));
+        return this.setProject(root, await openProject(root));
       }
       case CHANNELS.listRecent: {
         const out: RecentView[] = [];
@@ -248,7 +240,7 @@ export class DesktopHandlers {
         const entry = await this.deps.recents?.find((arg as { id: string }).id);
         if (!entry) throw new StoreError('not-found', 'Ese proyecto ya no está en la lista');
         const gone = new StoreError('not-found', 'La carpeta del proyecto ya no existe o no es un proyecto. Puedes quitarlo de la lista.');
-        const store = await ProjectStore.open(entry.root).catch(() => {
+        const store = await openProject(entry.root).catch(() => {
           throw gone;
         });
         return this.setProject(entry.root, store);
@@ -292,7 +284,7 @@ export class DesktopHandlers {
       case CHANNELS.unqueue:
         return this.requireRuns().unqueue(arg as string);
       case CHANNELS.listJobs:
-        return jobsOf(this.requireStore());
+        return jobsOf(composeLibrary(this.requireStore()));
       case CHANNELS.resumeRun:
         return this.requireRuns().resumeRun(arg as string);
       case CHANNELS.proposeCorrection: {

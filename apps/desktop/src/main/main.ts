@@ -4,8 +4,8 @@ import { pathToFileURL } from 'node:url';
 import { spawn } from 'node:child_process';
 import { ASSISTANT_EVENTS_CHANNEL, CHANNELS, RUN_EVENTS_CHANNEL, TERMINAL_EVENTS_CHANNEL } from '@orquestador/editor';
 import { sdkCreateAppServer, sdkQuery } from '@orquestador/claude';
-import { createEngineOrchestrator } from '@orquestador/runtime';
 import { ApiKeyVault, McpSecretVault, RecentStore, SettingsStore } from '@orquestador/store';
+import { composeOrchestrator } from './composition';
 import { DesktopHandlers } from './handlers';
 import { TerminalService, type SpawnPty } from './terminal';
 import { parseWindowTone, secureWebContents, titleBarOverlay, windowOptions, TITLEBAR, WINDOW_TONE_CHANNEL } from './window';
@@ -50,7 +50,7 @@ const handlers = new DesktopHandlers({
     if (err) throw new Error(err);
   },
   claudeQuery: sdkQuery,
-  createOrchestrator: (ctx) => createEngineOrchestrator(ctx, sdkQuery),
+  createOrchestrator: (ctx) => composeOrchestrator(ctx, sdkQuery),
   preinstallSpecKit: true,
   settings: new SettingsStore(join(dataDir(), 'config')),
   recents: new RecentStore(join(dataDir(), 'config')),

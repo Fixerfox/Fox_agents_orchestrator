@@ -2,6 +2,7 @@ import { promises as fs } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { portsOf } from './ports';
 import { MockAgent, MockDecider, Orchestrator, type Diagram, type RunEvent } from '@orquestador/core';
 import { ProjectStore } from '@orquestador/store';
 import { RunService } from '../src';
@@ -36,7 +37,7 @@ afterEach(() => fs.rm(dir, { recursive: true, force: true }));
 
 function service(decider = new MockDecider()) {
   const agent = new MockAgent({ a: { output: 'plan' }, b: { output: 'tareas' }, c: { output: 'web' } });
-  return { agent, decider, svc: new RunService(store, new Orchestrator({ getAdapter: () => agent, decider })) };
+  return { agent, decider, svc: new RunService(portsOf(store), new Orchestrator({ getAdapter: () => agent, decider })) };
 }
 
 describe('SPEC-053 · corregir en el servicio de ejecución', () => {
