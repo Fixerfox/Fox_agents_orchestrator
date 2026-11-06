@@ -6,11 +6,13 @@ import userEvent from '@testing-library/user-event';
 import type { Diagram, RunEvent } from '@orquestador/core';
 import { EMPTY_LIVE, addNode, connect, createDiagram, deriveLive, disconnect, type RunSummary } from '@orquestador/editor';
 import { App } from '../src/App';
-import { DRAG_TYPE } from '../src/Canvas';
-import { NodePanel } from '../src/NodePanel';
-import { QuestionCard, RunsScreen, type RunsNav } from '../src/RunsScreen';
+import { DRAG_TYPE } from '../src/diagrams/Canvas';
+import { NodePanel } from '../src/runs/NodePanel';
+import { QuestionCard } from '../src/runs/QuestionCard';
+import { RunsScreen } from '../src/runs/RunsScreen';
+import { type RunsNav } from '../src/runs/runsTypes';
 import { createMemoryApi } from '../src/memoryApi';
-import type { RunsIndex } from '../src/useRunsIndex';
+import type { RunsIndex } from '../src/runs/useRunsIndex';
 
 /** Entrada → Analista → Seguridad → Salida. */
 const PR: Diagram = {

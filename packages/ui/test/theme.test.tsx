@@ -7,11 +7,11 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { EMPTY_LIVE } from '@orquestador/editor';
 import { App } from '../src/App';
-import { DRAG_TYPE } from '../src/Canvas';
+import { DRAG_TYPE } from '../src/diagrams/Canvas';
 import { createMemoryApi } from '../src/memoryApi';
-import { Toolbar } from '../src/Toolbar';
-import { ThemeToggle } from '../src/ThemeToggle';
-import { THEME_KEY, applyTheme, loadTheme, nextTheme, saveTheme } from '../src/theme';
+import { Toolbar } from '../src/shell/Toolbar';
+import { ThemeToggle } from '../src/settings/ThemeToggle';
+import { THEME_KEY, applyTheme, loadTheme, nextTheme, saveTheme } from '../src/settings/theme';
 
 const root = join(__dirname, '..', '..', '..');
 const css = readFileSync(join(__dirname, '..', 'src', 'styles.css'), 'utf8');

@@ -1,0 +1,103 @@
+import type { AssistantApi } from './assistant';
+import type { DiagramsApi } from './diagrams';
+import type { KnowledgeApi } from './knowledge';
+import type { ProjectSessionApi } from './project';
+import type { RunsApi } from './runs';
+import type { SettingsApi } from './settings';
+
+/** API que el renderer ve como `window.orquestador`. Solo ids, nunca rutas. Un contexto, una interfaz [R56.18]. */
+export type ProjectApi = ProjectSessionApi & DiagramsApi & RunsApi & KnowledgeApi & SettingsApi & AssistantApi;
+
+export type InvokeMethod = Exclude<keyof ProjectApi, 'onRunEvents' | 'onAssistantEvents' | 'onTerminalEvents'>;
+
+/** Contrato único de canales IPC (método → canal). */
+export const CHANNELS = {
+  createProject: 'project:create',
+  openProject: 'project:open',
+  listRecent: 'project:recent',
+  openRecent: 'project:open-recent',
+  forgetRecent: 'project:forget-recent',
+  closeProject: 'project:close',
+  listDiagrams: 'diagram:list',
+  loadDiagram: 'diagram:load',
+  saveDiagram: 'diagram:save',
+  deleteDiagram: 'diagram:delete',
+  listExamples: 'examples:list',
+  startRun: 'run:start',
+  controlRun: 'run:control',
+  resumeRun: 'run:resume',
+  dismissRun: 'run:dismiss',
+  proposeCorrection: 'run:correct-propose',
+  correctRun: 'run:correct',
+  previewFile: 'run:preview',
+  openPreview: 'run:preview-open',
+  answerRun: 'run:answer',
+  subscribeRun: 'run:subscribe',
+  unsubscribeRun: 'run:unsubscribe',
+  listRuns: 'run:list',
+  listQueue: 'run:queue',
+  unqueue: 'run:unqueue',
+  listJobs: 'diagram:jobs',
+  pendingQuestions: 'run:pending',
+  runDiagram: 'run:diagram',
+  listOutput: 'run:output-list',
+  readOutput: 'run:output-read',
+  readRunFile: 'run:file-read',
+  listSkills: 'skill:list',
+  saveSkill: 'skill:save',
+  deleteSkill: 'skill:delete',
+  skillUsage: 'skill:usage',
+  skillFiles: 'skill:files',
+  addSkillFiles: 'skill:add-files',
+  addContextFiles: 'context:add-files',
+  removeSkillFile: 'skill:remove-file',
+  readSkillFile: 'skill:read-file',
+  saveSkillFile: 'skill:save-file',
+  inspectImport: 'import:inspect',
+  confirmImport: 'import:confirm',
+  cancelImport: 'import:cancel',
+  listAgents: 'agent:list',
+  saveAgent: 'agent:save',
+  deleteAgent: 'agent:delete',
+  agentUsage: 'agent:usage',
+  listContexts: 'context:list',
+  getLibraryFolders: 'library:get-folders',
+  saveLibraryFolders: 'library:save-folders',
+  saveContext: 'context:save',
+  deleteContext: 'context:delete',
+  contextUsage: 'context:usage',
+  listMcp: 'mcp:list',
+  saveMcp: 'mcp:save',
+  deleteMcp: 'mcp:delete',
+  mcpUsage: 'mcp:usage',
+  setMcpSecret: 'mcp:set-secret',
+  clearMcpSecret: 'mcp:clear-secret',
+  testMcp: 'mcp:test',
+  assistantSend: 'assistant:send',
+  assistantToolResult: 'assistant:tool-result',
+  assistantCancel: 'assistant:cancel',
+  terminalStart: 'terminal:start',
+  terminalWrite: 'terminal:write',
+  terminalResize: 'terminal:resize',
+  terminalKill: 'terminal:kill',
+  getSettings: 'settings:get',
+  saveSettings: 'settings:save',
+  testConnection: 'settings:test-connection',
+  draftWithClaude: 'ai:draft',
+  getWorkFolder: 'workfolder:get',
+  pickWorkFolder: 'workfolder:pick',
+  stageAttachment: 'input:stage',
+  pickAttachments: 'input:pick',
+  pickProjectFiles: 'input:pick-project',
+  clearWorkFolder: 'workfolder:clear',
+  inspectWorkFolder: 'workfolder:inspect',
+  listBackups: 'backup:list',
+  restoreBackup: 'backup:restore',
+  setApiKey: 'settings:set-key',
+  clearApiKey: 'settings:clear-key',
+} as const satisfies Record<InvokeMethod, string>;
+
+/** Canal por el que el proceso principal empuja lotes de eventos al renderer. */
+export const RUN_EVENTS_CHANNEL = 'run:events';
+
+export type ChannelName = (typeof CHANNELS)[keyof typeof CHANNELS];

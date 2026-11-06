@@ -118,7 +118,7 @@ export class MemoryRunRepository implements RunRepository {
     meta.status = 'cancelled';
     return true;
   }
-  async snapshotStep(args: { runId: string; key: string; files: readonly string[]; blocked: (rel: string) => boolean }): Promise<unknown> {
+  async snapshotStep(args: { runId: string; workRoot: string; key: string; files: readonly string[]; blocked: (rel: string) => boolean }): Promise<unknown> {
     for (const f of args.files) if (!args.blocked(f)) this.previews.set(`${args.runId}|${args.key}|${f}`, `/copias/${args.runId}/${f}`);
     return undefined;
   }

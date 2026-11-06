@@ -3,6 +3,7 @@ export * from './fs-util';
 export * from './paths';
 export * from './versioned-json';
 export * from './project';
+export * from './project-files';
 export * from './run-log';
 export * from './settings';
 export * from './import';

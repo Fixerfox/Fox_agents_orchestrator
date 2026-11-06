@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { shortcutFor } from '../src/shortcuts';
+import { shortcutFor } from '../src/diagrams/shortcuts';
 
 const k = (key: string, o: Partial<{ ctrlKey: boolean; metaKey: boolean; shiftKey: boolean }> = {}) =>
   shortcutFor({ key, ctrlKey: false, shiftKey: false, ...o });

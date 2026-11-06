@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { BookOpen, Bot, Copy, FileText, Pencil, Plug, Plus, Replace, SlidersHorizontal, Sparkles, Trash2, Workflow, X } from 'lucide-react';
-import { AssignPicker } from './AssignPicker';
+import { AssignPicker } from './common/index';
 import { finalSteps, validateDiagram, projectPermission, slugify, type AppSettings, type ProjectPermission, type DeliverableSpec, type Diagram, type RunEvent } from '@orquestador/core';
 
 const AUTOSAVE_MS = 700;
@@ -30,34 +30,35 @@ import {
   type SettingsView,
   type TerminalProgram,
 } from '@orquestador/editor';
-import { TerminalHub, TerminalPanel, type TermTab } from './TerminalPanel';
-import { AgentPicker } from './AgentPicker';
-import { LibraryScreen, type LibrarySection } from './AgentsScreen';
-import { SettingsDialog } from './SettingsDialog';
-import { Breadcrumbs } from './Breadcrumbs';
-import { Canvas, type AgentMenu, type Selection } from './Canvas';
-import type { MenuItem } from './ContextMenu';
-import { DraftStore } from './editors';
-import { AssistantPanel, type ChatState } from './AssistantPanel';
-import type { AssistantHost } from './assistantTools';
-import type { KnowledgeCatalog } from './ExtraKnowledge';
-import { Inspector } from './Inspector';
-import { DiagramsScreen } from './DiagramsScreen';
-import { InsertPicker, type InsertChoice } from './InsertPicker';
-import { NavRail, type SectionId } from './NavRail';
-import { downloadText } from './download';
-import { Palette, type AgentOption } from './Palette';
-import { ProjectScreen } from './ProjectScreen';
-import { ResizeHandle } from './ResizeHandle';
-import { ParallelDialog } from './ParallelDialog';
-import { RunDialog, type RunInputs } from './RunDialog';
-import { RunModal, RunsScreen, type RunsNav } from './RunsScreen';
-import { JobsScreen } from './JobsScreen';
-import { useRunsIndex } from './useRunsIndex';
-import { StartScreen, type StartPath } from './StartScreen';
-import { DiagramMenu, EditButtons, SaveStatus, Toolbar } from './Toolbar';
-import { isTypingTarget, shortcutFor } from './shortcuts';
-import { useSession } from './useSession';
+import { TerminalHub, TerminalPanel, type TermTab } from './shell/index';
+import { AgentPicker } from './diagrams/index';
+import { LibraryScreen, type LibrarySection } from './knowledge/index';
+import { SettingsDialog } from './settings/index';
+import { Breadcrumbs } from './diagrams/index';
+import { Canvas, type AgentMenu, type Selection } from './diagrams/index';
+import type { MenuItem } from './common/index';
+import { DraftStore } from './common/index';
+import { AssistantPanel, type ChatState } from './assistant/index';
+import type { AssistantHost } from './assistant/index';
+import type { KnowledgeCatalog } from './diagrams/index';
+import { Inspector } from './diagrams/index';
+import { DiagramsScreen } from './diagrams/index';
+import { InsertPicker, type InsertChoice } from './diagrams/index';
+import { NavRail, type SectionId } from './shell/index';
+import { downloadText } from './common/index';
+import { Palette, type AgentOption } from './diagrams/index';
+import { ProjectScreen } from './settings/index';
+import { ResizeHandle } from './common/index';
+import { ParallelDialog } from './diagrams/index';
+import { RunDialog, type RunInputs } from './runs/index';
+import { RunModal, RunsScreen, type RunsNav } from './runs/index';
+import { JobsScreen } from './runs/index';
+import { useRunsIndex } from './runs/index';
+import { StartScreen, type StartPath } from './shell/index';
+import { DiagramMenu, EditButtons, SaveStatus } from './diagrams/index';
+import { Toolbar } from './shell/index';
+import { isTypingTarget, shortcutFor } from './diagrams/index';
+import { useSession } from './diagrams/index';
 
 export interface AppProps {
   api: ProjectApi;

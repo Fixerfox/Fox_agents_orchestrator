@@ -3,7 +3,7 @@ import './setup';
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { RunDialog } from '../src/RunDialog';
+import { RunDialog } from '../src/runs/RunDialog';
 import { createMemoryApi } from '../src/memoryApi';
 
 const file = (name: string, bytes = 3, type = 'image/png') => {

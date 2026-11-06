@@ -1,6 +1,7 @@
 import path from 'node:path';
 import type { LibraryReader, RunRepository } from '@orquestador/core';
-import { MAX_INPUT_FILES, type ProjectStore } from './project';
+import type { ProjectStore } from './project';
+import { MAX_INPUT_FILES } from './project-files';
 import { findPreview, snapshotStep } from './previews';
 import { dismissInterruptedRun, listRuns, markCorrectedBy, markResumedBy, readRunDiagram, readRunLog, startLoggedRun } from './run-log';
 

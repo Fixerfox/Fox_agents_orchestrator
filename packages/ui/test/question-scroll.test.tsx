@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { QuestionCard } from '../src/RunsScreen';
+import { QuestionCard } from '../src/runs/QuestionCard';
 
 const css = readFileSync(join(__dirname, '..', 'src', 'styles.css'), 'utf8');
 const rule = (sel: string) => css.split('\n').find((l) => l.startsWith(`${sel} {`)) ?? '';

@@ -5,12 +5,12 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Diagram, RunEvent } from '@orquestador/core';
 import { CHANNELS, ContractError, EMPTY_LIVE, deriveLive, filesByStep, filesSinceReview, parseRequest, type RunSummary } from '@orquestador/editor';
-import { NodePanel } from '../src/NodePanel';
-import { shortNames } from '../src/OrqNode';
-import { PreviewDialog } from '../src/Preview';
-import { RunsScreen } from '../src/RunsScreen';
+import { NodePanel } from '../src/runs/NodePanel';
+import { shortNames } from '../src/diagrams/OrqNode';
+import { PreviewDialog } from '../src/runs/Preview';
+import { RunsScreen } from '../src/runs/RunsScreen';
 import { createMemoryApi } from '../src/memoryApi';
-import type { RunsIndex } from '../src/useRunsIndex';
+import type { RunsIndex } from '../src/runs/useRunsIndex';
 
 /** Entrada → Planificador → Implementador → Salida. */
 const D: Diagram = {

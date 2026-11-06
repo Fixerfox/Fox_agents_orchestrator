@@ -1,0 +1,211 @@
+import { useState, useCallback } from 'react';
+import { ArrowLeft, Play, Pause, Square } from 'lucide-react';
+import { type RunEvent, correctionTargets } from '@orquestador/core';
+import { type ProjectApi, summarizeRun, type HistoryRow, type RunAction, defaultStep, t, formatDuration, filesByStep } from '@orquestador/editor';
+import { CorrectionDialog } from './CorrectionDialog';
+import { PreviewThumb, PreviewDialog } from './Preview';
+import { LogViewer } from './LogViewer';
+import { NodePanel } from './NodePanel';
+import type { InboxItem } from './useRunsIndex';
+import { ProjectChanges, FileViewer } from './RunFiles';
+import { AuditPanel } from './AuditPanel';
+import { Gantt, RunStory } from './Timeline';
+import { RunDoneBanner } from './RunDoneBanner';
+import { type RunData, useRunData } from './useRunData';
+import { SummaryBody, Result, StoppedActions, RunCanvas } from './RunSummary';
+import { type RunsScreenProps } from './runsTypes';
+import { SECTIONS } from './RunsScreen';
+import { statusLabel } from './runFormat';
+import { QuestionCard } from './QuestionCard';
+import { RunModalView } from './RunModal';
+
+export type Btab = 'summary' | 'gantt' | 'log' | 'result' | 'files' | 'audit';
+
+export const BTABS: Btab[] = ['summary', 'gantt', 'log', 'result', 'files', 'audit'];
+
+/** Contenido de cada pestaña de una ejecución: el mismo abajo en la vista y en el modal [R35.10][R44.1]. */
+export function RunTabBody({ tab, data: d, api, runId, selected, onPick, onExport, wide = false, onOpenFile, onOpenDeliverable, openPath }: { tab: Btab; data: RunData; api: ProjectApi; runId: string; selected?: string | undefined; onPick: (key: string) => void; onExport: (runId: string, jsonl: string) => void; wide?: boolean; onOpenFile: (path: string) => void; onOpenDeliverable?: (path: string) => void; openPath?: string | undefined }) {
+  if (!d.live) return null;
+  if (tab === 'summary') {
+    const summary = summarizeRun(d.events, d.label, 600, Date.now(), d.status === 'interrupted');
+    return <SummaryBody summary={summary} onPick={onPick} wide={wide} {...(onOpenDeliverable ? { onOpenDeliverable } : {})} />;
+  }
+  if (tab === 'gantt')
+    return (
+      <>
+        <Gantt timeline={d.timeline} selected={selected} label={d.label} onPick={onPick} />
+        <RunStory events={d.events} label={d.label} onPick={onPick} />
+      </>
+    );
+  if (tab === 'audit') {
+    const fin = d.events.find((e): e is Extract<RunEvent, { type: 'node.finished' }> => e.type === 'node.finished' && e.nodeId === 'output' && !e.nodePath?.length);
+    return (
+      <AuditPanel
+        runId={runId}
+        events={d.events}
+        labelOf={d.label}
+        info={{ diagramName: d.title, status: d.status, durationS: d.duration, ...(d.events[0] ? { startedAt: d.events[0].ts } : {}), ...(d.measured ? { usage: { tokens: d.tokens, costUsd: d.live.usage.costUsd } } : {}), ...(d.reason ? { reason: d.reason } : {}), ...(fin?.output?.text ? { finalOutput: fin.output.text } : {}) }}
+      />
+    );
+  }
+  if (tab === 'log') return <LogViewer events={[...d.events]} onExport={(jsonl) => onExport(runId, jsonl)} />;
+  if (tab === 'result') return <Result api={api} runId={runId} live={d.live} running={d.running} label={d.label} duration={d.duration} usage={d.measured || d.running ? { tokens: d.tokens, costUsd: d.live.usage.costUsd } : undefined} openPath={openPath} />;
+  return <ProjectChanges api={api} runId={runId} finished={!d.running} events={d.events} labelOf={d.label} onOpen={onOpenFile} />;
+}
+
+/** Vista de una ejecución: cabecera, avisos, lienzo, mensajes del paso y pestañas inferiores [R35.8–R35.10]. */
+export function RunDetail(
+  p: RunsScreenProps & {
+    runId: string;
+    row: HistoryRow | undefined;
+    now: () => number;
+    control: (runId: string, a: RunAction) => void;
+    answer: (i: InboxItem, text: string) => void;
+  },
+) {
+  const d = useRunData(p.api, p.runId, p.main, p.row, p.index.loaded, p.now);
+  const [picked, setPicked] = useState<string | undefined>(p.nav.step);
+  /** Modal de la ejecución y la pestaña con la que se abre: «Resumen» si ya terminó y «Cronograma» mientras corre [R44.5]. */
+  const [modal, setModal] = useState<Btab>();
+  /** Fichero abierto en el visor [R45.10]. */
+  const [viewing, setViewing] = useState<string>();
+  /** Ventana «Pedir corrección», con el paso desde el que se abrió [R53.13]. */
+  const [fix, setFix] = useState<{ prefer?: string }>();
+  /** Vista previa en grande de un archivo de un paso [R54.5]. */
+  const [previewing, setPreviewing] = useState<{ key: string; path: string }>();
+  const openPreview = useCallback((key: string, path: string) => setPreviewing({ key, path }), []);
+  const previewCard = useCallback((key: string, path: string) => <PreviewThumb api={p.api} runId={p.runId} stepKey={key} path={path} />, [p.api, p.runId]);
+  const step = d.timeline.steps.find((s) => s.key === picked) ?? defaultStep(d.timeline.steps);
+  const back = SECTIONS.find((s) => s.id === p.nav.section)!;
+
+  if (!d.ready || !d.live) return <p className="orq-runs2__empty">{d.snap?.error ?? t('runs.loading')}</p>;
+  const { live, running, status, reason, label, diagram } = d;
+  // Pasos que se pueden corregir de una ejecución que ya no está en marcha [R53.13].
+  const fixable = !running && diagram ? correctionTargets(diagram, d.events) : [];
+  const answerHere = (questionId: string, text: string) => p.answer({ runId: p.runId, questionId, nodeId: '', nodePath: [], text: '' }, text);
+
+  return (
+    <div className="orq-run">
+      <header className="orq-run__head">
+        <button type="button" className="orq-btn orq-btn--small" onClick={() => p.onNav({ section: p.nav.section })}>
+          <ArrowLeft size={14} aria-hidden="true" />
+          {t('runs.back', { section: t(back.label) })}
+        </button>
+        <h1>{d.title}</h1>
+        <span className={`orq-pill is-${status}`}>{statusLabel(status, running && live.paused)}</span>
+        <span className="orq-run__input" title={d.input}>
+          {d.input}
+        </span>
+        <span className="orq-mono orq-hint orq-run__figures">
+          {formatDuration(d.duration)} · {d.usageText}
+        </span>
+        {!running && <StoppedActions api={p.api} runId={p.runId} status={status} row={p.row} onOpen={(id) => (p.index.refresh(), p.onNav({ section: p.nav.section, runId: id }))} onChanged={() => p.index.refresh()} />}
+        {running && (
+          <>
+            <button type="button" className="orq-btn orq-btn--small" onClick={() => p.control(p.runId, live.paused ? 'resume' : 'pause')}>
+              {live.paused ? <Play size={13} aria-hidden="true" /> : <Pause size={13} aria-hidden="true" />}
+              {live.paused ? t('runs.resume') : t('runs.pause')}
+            </button>
+            <button type="button" className="orq-btn orq-btn--small orq-btn--stop" onClick={() => p.control(p.runId, 'cancel')}>
+              <Square size={11} fill="currentColor" aria-hidden="true" />
+              {t('runs.cancel')}
+            </button>
+          </>
+        )}
+      </header>
+      {running && live.pending.length > 0 && (
+        // Alto máximo y scroll propio: las preguntas nunca tapan la ejecución ni quedan cortadas por abajo.
+        <div className="orq-run__asks">
+          {live.pending.map((q) => (
+            <div key={q.questionId} className="orq-run__banner">
+              <QuestionCard item={q} from={label(q.nodeId, q.nodePath)} onAnswer={(text) => answerHere(q.questionId, text)} />
+            </div>
+          ))}
+        </div>
+      )}
+      {status === 'failed' && (
+        <div className="orq-run__banner orq-run__banner--error" role="alert">
+          <strong>{t('runs.failedAt')}</strong>
+          <span>{reason ? t('runs.reason', { reason }) : t('runs.noReason')}</span>
+        </div>
+      )}
+      {status === 'interrupted' && (
+        <div className="orq-run__banner orq-run__banner--error" role="alert">
+          <strong>{t('runs.interrupted')}</strong>
+          <span>{t('runs.interrupted.why')}</span>
+        </div>
+      )}
+      {(p.row?.resumedFrom || p.row?.resumedBy) && (
+        <p className="orq-run__note orq-run__link" role="note">
+          {p.row.resumedBy ? t('resume.by') : t('resume.from')}
+          <button type="button" className="orq-btn orq-btn--small orq-btn--ghost" onClick={() => p.onNav({ section: p.nav.section, runId: (p.row!.resumedBy ?? p.row!.resumedFrom)! })}>
+            {p.row.resumedBy ? t('resume.openNew') : t('resume.openOld')}
+          </button>
+        </p>
+      )}
+      {(p.row?.correctedFrom || (p.row?.correctedBy?.length ?? 0) > 0) && (
+        // Enlaces con la ejecución corregida o con la última corrección [R53.14].
+        <p className="orq-run__note orq-run__link" role="note">
+          {p.row!.correctedBy?.length ? t('fix.by') : t('fix.from')}
+          <button type="button" className="orq-btn orq-btn--small orq-btn--ghost" onClick={() => p.onNav({ section: p.nav.section, runId: (p.row!.correctedBy?.at(-1) ?? p.row!.correctedFrom)! })}>
+            {p.row!.correctedBy?.length ? t('fix.openNew') : t('fix.openOld')}
+          </button>
+        </p>
+      )}
+      {diagram && d.old && <p className="orq-run__note" role="note">{t('runs.oldDiagram')}</p>}
+      <div className="orq-run__body">
+        <div className="orq-run__left">
+          <div className="orq-run__canvas">
+            {diagram ? (
+              <RunCanvas diagram={diagram} live={live} events={d.events} agentNames={p.agentNames} onSelect={setPicked} onOpenFile={openPreview} previewCard={previewCard} />
+            ) : (
+              <p className="orq-runs2__empty">{diagram === null ? t('runs.noDiagram') : t('runs.loading')}</p>
+            )}
+            {/* En lugar del panel de pestañas, un aviso con la frase y el botón al modal [R44.5]. */}
+            <RunDoneBanner events={d.events} labelOf={label} running={running} interrupted={status === 'interrupted'} onSummary={() => setModal(running ? 'gantt' : 'summary')} onCorrect={fixable.length > 0 ? () => setFix({}) : undefined} />
+          </div>
+        </div>
+        <aside className="orq-run__side" aria-label={step ? label(step.nodeId, step.nodePath) : t('runs.step.none')}>
+          {step && step.nodePath.length === 0 && fixable.includes(step.nodeId) && (
+            <button type="button" className="orq-btn orq-btn--small orq-run__fixstep" onClick={() => setFix({ prefer: step.nodeId })}>
+              {t('fix.open.step')}
+            </button>
+          )}
+          {step ? (
+            <NodePanel events={d.events} live={live} nodeId={step.nodeId} nodePath={step.nodePath} label={label(step.nodeId, step.nodePath)} labelOf={(id) => label(id, step.nodePath)} onAnswer={answerHere} closed={!running} onOpenFile={setViewing} onPreview={openPreview} renderThumb={previewCard} />
+          ) : (
+            <p className="orq-hint">{t('runs.step.none')}</p>
+          )}
+        </aside>
+      </div>
+      {modal && <RunModalView data={d} api={p.api} runId={p.runId} initialTab={modal} onClose={() => setModal(undefined)} onPick={(k) => (setModal(undefined), setPicked(k))} onExport={p.onExport} />}
+      {previewing && (
+        // Vista previa en grande: archivos del paso, comparar con la anterior, ver cambios y pedir corrección [R54.5].
+        <PreviewDialog
+          api={p.api}
+          runId={p.runId}
+          stepKey={previewing.key}
+          label={label(previewing.key.split('/').pop()!, previewing.key.split('/').slice(0, -1))}
+          files={filesByStep(d.events)[previewing.key] ?? [{ path: previewing.path }]}
+          initial={previewing.path}
+          compareRunId={p.row?.correctedFrom ?? p.row?.resumedFrom}
+          onClose={() => setPreviewing(undefined)}
+          onChanges={(path) => (setPreviewing(undefined), setViewing(path))}
+          onCorrect={fixable.includes(previewing.key) ? () => (setPreviewing(undefined), setFix({ prefer: previewing.key })) : undefined}
+        />
+      )}
+      {fix && diagram && (
+        <CorrectionDialog
+          api={p.api}
+          runId={p.runId}
+          diagram={diagram}
+          events={d.events}
+          prefer={fix.prefer}
+          onClose={() => setFix(undefined)}
+          onOpen={(id) => (setFix(undefined), p.index.refresh(), p.onNav({ section: p.nav.section, runId: id }))}
+        />
+      )}
+      {viewing !== undefined && <FileViewer api={p.api} runId={p.runId} events={d.events} path={viewing} labelOf={label} onClose={() => setViewing(undefined)} />}
+    </div>
+  );
+}
