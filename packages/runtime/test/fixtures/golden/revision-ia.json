@@ -1,0 +1,432 @@
+{
+  "name": "revision-ia",
+  "order": "global",
+  "diagram": {
+    "id": "revision-ia",
+    "name": "revision-ia",
+    "schemaVersion": 1,
+    "nodes": [
+      {
+        "id": "entry",
+        "kind": "entry"
+      },
+      {
+        "id": "dis",
+        "kind": "agent",
+        "agentId": "dis",
+        "label": "dis"
+      },
+      {
+        "id": "qa",
+        "kind": "agent",
+        "agentId": "qa",
+        "label": "qa"
+      },
+      {
+        "id": "rev",
+        "kind": "review",
+        "label": "rev",
+        "review": {
+          "maxRounds": 3,
+          "mode": "ai",
+          "criteria": "Debe estar completo"
+        }
+      },
+      {
+        "id": "output",
+        "kind": "output"
+      }
+    ],
+    "edges": [
+      {
+        "id": "entry->dis",
+        "from": "entry",
+        "to": "dis"
+      },
+      {
+        "id": "dis->qa",
+        "from": "dis",
+        "to": "qa"
+      },
+      {
+        "id": "qa->rev",
+        "from": "qa",
+        "to": "rev"
+      },
+      {
+        "id": "rev->output:approved",
+        "from": "rev",
+        "to": "output",
+        "port": "approved"
+      },
+      {
+        "id": "rev->dis:rejected",
+        "from": "rev",
+        "to": "dis",
+        "port": "rejected"
+      },
+      {
+        "id": "rev->output:x",
+        "from": "rev",
+        "to": "output",
+        "port": "exhausted"
+      }
+    ]
+  },
+  "runs": [
+    [
+      {
+        "type": "run.started",
+        "diagramId": "revision-ia",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.queued",
+        "nodeId": "entry",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.started",
+        "nodeId": "entry",
+        "input": {
+          "text": "pedido inicial",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "node.finished",
+        "nodeId": "entry",
+        "status": "succeeded",
+        "output": {
+          "text": "pedido inicial",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "edge.traversed",
+        "edgeId": "entry->dis",
+        "fromNodeId": "entry",
+        "toNodeId": "dis",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.queued",
+        "nodeId": "dis",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.started",
+        "nodeId": "dis",
+        "input": {
+          "text": "pedido inicial",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "agent.request",
+        "nodeId": "dis",
+        "agentId": "dis",
+        "attempt": 1,
+        "input": {
+          "text": "pedido inicial",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "node.finished",
+        "nodeId": "dis",
+        "status": "succeeded",
+        "output": {
+          "text": "[dis] pedido inicial",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "edge.traversed",
+        "edgeId": "dis->qa",
+        "fromNodeId": "dis",
+        "toNodeId": "qa",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.queued",
+        "nodeId": "qa",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.started",
+        "nodeId": "qa",
+        "input": {
+          "text": "[dis] pedido inicial",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "agent.request",
+        "nodeId": "qa",
+        "agentId": "qa",
+        "attempt": 1,
+        "input": {
+          "text": "[dis] pedido inicial",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "node.finished",
+        "nodeId": "qa",
+        "status": "succeeded",
+        "output": {
+          "text": "[qa] [dis] pedido inicial",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "edge.traversed",
+        "edgeId": "qa->rev",
+        "fromNodeId": "qa",
+        "toNodeId": "rev",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.queued",
+        "nodeId": "rev",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.started",
+        "nodeId": "rev",
+        "input": {
+          "text": "[qa] [dis] pedido inicial",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "decision",
+        "nodeId": "rev",
+        "kind": "judge",
+        "request": {
+          "prompt": "Debe estar completo",
+          "output": {
+            "text": "[qa] [dis] pedido inicial",
+            "files": []
+          },
+          "iteration": 1
+        },
+        "response": {
+          "done": false,
+          "reason": "falta pulir"
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "review.decided",
+        "nodeId": "rev",
+        "round": 1,
+        "max": 3,
+        "verdict": "rejected",
+        "source": "ai",
+        "reason": "falta pulir",
+        "returnTo": "dis",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.finished",
+        "nodeId": "rev",
+        "status": "succeeded",
+        "output": {
+          "text": "[qa] [dis] pedido inicial",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "edge.traversed",
+        "edgeId": "rev->dis:rejected",
+        "fromNodeId": "rev",
+        "toNodeId": "dis",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.queued",
+        "nodeId": "dis",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.started",
+        "nodeId": "dis",
+        "input": {
+          "text": "pedido inicial\n\n---\n\n## Revisión · vuelta 2 de 3\n\nLa revisión rechazó la entrega anterior. Corrige lo que se indica y entrega de nuevo el trabajo completo.\n\n### Tu entrega anterior\n\n[dis] pedido inicial\n\n### Correcciones pedidas\n\n[qa] [dis] pedido inicial",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "agent.request",
+        "nodeId": "dis",
+        "agentId": "dis",
+        "attempt": 1,
+        "input": {
+          "text": "pedido inicial\n\n---\n\n## Revisión · vuelta 2 de 3\n\nLa revisión rechazó la entrega anterior. Corrige lo que se indica y entrega de nuevo el trabajo completo.\n\n### Tu entrega anterior\n\n[dis] pedido inicial\n\n### Correcciones pedidas\n\n[qa] [dis] pedido inicial",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "node.finished",
+        "nodeId": "dis",
+        "status": "succeeded",
+        "output": {
+          "text": "[dis] pedido inicial\n\n---\n\n## Revisión · vuelta 2 de 3\n\nLa revisión rechazó la entrega anterior. Corrige lo que se indica y entrega de nuevo el trabajo completo.\n\n### Tu entrega anterior\n\n[dis] pedido inicial\n\n### Correcciones pedidas\n\n[qa] [dis] pedido inicial",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "edge.traversed",
+        "edgeId": "dis->qa",
+        "fromNodeId": "dis",
+        "toNodeId": "qa",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.queued",
+        "nodeId": "qa",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.started",
+        "nodeId": "qa",
+        "input": {
+          "text": "[dis] pedido inicial\n\n---\n\n## Revisión · vuelta 2 de 3\n\nLa revisión rechazó la entrega anterior. Corrige lo que se indica y entrega de nuevo el trabajo completo.\n\n### Tu entrega anterior\n\n[dis] pedido inicial\n\n### Correcciones pedidas\n\n[qa] [dis] pedido inicial",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "agent.request",
+        "nodeId": "qa",
+        "agentId": "qa",
+        "attempt": 1,
+        "input": {
+          "text": "[dis] pedido inicial\n\n---\n\n## Revisión · vuelta 2 de 3\n\nLa revisión rechazó la entrega anterior. Corrige lo que se indica y entrega de nuevo el trabajo completo.\n\n### Tu entrega anterior\n\n[dis] pedido inicial\n\n### Correcciones pedidas\n\n[qa] [dis] pedido inicial",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "node.finished",
+        "nodeId": "qa",
+        "status": "succeeded",
+        "output": {
+          "text": "[qa] [dis] pedido inicial\n\n---\n\n## Revisión · vuelta 2 de 3\n\nLa revisión rechazó la entrega anterior. Corrige lo que se indica y entrega de nuevo el trabajo completo.\n\n### Tu entrega anterior\n\n[dis] pedido inicial\n\n### Correcciones pedidas\n\n[qa] [dis] pedido inicial",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "edge.traversed",
+        "edgeId": "qa->rev",
+        "fromNodeId": "qa",
+        "toNodeId": "rev",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.queued",
+        "nodeId": "rev",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.started",
+        "nodeId": "rev",
+        "input": {
+          "text": "[qa] [dis] pedido inicial\n\n---\n\n## Revisión · vuelta 2 de 3\n\nLa revisión rechazó la entrega anterior. Corrige lo que se indica y entrega de nuevo el trabajo completo.\n\n### Tu entrega anterior\n\n[dis] pedido inicial\n\n### Correcciones pedidas\n\n[qa] [dis] pedido inicial",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "decision",
+        "nodeId": "rev",
+        "kind": "judge",
+        "request": {
+          "prompt": "Debe estar completo",
+          "output": {
+            "text": "[qa] [dis] pedido inicial\n\n---\n\n## Revisión · vuelta 2 de 3\n\nLa revisión rechazó la entrega anterior. Corrige lo que se indica y entrega de nuevo el trabajo completo.\n\n### Tu entrega anterior\n\n[dis] pedido inicial\n\n### Correcciones pedidas\n\n[qa] [dis] pedido inicial",
+            "files": []
+          },
+          "iteration": 2
+        },
+        "response": {
+          "done": true,
+          "reason": "cumple"
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "review.decided",
+        "nodeId": "rev",
+        "round": 2,
+        "max": 3,
+        "verdict": "approved",
+        "source": "ai",
+        "reason": "cumple",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.finished",
+        "nodeId": "rev",
+        "status": "succeeded",
+        "output": {
+          "text": "[qa] [dis] pedido inicial\n\n---\n\n## Revisión · vuelta 2 de 3\n\nLa revisión rechazó la entrega anterior. Corrige lo que se indica y entrega de nuevo el trabajo completo.\n\n### Tu entrega anterior\n\n[dis] pedido inicial\n\n### Correcciones pedidas\n\n[qa] [dis] pedido inicial",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "edge.traversed",
+        "edgeId": "rev->output:approved",
+        "fromNodeId": "rev",
+        "toNodeId": "output",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.queued",
+        "nodeId": "output",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.started",
+        "nodeId": "output",
+        "input": {
+          "text": "[qa] [dis] pedido inicial\n\n---\n\n## Revisión · vuelta 2 de 3\n\nLa revisión rechazó la entrega anterior. Corrige lo que se indica y entrega de nuevo el trabajo completo.\n\n### Tu entrega anterior\n\n[dis] pedido inicial\n\n### Correcciones pedidas\n\n[qa] [dis] pedido inicial",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "node.finished",
+        "nodeId": "output",
+        "status": "succeeded",
+        "output": {
+          "text": "[qa] [dis] pedido inicial\n\n---\n\n## Revisión · vuelta 2 de 3\n\nLa revisión rechazó la entrega anterior. Corrige lo que se indica y entrega de nuevo el trabajo completo.\n\n### Tu entrega anterior\n\n[dis] pedido inicial\n\n### Correcciones pedidas\n\n[qa] [dis] pedido inicial",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "run.finished",
+        "status": "succeeded",
+        "runId": "run-1"
+      }
+    ]
+  ]
+}

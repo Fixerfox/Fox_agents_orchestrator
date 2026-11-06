@@ -4,13 +4,14 @@ import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { EditorSession, createDiagram, exampleTemplates } from '@orquestador/editor';
-import { AgentPicker } from '../src/AgentPicker';
-import { ContextMenu } from '../src/ContextMenu';
-import { Breadcrumbs } from '../src/Breadcrumbs';
-import { Inspector } from '../src/Inspector';
-import { Palette } from '../src/Palette';
-import { ProblemsPanel } from '../src/ProblemsPanel';
-import { EditButtons, SaveStatus, Toolbar } from '../src/Toolbar';
+import { AgentPicker } from '../src/diagrams/AgentPicker';
+import { ContextMenu } from '../src/common/ContextMenu';
+import { Breadcrumbs } from '../src/diagrams/Breadcrumbs';
+import { Inspector } from '../src/diagrams/Inspector';
+import { Palette } from '../src/diagrams/Palette';
+import { ProblemsPanel } from '../src/diagrams/ProblemsPanel';
+import { EditButtons, SaveStatus } from '../src/diagrams/DiagramMenu';
+import { Toolbar } from '../src/shell/Toolbar';
 
 const P = { x: 0, y: 0 };
 const AGENTS = [

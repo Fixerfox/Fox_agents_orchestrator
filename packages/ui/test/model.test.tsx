@@ -6,7 +6,7 @@ import userEvent from '@testing-library/user-event';
 import type { RunEvent } from '@orquestador/core';
 import { deriveLive } from '@orquestador/editor';
 import { App } from '../src/App';
-import { NodePanel } from '../src/NodePanel';
+import { NodePanel } from '../src/runs/NodePanel';
 import { createMemoryApi } from '../src/memoryApi';
 
 const AGENTS = [{ id: 'sprites', name: 'Sprites', description: 'Dibuja en píxel art', model: 'claude-sonnet-5-5' }];

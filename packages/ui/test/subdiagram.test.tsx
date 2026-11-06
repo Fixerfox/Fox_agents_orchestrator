@@ -6,7 +6,7 @@ import userEvent from '@testing-library/user-event';
 import type { Diagram } from '@orquestador/core';
 import { createDiagram } from '@orquestador/editor';
 import { App } from '../src/App';
-import { DRAG_TYPE } from '../src/Canvas';
+import { DRAG_TYPE } from '../src/diagrams/Canvas';
 import { createMemoryApi } from '../src/memoryApi';
 
 /** «Cueva»: Entrada → pintor → Salida. */

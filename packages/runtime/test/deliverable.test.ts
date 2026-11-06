@@ -2,6 +2,7 @@ import { promises as fs } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { portsOf } from './ports';
 import { MockDecider, Orchestrator, type Diagram, type RunEvent } from '@orquestador/core';
 import { ProjectStore } from '@orquestador/store';
 import { RunService } from '../src';
@@ -36,7 +37,7 @@ function service() {
     },
   };
   const orch = new Orchestrator({ getAdapter: () => adapter as never, decider: new MockDecider(), retry: { maxAttempts: 1, baseDelayMs: 0 } } as never);
-  return { svc: new RunService(store, orch), fix: () => void (failB = false) };
+  return { svc: new RunService(portsOf(store), orch), fix: () => void (failB = false) };
 }
 const started = async (svc: RunService, runId: string) =>
   (await svc.subscribe(runId, 1, () => {})).backlog.find((e): e is Extract<RunEvent, { type: 'run.started' }> => e.type === 'run.started')!;

@@ -6,10 +6,10 @@ import userEvent from '@testing-library/user-event';
 import type { RunEvent } from '@orquestador/core';
 import { deriveLive, type LiveView } from '@orquestador/editor';
 import { App } from '../src/App';
-import { NodeDialog } from '../src/NodeDialog';
-import { NodePanel } from '../src/NodePanel';
-import { ResultsPanel } from '../src/ResultsPanel';
-import { QuestionCard } from '../src/RunsScreen';
+import { NodeDialog } from '../src/runs/NodeDialog';
+import { NodePanel } from '../src/runs/NodePanel';
+import { ResultsPanel } from '../src/runs/ResultsPanel';
+import { QuestionCard } from '../src/runs/QuestionCard';
 import { createMemoryApi } from '../src/memoryApi';
 
 const AGENTS = [{ id: 'sprites', name: 'Sprites', description: 'Dibuja', model: 'claude-sonnet-5-5' }];

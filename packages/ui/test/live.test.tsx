@@ -6,11 +6,11 @@ import userEvent from '@testing-library/user-event';
 import { MockAgent, MockDecider, Orchestrator, type RunEvent } from '@orquestador/core';
 import { EMPTY_LIVE, deriveLive, type LiveView } from '@orquestador/editor';
 import { App } from '../src/App';
-import { buildFlowEdges, buildFlowNodes } from '../src/Canvas';
-import { NodePanel } from '../src/NodePanel';
-import { ResultsPanel } from '../src/ResultsPanel';
-import { RunDialog } from '../src/RunDialog';
-import { Toolbar } from '../src/Toolbar';
+import { buildFlowEdges, buildFlowNodes } from '../src/diagrams/Canvas';
+import { NodePanel } from '../src/runs/NodePanel';
+import { ResultsPanel } from '../src/runs/ResultsPanel';
+import { RunDialog } from '../src/runs/RunDialog';
+import { Toolbar } from '../src/shell/Toolbar';
 import { createMemoryApi } from '../src/memoryApi';
 
 const AGENTS = [{ id: 'creador', name: 'Creador' }, { id: 'revisor', name: 'Revisor' }];

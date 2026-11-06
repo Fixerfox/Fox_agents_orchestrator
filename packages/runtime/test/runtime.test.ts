@@ -2,6 +2,7 @@ import { promises as fs } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { portsOf } from './ports';
 import {
   MockAgent,
   MockDecider,
@@ -35,7 +36,7 @@ afterEach(() => fs.rm(dir, { recursive: true, force: true }));
 function service(scripts: ConstructorParameters<typeof MockAgent>[0] = { a: { output: 'hecho', tokens: ['he', 'cho'] } }) {
   const agent = new MockAgent(scripts);
   const orch = new Orchestrator({ getAdapter: () => agent, decider: new MockDecider() });
-  return { svc: new RunService(store, orch), agent };
+  return { svc: new RunService(portsOf(store), orch), agent };
 }
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -259,7 +260,7 @@ describe('demostración [R20.7]', () => {
       ],
     );
     await store.diagrams.save(ex);
-    const svc = new RunService(store, createDemoOrchestrator());
+    const svc = new RunService(portsOf(store), createDemoOrchestrator());
     const { runId } = await svc.start({ diagramId: 'd', order: 'hazme un juego' });
     await vi.waitFor(() => expect(svc.pending(runId)).toHaveLength(1));
     expect(svc.pending(runId)[0]!.options).toEqual(['Pixel art', 'Vectorial', 'Realista']);
@@ -319,7 +320,7 @@ describe('reanudar y cancelar [R41.2][R41.3]', () => {
       },
     };
     const orch = new Orchestrator({ getAdapter: () => adapter as never, decider: new MockDecider(), retry: { maxAttempts: 1, baseDelayMs: 0 } } as never);
-    return { svc: new RunService(store, orch), calls, fix: () => void (failB = false) };
+    return { svc: new RunService(portsOf(store), orch), calls, fix: () => void (failB = false) };
   }
 
   it('[R41.2] reanuda una fallida con la misma entrada, reutiliza lo hecho y enlaza las dos; no se reanuda dos veces', async () => {

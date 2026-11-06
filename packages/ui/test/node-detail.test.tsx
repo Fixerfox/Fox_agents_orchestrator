@@ -5,9 +5,9 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { RunEvent } from '@orquestador/core';
 import { deriveLive } from '@orquestador/editor';
-import { NodeDialog } from '../src/NodeDialog';
-import { NodePanel } from '../src/NodePanel';
-import { ResizeHandle } from '../src/ResizeHandle';
+import { NodeDialog } from '../src/runs/NodeDialog';
+import { NodePanel } from '../src/runs/NodePanel';
+import { ResizeHandle } from '../src/common/ResizeHandle';
 
 const ev = (seq: number, body: object): RunEvent => ({ runId: 'r', seq, ts: 't', ...body }) as RunEvent;
 const LONG = Array.from({ length: 40 }, (_, i) => `línea ${i + 1}`).join('\n');

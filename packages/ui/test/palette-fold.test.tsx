@@ -3,7 +3,7 @@ import './setup';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Palette } from '../src/Palette';
+import { Palette } from '../src/diagrams/Palette';
 
 const AGENTS = [
   { id: 'dis', name: 'disenador', editable: true },

@@ -23,4 +23,5 @@ Cada hito se itera dos veces (propuesta y solución) y se cierra con tests en ve
 | **M5 · Registro y biblioteca** | Alta/configuración de agentes, skills, contextos y catálogo MCP; global vs proyecto con versiones fijables; importación con revisión; optimizar instrucciones con vista de diferencias; plantillas |
 | **M6 · Adapter Claude** | Integración con Claude Agent SDK y gestión de secretos |
 | **M7 · Replay y pulido** | Reproducción de ejecuciones, empaquetado Windows y Linux |
+| **M11 · Arquitectura** ✅ | SPEC-056: arquitectura hexagonal con contextos. M11a límites, puertos y grabaciones de referencia; M11b contextos de `core`; M11c tipos de nodo como handlers, `RunService` como fachada y presupuesto de tamaño; M11d contrato y UI por contexto. Sin funcionalidad nueva, salvo arreglar las escrituras con lectores a la vez en Windows (R56.21) |
 | **Futuro** | Línea de tiempo, mensajes a agentes en curso, reintentar/saltar nodos, ejecuciones programadas, sidecar Python, plantillas |

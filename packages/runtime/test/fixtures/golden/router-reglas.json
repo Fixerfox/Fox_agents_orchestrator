@@ -1,0 +1,250 @@
+{
+  "name": "router-reglas",
+  "order": "global",
+  "diagram": {
+    "id": "router-reglas",
+    "name": "router-reglas",
+    "schemaVersion": 1,
+    "nodes": [
+      {
+        "id": "entry",
+        "kind": "entry"
+      },
+      {
+        "id": "r",
+        "kind": "router",
+        "label": "r",
+        "router": {
+          "mode": "rules"
+        }
+      },
+      {
+        "id": "si",
+        "kind": "agent",
+        "agentId": "si",
+        "label": "si"
+      },
+      {
+        "id": "no",
+        "kind": "agent",
+        "agentId": "no",
+        "label": "no"
+      },
+      {
+        "id": "output",
+        "kind": "output"
+      }
+    ],
+    "edges": [
+      {
+        "id": "entry->r",
+        "from": "entry",
+        "to": "r"
+      },
+      {
+        "id": "r->si",
+        "from": "r",
+        "to": "si",
+        "condition": "vale"
+      },
+      {
+        "id": "r->no",
+        "from": "r",
+        "to": "no",
+        "condition": "no vale"
+      },
+      {
+        "id": "si->output",
+        "from": "si",
+        "to": "output"
+      },
+      {
+        "id": "no->output",
+        "from": "no",
+        "to": "output"
+      }
+    ]
+  },
+  "runs": [
+    [
+      {
+        "type": "run.started",
+        "diagramId": "router-reglas",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.queued",
+        "nodeId": "entry",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.started",
+        "nodeId": "entry",
+        "input": {
+          "text": "pedido inicial",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "node.finished",
+        "nodeId": "entry",
+        "status": "succeeded",
+        "output": {
+          "text": "pedido inicial",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "edge.traversed",
+        "edgeId": "entry->r",
+        "fromNodeId": "entry",
+        "toNodeId": "r",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.queued",
+        "nodeId": "r",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.started",
+        "nodeId": "r",
+        "input": {
+          "text": "pedido inicial",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "decision",
+        "nodeId": "r",
+        "kind": "condition",
+        "request": {
+          "input": {
+            "text": "pedido inicial",
+            "files": []
+          }
+        },
+        "response": [
+          {
+            "edgeId": "r->si",
+            "condition": "vale",
+            "matched": true
+          },
+          {
+            "edgeId": "r->no",
+            "condition": "no vale",
+            "matched": false
+          }
+        ],
+        "runId": "run-1"
+      },
+      {
+        "type": "route.decided",
+        "fromNodeId": "r",
+        "chosen": [
+          "si"
+        ],
+        "mode": "rules",
+        "reason": "reglas de las aristas",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.finished",
+        "nodeId": "r",
+        "status": "succeeded",
+        "output": {
+          "text": "pedido inicial",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "edge.traversed",
+        "edgeId": "r->si",
+        "fromNodeId": "r",
+        "toNodeId": "si",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.queued",
+        "nodeId": "si",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.finished",
+        "nodeId": "no",
+        "status": "skipped",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.started",
+        "nodeId": "si",
+        "input": {
+          "text": "pedido inicial",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "agent.request",
+        "nodeId": "si",
+        "agentId": "si",
+        "attempt": 1,
+        "input": {
+          "text": "pedido inicial",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "node.finished",
+        "nodeId": "si",
+        "status": "succeeded",
+        "output": {
+          "text": "[si] pedido inicial",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "edge.traversed",
+        "edgeId": "si->output",
+        "fromNodeId": "si",
+        "toNodeId": "output",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.queued",
+        "nodeId": "output",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.started",
+        "nodeId": "output",
+        "input": {
+          "text": "[si] pedido inicial",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "node.finished",
+        "nodeId": "output",
+        "status": "succeeded",
+        "output": {
+          "text": "[si] pedido inicial",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "run.finished",
+        "status": "succeeded",
+        "runId": "run-1"
+      }
+    ]
+  ]
+}

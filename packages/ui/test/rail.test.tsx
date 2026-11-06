@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { exampleTemplates } from '@orquestador/editor';
-import { Palette } from '../src/Palette';
+import { Palette } from '../src/diagrams/Palette';
 
 const palette = (o: Partial<React.ComponentProps<typeof Palette>> = {}) => {
   const props = {

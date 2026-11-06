@@ -2,6 +2,7 @@ import { promises as fs } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { portsOf } from './ports';
 import { MockAgent, MockDecider, Orchestrator, type Diagram, type RunEvent } from '@orquestador/core';
 import { ProjectStore } from '@orquestador/store';
 import { RunService } from '../src';
@@ -26,7 +27,7 @@ afterEach(() => fs.rm(dir, { recursive: true, force: true }));
 describe('SPEC-048 · entrada con archivos en el servicio de ejecución', () => {
   it('[R48.5] el primer paso recibe el texto y los archivos; sin texto también vale si hay archivos', async () => {
     const agent = new MockAgent({ a: { output: 'ok' } });
-    const svc = new RunService(store, new Orchestrator({ getAdapter: () => agent, decider: new MockDecider() }));
+    const svc = new RunService(portsOf(store), new Orchestrator({ getAdapter: () => agent, decider: new MockDecider() }));
     const att = await store.stageAttachment('logo.svg', new Uint8Array([60, 115]));
     const { runId } = await svc.start({ diagramId: 'd', order: '', files: ['brief.md'], attachments: [att.id] });
     await svc.settled(runId);
@@ -36,7 +37,7 @@ describe('SPEC-048 · entrada con archivos en el servicio de ejecución', () => 
   });
 
   it('[R48.5] rechaza adjuntos desconocidos, rutas fuera, más de 20 archivos y una entrada vacía', async () => {
-    const svc = new RunService(store, new Orchestrator({ getAdapter: () => new MockAgent(), decider: new MockDecider() }));
+    const svc = new RunService(portsOf(store), new Orchestrator({ getAdapter: () => new MockAgent(), decider: new MockDecider() }));
     await expect(svc.start({ diagramId: 'd', order: 'x', attachments: ['no-existe'] })).rejects.toMatchObject({ code: 'bad-request' });
     await expect(svc.start({ diagramId: 'd', order: 'x', files: ['../fuera.md'] })).rejects.toMatchObject({ code: 'bad-request' });
     await expect(svc.start({ diagramId: 'd', order: 'x', files: Array.from({ length: 21 }, () => 'brief.md') })).rejects.toMatchObject({ code: 'bad-request' });
@@ -54,7 +55,7 @@ describe('SPEC-048 · entrada con archivos en el servicio de ejecución', () => 
         yield { type: 'result', text: `hecho ${req.agentId}` };
       },
     };
-    const svc = new RunService(store, new Orchestrator({ getAdapter: () => adapter as never, decider: new MockDecider(), retry: { maxAttempts: 1, baseDelayMs: 0 } } as never));
+    const svc = new RunService(portsOf(store), new Orchestrator({ getAdapter: () => adapter as never, decider: new MockDecider(), retry: { maxAttempts: 1, baseDelayMs: 0 } } as never));
     const first = await svc.start({ diagramId: 'd', order: 'pedido', files: ['brief.md'] });
     await svc.settled(first.runId);
     failB = false;

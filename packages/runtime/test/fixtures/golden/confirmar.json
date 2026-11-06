@@ -1,0 +1,223 @@
+{
+  "name": "confirmar",
+  "order": "global",
+  "diagram": {
+    "id": "confirmar",
+    "name": "confirmar",
+    "schemaVersion": 1,
+    "nodes": [
+      {
+        "id": "entry",
+        "kind": "entry"
+      },
+      {
+        "id": "a",
+        "kind": "agent",
+        "agentId": "a",
+        "label": "a",
+        "confirm": true
+      },
+      {
+        "id": "output",
+        "kind": "output"
+      }
+    ],
+    "edges": [
+      {
+        "id": "entry->a",
+        "from": "entry",
+        "to": "a"
+      },
+      {
+        "id": "a->output",
+        "from": "a",
+        "to": "output"
+      }
+    ]
+  },
+  "runs": [
+    [
+      {
+        "type": "run.started",
+        "diagramId": "confirmar",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.queued",
+        "nodeId": "entry",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.started",
+        "nodeId": "entry",
+        "input": {
+          "text": "pedido inicial",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "node.finished",
+        "nodeId": "entry",
+        "status": "succeeded",
+        "output": {
+          "text": "pedido inicial",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "edge.traversed",
+        "edgeId": "entry->a",
+        "fromNodeId": "entry",
+        "toNodeId": "a",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.queued",
+        "nodeId": "a",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.started",
+        "nodeId": "a",
+        "input": {
+          "text": "pedido inicial",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "agent.request",
+        "nodeId": "a",
+        "agentId": "a",
+        "attempt": 1,
+        "input": {
+          "text": "pedido inicial",
+          "files": []
+        },
+        "confirm": true,
+        "runId": "run-1"
+      },
+      {
+        "type": "agent.question",
+        "nodeId": "a",
+        "questionId": "q-1",
+        "text": "primera versión",
+        "options": [
+          "Aprobar"
+        ],
+        "confirm": {
+          "round": 1
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "agent.answer",
+        "nodeId": "a",
+        "questionId": "q-1",
+        "text": "Hazlo más corto",
+        "runId": "run-1"
+      },
+      {
+        "type": "confirm.decided",
+        "nodeId": "a",
+        "round": 1,
+        "verdict": "changes",
+        "text": "Hazlo más corto",
+        "runId": "run-1"
+      },
+      {
+        "type": "agent.request",
+        "nodeId": "a",
+        "agentId": "a",
+        "attempt": 1,
+        "input": {
+          "text": "pedido inicial\n\n## Cambios pedidos antes de confirmar (vuelta 1)\n\n### Tu entrega anterior\n\nprimera versión\n\n### Lo que pide el usuario\n\nHazlo más corto",
+          "files": []
+        },
+        "confirm": true,
+        "previousAnswers": [
+          {
+            "question": "¿Apruebas lo que has hecho o quieres cambios?",
+            "answer": "Hazlo más corto"
+          }
+        ],
+        "runId": "run-1"
+      },
+      {
+        "type": "agent.question",
+        "nodeId": "a",
+        "questionId": "q-2",
+        "text": "primera versión",
+        "options": [
+          "Aprobar"
+        ],
+        "confirm": {
+          "round": 2
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "agent.answer",
+        "nodeId": "a",
+        "questionId": "q-2",
+        "text": "Aprobar",
+        "runId": "run-1"
+      },
+      {
+        "type": "confirm.decided",
+        "nodeId": "a",
+        "round": 2,
+        "verdict": "approved",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.finished",
+        "nodeId": "a",
+        "status": "succeeded",
+        "output": {
+          "text": "primera versión",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "edge.traversed",
+        "edgeId": "a->output",
+        "fromNodeId": "a",
+        "toNodeId": "output",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.queued",
+        "nodeId": "output",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.started",
+        "nodeId": "output",
+        "input": {
+          "text": "primera versión",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "node.finished",
+        "nodeId": "output",
+        "status": "succeeded",
+        "output": {
+          "text": "primera versión",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "run.finished",
+        "status": "succeeded",
+        "runId": "run-1"
+      }
+    ]
+  ]
+}

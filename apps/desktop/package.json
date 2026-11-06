@@ -10,6 +10,7 @@
     "@orquestador/editor": "*",
     "@orquestador/runtime": "*",
     "@orquestador/store": "*",
-    "@orquestador/ui": "*"
+    "@orquestador/ui": "*",
+    "@orquestador/workspace": "*"
   }
 }

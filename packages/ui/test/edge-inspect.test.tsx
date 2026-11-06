@@ -6,8 +6,8 @@ import userEvent from '@testing-library/user-event';
 import { ReactFlowProvider } from '@xyflow/react';
 import { MockAgent, MockDecider, Orchestrator, type Diagram, type DiagramNode, type Edge, type RunEvent } from '@orquestador/core';
 import { EditorSession, deriveLive, edgeTraversals } from '@orquestador/editor';
-import { Canvas } from '../src/Canvas';
-import { EdgeInspector } from '../src/EdgeInspector';
+import { Canvas } from '../src/diagrams/Canvas';
+import { EdgeInspector } from '../src/diagrams/EdgeInspector';
 
 const agent = (id: string, extra: Partial<DiagramNode> = {}): DiagramNode => ({ id, kind: 'agent', agentId: id, label: id, position: { x: 0, y: 0 }, ...extra });
 const edge = (from: string, to: string, port?: Edge['port']): Edge => ({ id: `${from}->${to}`, from, to, ...(port ? { port } : {}) });

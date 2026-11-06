@@ -36,6 +36,8 @@ Aplicación de escritorio para orquestar agentes de IA de forma visual mediante 
 6. **Ejecución (M3b/M4):** `packages/workspace` (aislamiento y fusión de archivos), `packages/runtime` (RunService: arranca, controla y entrega eventos por lotes). La UI solo consume eventos con `RunClient` (dedupe por `seq`).
 7. **Interfaz de agente (adapter):** cada proveedor/motor implementa la misma interfaz para poder sustituirlo o simularlo.
 
+8. **Hexagonal (SPEC-056):** `core` define los puertos (`AgentEngine`, `RunRepository`, `LibraryReader`, `PathPolicy`, `WorkspaceFiles`) y no importa de nadie. `runtime` solo depende de `core`; `claude`, `store` y `workspace` son adaptadores; `apps/desktop/src/main/composition.ts` es el único sitio que los crea. La matriz está en `scripts/architecture.json` y la comprueban un test y ESLint. `core` se organiza en contextos (`docs/06-contextos.md`). Cada tipo de nodo es un `NodeHandler` en `execution/nodes/`.
+
 ## Tests
 - **Unitarios:** Vitest (orquestador, modelo de grafo, bus de eventos).
 - **E2E:** Playwright (soporta Electron) para la UI.
