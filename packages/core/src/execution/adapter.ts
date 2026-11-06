@@ -9,6 +9,10 @@ export type AgentStreamEvent =
   | { type: 'token'; text: string }
   | { type: 'tool_call'; tool: string; input: unknown }
   | { type: 'tool_result'; tool: string; ok: boolean; output?: string; /** Id de la llamada, si el motor lo da [R55.2]. */ id?: string }
+  /** Rama de git que el agente creó o en la que actuó [R58.1]. */
+  | { type: 'branch'; branch: string; via: 'head' | 'command' | 'mcp' | 'ran'; created?: boolean }
+  /** Lo que el agente hizo en una rama [R58.11]. */
+  | { type: 'git_action'; branch: string; action: 'commit' | 'push' | 'pr' | 'merge' | 'delete' | 'switch'; /** PR o merge request [R58.14]. */ url?: string }
   | { type: 'usage'; inputTokens: number; outputTokens: number; costUsd?: number }
   /** Archivo creado o modificado por el agente [R31.12]; `change` es opcional para adaptadores que no lo saben. */
   | { type: 'file'; path: string; change?: FileChange; /** Lo cambió un comando (sin copia) [R55.3]. */ via?: FileVia }

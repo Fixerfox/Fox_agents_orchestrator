@@ -111,6 +111,19 @@ describe('SPEC-056 · composición de la aplicación', () => {
     expect((await svc.proposeCorrection(runId, 'Cambia el plan')).proposal).toEqual({ nodeId: 'p', reason: 'el plan' });
   });
 
+  it('[R58.2] un script que crea la rama, sin comandos git a la vista, llega como evento de la ejecución', async () => {
+    await fs.mkdir(join(dir, '.git'));
+    await fs.writeFile(join(dir, '.git', 'HEAD'), 'ref: refs/heads/main\n');
+    const query: QueryFn = async function* () {
+      yield { type: 'assistant', message: { content: [{ type: 'tool_use', id: 't1', name: 'Bash', input: { command: 'bash crear-feature.sh' } }] } } as SdkMessage;
+      await fs.writeFile(join(dir, '.git', 'HEAD'), 'ref: refs/heads/001-feature\n');
+      yield { type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 't1', content: 'ok' }] } } as SdkMessage;
+      yield result('Hecho');
+    };
+    const { events } = await composeOrchestrator(context('claude'), query).start(flow, 'Pinta').result;
+    expect(events.filter((e) => e.type === 'git.branch')).toMatchObject([{ nodeId: 'p', branch: '001-feature', via: 'head' }]);
+  });
+
   it('[R56.5] con el motor simulado no se llama a Claude', async () => {
     let calls = 0;
     const query: QueryFn = async function* () {

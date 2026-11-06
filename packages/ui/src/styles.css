@@ -2031,3 +2031,16 @@ button.orq-story__line:hover { background: var(--raised); }
 .orq-agentf2__main { overflow: auto; padding: 20px 24px; }
 .orq-agentf2 .orq-agentf__card { max-width: 420px; }
 @media (max-width: 900px) { .orq-agentf2 { flex-direction: column; } .orq-agentf2__nav { width: auto; flex-direction: row; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--line); } }
+
+/* Ramas de git [R58.8][R58.10][R58.12] */
+.orq-node__git { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; color: var(--accent-text); font: 500 11px/16px var(--mono); }
+.orq-prlink { display: inline-flex; align-items: center; gap: 4px; color: var(--accent-text); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; pointer-events: all; cursor: pointer; }
+.orq-node__git > span { display: inline-flex; align-items: center; gap: 3px; }
+.orq-branchbox { position: relative; width: 100%; height: 100%; box-sizing: border-box; border: 2px dashed var(--accent); border-radius: 14px; background: color-mix(in srgb, var(--accent) 4%, transparent); }
+.orq-branchbox__name { position: absolute; top: 6px; left: 12px; display: inline-flex; align-items: center; gap: 5px; max-width: calc(100% - 24px); color: var(--accent-text); font: 600 12px/18px var(--mono); }
+.orq-branchbox__name span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.orq-rsum__branches { padding: 12px 14px; border-radius: 10px; border: 1px dashed var(--accent); background: color-mix(in srgb, var(--accent) 7%, var(--card)); }
+.orq-rsum__branches h3 { margin: 0 0 8px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--accent-text); }
+.orq-rsum__branches ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.orq-rsum__branches li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.orq-rsum__branch { display: inline-flex; align-items: center; gap: 6px; min-width: 0; color: var(--accent-text); font: 600 14px/20px var(--mono); overflow-wrap: anywhere; }

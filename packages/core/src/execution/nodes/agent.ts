@@ -151,6 +151,12 @@ async function attemptAgent(step: StepContext, node: DiagramNode, input: Payload
         }
         step.emitter.emit({ type: 'file.produced', nodeId: node.id, path: ev.path, ...(ev.change ? { change: ev.change } : {}), ...(ev.via ? { via: ev.via } : {}) }, path);
         break;
+      case 'branch':
+        step.emitter.emit({ type: 'git.branch', nodeId: node.id, branch: ev.branch, via: ev.via, ...(ev.created ? { created: true } : {}) }, path);
+        break;
+      case 'git_action':
+        step.emitter.emit({ type: 'git.action', nodeId: node.id, branch: ev.branch, action: ev.action, ...(ev.url ? { url: ev.url } : {}) }, path);
+        break;
       case 'result':
         resultText = ev.text;
         for (const f of ev.files ?? []) if (!files.has(f)) files.set(f, undefined);

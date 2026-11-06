@@ -101,7 +101,7 @@ function createWindow(): void {
   const win = new BrowserWindow(windowOptions(join(__dirname, 'preload.cjs')));
   mainWindow = win;
   const indexUrl = pathToFileURL(join(__dirname, 'renderer', 'index.html')).toString();
-  secureWebContents(win.webContents, win.webContents.session, indexUrl);
+  secureWebContents(win.webContents, win.webContents.session, indexUrl, (url) => void shell.openExternal(url));
   win.once('ready-to-show', () => win.show());
   // Sin menú del sistema (File, Edit…) en Windows y Linux [R19.8].
   if (process.platform !== 'darwin') win.removeMenu();

@@ -1,8 +1,11 @@
+import { PrLink } from '../common';
 import { AgentAvatar, AskFirstMark, HandMark, type AgentLook } from '../common';
 import { Handle, Position, type NodeProps, type Node } from '@xyflow/react';
 import { useState, type ReactNode } from 'react';
-import { AlertTriangle, Bot, Boxes, Braces, Check, CircleDashed, CircleSlash, Eye, FileCode, FileText, GitFork, Image as ImageIcon, Loader2, MessageCircleQuestion, Minus, Play, Repeat2, ShieldCheck, Square, X } from 'lucide-react';
+import { AlertTriangle, Bot, Boxes, Braces, Check, CircleDashed, CircleSlash, Eye, FileCode, FileText, GitBranch, GitCommitHorizontal, GitFork, GitMerge, GitPullRequest, Image as ImageIcon, Loader2, MessageCircleQuestion, Minus, Play, Repeat2, ShieldCheck, Square, Trash2, Upload, X } from 'lucide-react';
 import { t, type LiveNodeStatus, type LoopInfo, type MessageKey, type ReviewInfo } from '@orquestador/editor';
+
+const GIT_ICON: Readonly<Record<string, typeof Upload>> = { commit: GitCommitHorizontal, push: Upload, pr: GitPullRequest, merge: GitMerge, delete: Trash2, switch: GitBranch };
 
 export interface OrqNodeData extends Record<string, unknown> {
   kind: 'entry' | 'output' | 'agent' | 'router' | 'loop' | 'review' | 'subdiagram' | 'transform';
@@ -38,6 +41,10 @@ export interface OrqNodeData extends Record<string, unknown> {
   human?: boolean;
   /** Archivos que creó o cambió el paso en la ejecución [R54.1]. */
   files?: readonly NodeFile[];
+  /** Lo que hizo en las ramas de git [R58.12]. */
+  gitActions?: readonly string[];
+  /** PR o merge request que creó [R58.15]. */
+  prUrl?: string;
   /** «Ampliar»: la vista previa en grande [R54.2]. */
   onOpenFile?: (path: string) => void;
   /** Vista previa pequeña de un archivo, en la tarjeta junto al nodo [R54.2]. */
@@ -138,6 +145,20 @@ export function OrqNode({ data, selected }: NodeProps<OrqFlowNode>) {
         )}
         {data.note && <span className="orq-node__note">{data.note}</span>}
         {data.waits && <span className="orq-node__waits">{data.waits}</span>}
+        {data.gitActions && (
+          <span className="orq-node__git">
+            {data.gitActions.map((a) => {
+              const Mark = GIT_ICON[a] ?? GitCommitHorizontal;
+              if (a === 'pr' && data.prUrl) return <PrLink key={a} url={data.prUrl} />;
+              return (
+                <span key={a}>
+                  <Mark size={12} aria-hidden="true" />
+                  {t(`git.action.${a}` as MessageKey)}
+                </span>
+              );
+            })}
+          </span>
+        )}
         {data.review && (
           <span className={`orq-node__loop orq-node__review is-${data.review.verdict}`}>
             {t('node.review.round', { n: data.review.n, max: data.review.max })} · {t(`review.verdict.${data.review.verdict}` as MessageKey)}

@@ -15,6 +15,7 @@ import { deliverableLabel, edgeTraversals, isForcedOnStep, isRequired, knowledge
 import { EdgeInspector } from './EdgeInspector';
 import { OrqNode, type NodeFile, type OrqFlowNode } from './OrqNode';
 import { ResNode, type ResFlowNode, type ResNodeData } from './ResNode';
+import { BranchNode, branchFlowNodes, withoutBranchBoxes } from './BranchNode';
 import { OrqEdge, OrqReturnEdge, type InsertHandler } from './OrqEdge';
 import { ContextMenu, type MenuItem } from '../common';
 import { useSession } from './useSession';
@@ -75,7 +76,7 @@ export interface AgentMenu {
 
 type MenuTarget = { x: number; y: number; kind: 'node' | 'edge' | 'pane'; id?: string; at?: { x: number; y: number } };
 
-const nodeTypes = { orq: OrqNode, res: ResNode };
+const nodeTypes = { orq: OrqNode, res: ResNode, branch: BranchNode };
 const edgeTypes = { orq: OrqEdge, orqReturn: OrqReturnEdge };
 
 /** Tipo de dato al arrastrar un nodo desde la paleta [R21.4]. */
@@ -233,6 +234,8 @@ export function buildFlowNodes(
     const runStatus = live?.nodeStatus[key];
     const loop = live?.loops[key];
     const review = live?.reviews[key];
+    const gitActions = live?.gitActions[key];
+    const prUrl = live?.gitLinks[key];
     const own = subtitle(n, agentNames);
     const sub = own !== undefined && finals.has(n.id) ? t('node.sub.final', { sub: own }) : own;
     return {
@@ -258,6 +261,8 @@ export function buildFlowNodes(
         ...((live?.pending ?? []).some((q) => [...q.nodePath, q.nodeId].join('/') === key || `${q.nodePath.join('/')}/`.startsWith(`${key}/`)) ? { asking: true } : {}),
         ...(loop ? { loop } : {}),
         ...(review ? { review } : {}),
+        ...(gitActions ? { gitActions } : {}),
+        ...(prUrl ? { prUrl } : {}),
         // Fichas con lo que hizo el paso, colgadas debajo [R54.1].
         ...((extra.stepFiles?.[key]?.length ?? 0) > 0
           ? {
@@ -362,6 +367,12 @@ export function Canvas({ session, onSelection, onReject, live, events, onAddAt, 
     [derived],
   );
 
+  // Los recuadros de las ramas van detrás de los pasos y los siguen al moverlos [R58.8].
+  const shown = useMemo<CanvasNode[]>(() => {
+    const boxes = live ? branchFlowNodes(snap.level, snap.path, nodes, live.branches) : [];
+    return boxes.length > 0 ? ([...boxes, ...nodes] as unknown as CanvasNode[]) : nodes;
+  }, [live, snap.level, snap.path, nodes]);
+
   useEffect(() => {
     if (!selectRequest) return;
     const id = selectRequest.id;
@@ -385,7 +396,8 @@ export function Canvas({ session, onSelection, onReject, live, events, onAddAt, 
   };
 
   const onNodesChange = useCallback((changes: NodeChange<CanvasNode>[]) => {
-    setNodes((cur) => applyNodeChanges(changes, cur));
+    const own = withoutBranchBoxes(changes);
+    if (own.length > 0) setNodes((cur) => applyNodeChanges(own, cur));
   }, []);
 
   const onSelectionChange = useCallback(
@@ -501,7 +513,7 @@ export function Canvas({ session, onSelection, onReject, live, events, onAddAt, 
       }}
     >
       <ReactFlow
-        nodes={nodes}
+        nodes={shown}
         edges={edges}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}

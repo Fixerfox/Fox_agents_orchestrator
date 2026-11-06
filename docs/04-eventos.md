@@ -25,6 +25,8 @@ interface EventBase { runId: Id; seq: number; ts: string; type: string; nodePath
 | `permission.requested` | `nodeId, action, detail` | Una acción pide confirmación en la UI |
 | `permission.resolved` | `nodeId, allowed` | El usuario responde |
 | `file.produced` | `nodeId, path, change?: 'created' \| 'modified'` | Un agente crea o modifica un archivo; se emite al terminar la herramienta que lo escribió, también si luego el paso falla (SPEC-045) |
+| `git.branch` | `nodeId, branch, via: 'head' \| 'command' \| 'mcp' \| 'ran', created?` | El paso creó una rama o actuó en ella (SPEC-058) |
+| `git.action` | `nodeId, branch, action: 'commit' \| 'push' \| 'pr' \| 'merge' \| 'delete' \| 'switch', url?` | El paso hizo eso en esa rama; `url` es la de la PR (SPEC-058) |
 | `node.retrying` | `nodeId, attempt, max, delayMs, message` | Reintento automático tras error temporal |
 | `workspace.merged` | `nodeId, files` | Cambios de un agente fusionados en el proyecto |
 | `workspace.conflict` | `nodeIds, files` | Conflicto entre agentes paralelos; requiere atención |
