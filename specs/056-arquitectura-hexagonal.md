@@ -117,7 +117,7 @@ Esta spec no añade funcionalidad. Cambia la estructura para que añadir un tipo
 
 ### D · Contrato y UI por contexto (M11d)
 - **R56.18** [M11d] `editor/src/api.ts` se reparte en `editor/src/api/` por contexto: `project`, `diagrams`, `runs`, `knowledge`, `settings` y `assistant`. `ProjectApi` es la unión (`&`) de esas interfaces. Un test compara la lista de métodos de `ProjectApi` con una instantánea: no se renombra ni se quita ninguno, así que el preload y los canales IPC no cambian. `ui/src/memoryApi.ts` y `apps/desktop/src/main/handlers.ts` se reparten igual.
-- **R56.19** [M11d] `ui/src` se organiza en carpetas por contexto: `shell` (navegación, rail, layout), `diagrams`, `runs`, `knowledge`, `settings` y `assistant`, con las mismas reglas de R56.9 (los componentes comunes en `ui/src/common/`). `App.tsx` solo compone la navegación, el layout y los proveedores. `AgentsScreen` y `RunsScreen` se parten en subcomponentes (lista, ficha, pestañas).
+- **R56.19** [M11d] `ui/src` se organiza en carpetas por contexto: `shell` (navegación, rail, layout), `diagrams`, `runs`, `knowledge`, `settings` y `assistant`, con las mismas reglas de R56.9 (los componentes comunes en `ui/src/common/`; la API en memoria de R56.18 se queda en `ui/src/memory/` con `ui/src/memoryApi.ts` como entrada). `App.tsx` solo compone la navegación, el layout y los proveedores. `AgentsScreen` y `RunsScreen` se parten en subcomponentes (lista, ficha, pestañas).
 - **R56.20** [M11d] Presupuesto de tamaño en `ui` y `apps/desktop`: ningún archivo de `src` pasa de 600 líneas, con las excepciones en la lista del test.
 
 ## Escenarios
