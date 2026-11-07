@@ -1,5 +1,5 @@
 import { keepNodes } from './keepNodes';
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   Background,
   Controls,
@@ -11,9 +11,10 @@ import {
   type NodeChange,
 } from '@xyflow/react';
 import { Braces, Copy, GitFork, LogIn, Pencil, Repeat2, ShieldCheck, Trash2, Bot, Workflow } from 'lucide-react';
-import { MODELS, finalSteps, returnEdges, type Diagram, type KnowledgeExtra, type ReviewPort, type RunEvent, isCoordinator, splitBranchIds } from '@orquestador/core';
-import { deliverableLabel, edgeTraversals, isForcedOnStep, isRequired, knowledgeKey, setRequired, transformSubtitle, type EditorSession, type LiveView } from '@orquestador/editor';
+import { finalSteps, returnEdges, type Diagram, type KnowledgeExtra, type ReviewPort, type RunEvent, isCoordinator, splitBranchIds } from '@orquestador/core';
+import { deliverableLabel, edgeTraversals, isForcedOnStep, isRequired, knowledgeKey, setRequired, type EditorSession, type LiveView } from '@orquestador/editor';
 import { EdgeInspector } from './EdgeInspector';
+import { FIT_VIEW, offscreen, subtitle } from './canvasView';
 import { OrqNode, type NodeFile, type OrqFlowNode } from './OrqNode';
 import { ResNode, type ResFlowNode, type ResNodeData } from './ResNode';
 import { BranchNode, branchFlowNodes, withoutBranchBoxes } from './BranchNode';
@@ -83,28 +84,6 @@ const edgeTypes = { orq: OrqEdge, orqReturn: OrqReturnEdge };
 /** Tipo de dato al arrastrar un nodo desde la paleta [R21.4]. */
 export const DRAG_TYPE = 'application/x-orquestador-node';
 
-/** Subtítulo de la tarjeta: agente asignado, o modo del router o del bucle [R21.5]. */
-function subtitle(n: Diagram['nodes'][number], agentNames: Readonly<Record<string, string>>, level: Diagram): string | undefined {
-  if (n.kind === 'agent') {
-    if (!n.agentId) return undefined;
-    const agent = agentNames[n.agentId] ?? n.agentId;
-    // Un paso con modelo propio lo enseña junto al agente [R40.5].
-    const sub = n.model ? t('node.sub.model', { agent, model: MODELS.find((m) => m.id === n.model)?.name ?? n.model }) : agent;
-    // Confirma antes de terminar [R43.3].
-    const confirmed = n.confirm ? t('node.sub.confirm', { sub }) : sub;
-    return isCoordinator(n) ? t('node.sub.split', { sub: confirmed, n: splitBranchIds(level, n.id).length }) : confirmed;
-  }
-  if (n.kind === 'subdiagram') return n.subdiagram ? t('sub.sub', { name: agentNames[`diagram:${n.subdiagram.templateId}`] ?? n.subdiagram.templateId }) : undefined;
-  if (n.kind === 'router') return t(n.router?.mode === 'rules' ? 'node.sub.router.rules' : 'node.sub.router.ai');
-  if (n.kind === 'transform') return transformSubtitle(n.transform);
-  if (n.kind === 'review') return t(n.review?.mode === 'ai' ? 'node.sub.review.ai' : n.review?.mode === 'human' ? 'node.sub.review.human' : 'node.sub.review.verdict');
-  if (n.kind === 'loop' && n.loop) {
-    if (n.loop.mode === 'ai-judge') return t('node.sub.loop.ai');
-    const c = n.loop.count ?? 1;
-    return c === 1 ? t('node.sub.loop.count.one') : t('node.sub.loop.count', { n: c });
-  }
-  return undefined;
-}
 
 /** Datos extra de las tarjetas (prototipo «Editor A»): conocimiento de cada agente y última entrada [R32.27]. */
 export interface NodeExtras {
@@ -242,7 +221,7 @@ export function buildFlowNodes(
     const prUrl = live?.gitLinks[key];
     const alerts = live?.alerts[key];
     const own = subtitle(n, agentNames, level);
-    const sub = own !== undefined && finals.has(n.id) ? t('node.sub.final', { sub: own }) : own;
+    const sub = finals.has(n.id) ? (own !== undefined ? t('node.sub.final', { sub: own }) : t('node.sub.finalOnly')) : own;
     return {
       id: n.id,
       type: 'orq',
@@ -333,7 +312,7 @@ export function Canvas({ session, onSelection, onReject, live, overlay, events, 
   const closeInspect = useCallback(() => setInspect(undefined), []);
   const hasRun = (events?.length ?? 0) > 0;
   useEffect(() => {
-    const id = requestAnimationFrame(() => void flow.fitView({ duration: 0, padding: 0.2, maxZoom: 1 }));
+    const id = requestAnimationFrame(() => void flow.fitView({ duration: 0, ...FIT_VIEW }));
     return () => cancelAnimationFrame(id);
   }, [levelKey]);
   const ports = useMemo<PortHandlers>(
@@ -384,6 +363,7 @@ export function Canvas({ session, onSelection, onReject, live, overlay, events, 
     const id = selectRequest.id;
     setNodes((cur) => cur.map((n) => ({ ...n, selected: n.id === id })));
     onSelection({ nodes: [id], edges: [] });
+    reveal(id);
   }, [selectRequest]);
 
   const inspectedId = inspect && inspect.level === levelKey && hasRun ? inspect.edgeId : undefined;
@@ -406,10 +386,31 @@ export function Canvas({ session, onSelection, onReject, live, overlay, events, 
     if (own.length > 0) setNodes((cur) => applyNodeChanges(own, cur));
   }, []);
 
+  const box = useRef<HTMLDivElement>(null);
+  /** Al elegir un paso que queda tapado o fuera, el lienzo se centra en él; tras abrirse el panel [R63.29]. */
+  const reveal = useCallback(
+    (id: string) => {
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => {
+          const el = box.current;
+          const node = flow.getInternalNode(id);
+          if (!el || !node) return;
+          const rect = { ...node.internals.positionAbsolute, width: node.measured.width ?? 0, height: node.measured.height ?? 0 };
+          const vp = flow.getViewport();
+          const size = { width: el.clientWidth, height: el.clientHeight };
+          if (size.width === 0 || !offscreen(rect, vp, size)) return;
+          void flow.setCenter(rect.x + rect.width / 2, rect.y + rect.height / 2, { zoom: vp.zoom, duration: 200 });
+        }),
+      );
+    },
+    [flow],
+  );
   const onSelectionChange = useCallback(
-    ({ nodes: ns, edges: es }: { nodes: { id: string }[]; edges: { id: string }[] }) =>
-      onSelection({ nodes: ns.map((n) => n.id), edges: es.map((e) => e.id) }),
-    [onSelection],
+    ({ nodes: ns, edges: es }: { nodes: { id: string }[]; edges: { id: string }[] }) => {
+      onSelection({ nodes: ns.map((n) => n.id), edges: es.map((e) => e.id) });
+      if (ns.length === 1 && es.length === 0) reveal(ns[0]!.id);
+    },
+    [onSelection, reveal],
   );
 
   const onConnect = useCallback(
@@ -480,6 +481,7 @@ export function Canvas({ session, onSelection, onReject, live, overlay, events, 
 
   return (
     <div
+      ref={box}
       className="orq-canvas"
       data-testid="canvas"
       onDragOver={(e) => {
@@ -563,11 +565,11 @@ export function Canvas({ session, onSelection, onReject, live, overlay, events, 
         }}
         defaultEdgeOptions={{ interactionWidth: 28 }}
         fitView
-        fitViewOptions={{ padding: 0.2, maxZoom: 1 }}
+        fitViewOptions={FIT_VIEW}
         proOptions={{ hideAttribution: true }}
       >
         <Background gap={24} size={1} color="var(--grid)" />
-        <Controls showInteractive={false} />
+        <Controls showInteractive={false} fitViewOptions={FIT_VIEW} />
         {overlay?.(snap.path)}
       </ReactFlow>
       {snap.level.nodes.length <= 2 && <p className="orq-canvas__empty">{t('canvas.empty')}</p>}

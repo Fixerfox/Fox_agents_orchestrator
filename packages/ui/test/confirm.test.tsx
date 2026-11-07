@@ -114,8 +114,9 @@ describe('SPEC-043 · confirmar antes de terminar (interfaz)', () => {
     expect(box.checked).toBe(false);
     await userEvent.click(box);
     expect((screen.getByRole('checkbox', { name: 'Confirmar antes de terminar' }) as HTMLInputElement).checked).toBe(true);
-    expect(within(card).getByText('Sprites · confirma')).toBeTruthy();
+    // El paso se llama como su agente: no se repite el nombre [R63.25].
+    expect(within(card).getByText('confirma')).toBeTruthy();
     await userEvent.click(screen.getByRole('checkbox', { name: 'Confirmar antes de terminar' }));
-    expect(within(card).getByText('Sprites')).toBeTruthy();
+    expect(within(card).queryByText('confirma')).toBeNull();
   });
 });

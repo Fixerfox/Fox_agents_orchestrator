@@ -38,7 +38,8 @@ export function StartScreen({ api, onOpened, onSettings, engine }: Props) {
     setRecent(r.ok ? r.value : []);
   }, [api]);
   useEffect(() => void reload(), [reload]);
-  useEffect(() => first.current?.focus(), []);
+  // El foco queda listo para el teclado, sin el anillo que parece una selección al abrir con el ratón.
+  useEffect(() => first.current?.focus({ focusVisible: false } as FocusOptions), []);
 
   const pick = async (kind: 'create' | 'open', path: StartPath = 'empty') => {
     setError(undefined);

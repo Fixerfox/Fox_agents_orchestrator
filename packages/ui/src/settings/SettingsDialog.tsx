@@ -341,6 +341,8 @@ const NAV: { id: string; label: MessageKey; work?: boolean }[] = [
   { id: 'sec-work', label: 'settings.section.work', work: true },
   { id: 'sec-rules', label: 'settings.section.rules' },
   { id: 'sec-budget', label: 'settings.section.budget' },
+  // La sección existía pero no estaba en el índice [R63.24].
+  { id: 'sec-supervisor', label: 'settings.sup' },
   { id: 'sec-look', label: 'settings.section.look' },
 ];
 

@@ -253,8 +253,8 @@ describe('aplicación en vivo [R15.1][R15.5][R15.8][R18.12][R18.13]', () => {
     await userEvent.click(again.getByRole('tab', { name: 'Historial' }));
     expect(screen.getByRole('region', { name: 'Registro de la ejecución' })).toBeTruthy();
     await userEvent.keyboard('{Escape}');
-    await userEvent.click(screen.getByRole('button', { name: 'Volver a En directo' }));
-    expect(screen.getByText(/No hay nada ejecutándose/)).toBeTruthy();
+    // Terminada, la ejecución cuelga de «Historial» [R63.26].
+    await userEvent.click(screen.getByRole('button', { name: 'Volver a Historial' }));
     const sub = within(screen.getByRole('navigation', { name: 'Apartados de Ejecuciones' }));
     await userEvent.click(sub.getByRole('button', { name: /^Historial/ }));
     expect(screen.getByRole('button', { name: /^Abrir Bucle de revisión · / })).toBeTruthy();
