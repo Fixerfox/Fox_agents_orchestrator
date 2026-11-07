@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, KeyRound } from 'lucide-react';
-import { MODELS, loadsClaudeConfig, projectPermission, type AppSettings, type AuthMode, type Engine, type ProjectPermission, supervisorModel, supervisorReviews } from '@orquestador/core';
+import { MODELS, loadsClaudeConfig, projectPermission, type AppSettings, type AuthMode, type Engine, type ProjectPermission, supervisorHumanChecks, supervisorModel, supervisorReviews } from '@orquestador/core';
 import { PermissionPicker } from '../common';
 import { t, type ConnectionResult, type MessageKey, type ProjectApi, type SettingsView, type WorkFolderView } from '@orquestador/editor';
 import { Field, fieldErrors } from '../common';
@@ -75,6 +75,7 @@ export function SettingsDialog({ api, onClose, onSaved }: Props) {
       ...(draft.claudeConfig !== undefined ? { claudeConfig: draft.claudeConfig } : {}),
       ...(draft.supervisorReview !== undefined ? { supervisorReview: draft.supervisorReview } : {}),
       ...(draft.supervisorModel !== undefined ? { supervisorModel: draft.supervisorModel } : {}),
+      ...(draft.supervisorHumanChecks !== undefined ? { supervisorHumanChecks: draft.supervisorHumanChecks } : {}),
     };
     const res = await api.saveSettings(body);
     if (!res.ok) {
@@ -290,6 +291,14 @@ export function SettingsDialog({ api, onClose, onSaved }: Props) {
               ))}
             </select>
           </Field>
+          {/* Lo que solo puede comprobar una persona: avisar o fallar [R65.4]. */}
+          <Field label={t('set.sup.human')} id="set-sup-human" error={errors['supervisorHumanChecks']}>
+            <select id="set-sup-human" value={supervisorHumanChecks(draft)} onChange={(e) => set({ supervisorHumanChecks: e.target.value as 'warn' | 'fail' })}>
+              <option value="warn">{t('set.sup.human.warn')}</option>
+              <option value="fail">{t('set.sup.human.fail')}</option>
+            </select>
+          </Field>
+          <p className="orq-hint">{t('set.sup.human.hint')}</p>
         </section>
         <section id="sec-look" aria-labelledby="set-look">
           <h3 id="set-look">{t('settings.section.look')}</h3>

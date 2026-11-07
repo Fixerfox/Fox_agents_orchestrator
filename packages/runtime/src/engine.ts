@@ -1,4 +1,4 @@
-import { AgentError, DEFAULT_REVIEW_CRITERIA, Orchestrator, supervisorModel, supervisorReviews, type AgentEngine, type AgentProfile, type AppSettings, type Decider, type Id, type KnowledgeExtra, type LibraryReader } from '@orquestador/core';
+import { AgentError, DEFAULT_REVIEW_CRITERIA, Orchestrator, supervisorHumanChecks, supervisorModel, supervisorReviews, type AgentEngine, type AgentProfile, type AppSettings, type Decider, type Id, type KnowledgeExtra, type LibraryReader } from '@orquestador/core';
 import { createDemoParts } from './demo';
 
 /** Lo que el orquestador necesita saber del proyecto abierto y de Ajustes, siempre al día [R27.1]. */
@@ -75,7 +75,7 @@ export function createEngineOrchestrator(ctx: EngineContext, engines: readonly A
   // Un subdiagrama es otro diagrama del proyecto en su última versión guardada [R33.7], o la de la copia de la
   // ejecución [R52.1].
   // El Supervisor va siempre; revisa con IA si está activa y el motor sabe hacerlo [R60.12][R60.14].
-  const supervisor = { review: () => supervisorReviews(ctx.settings()), model: () => supervisorModel(ctx.settings()) };
+  const supervisor = { review: () => supervisorReviews(ctx.settings()), model: () => supervisorModel(ctx.settings()), humanChecks: () => supervisorHumanChecks(ctx.settings()) };
   return new Orchestrator({
     getAdapter: () => pick().adapter,
     // Fuera de una ejecución (proponer una corrección) vale el motor de Ajustes en cada momento.

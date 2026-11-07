@@ -8,6 +8,8 @@ export interface AssistantToolSpec {
   params: Record<string, AssistantParam>;
   /** Necesita «Permitir» del usuario antes de hacerse [R29.3]. */
   destructive?: boolean;
+  /** Pide «Permitir» siempre, aunque el proyecto no pida confirmar acciones [R65.9]. */
+  alwaysConfirm?: boolean;
   /** Solo consulta: no cambia nada. */
   readOnly?: boolean;
   /** Espera a que el usuario escriba algo en la tarjeta (un secreto) [R30.12]. */
@@ -44,6 +46,14 @@ export const ASSISTANT_TOOLS: readonly AssistantToolSpec[] = [
     description: 'Reanuda una ejecución interrumpida, fallida o cancelada (canResume en list_runs): arranca otra que reutiliza lo que ya terminó bien y sigue desde donde se quedó. Gasta tokens: pide permiso al usuario.',
     params: { runId: s('Id de la ejecución que reanudar') },
     destructive: true,
+  },
+  {
+    name: 'accept_run',
+    description:
+      'Da por buena una ejecución fallida (status failed): queda como terminada bien y aceptada por el asistente, y se guarda por qué había fallado. Úsala SOLO cuando la persona te lo pida expresamente (p. ej. «dala por buena», «el fallo no importa»), nunca por iniciativa propia. reason: por qué se acepta, con las palabras de la persona. Pide permiso siempre.',
+    params: { runId: s('Id de la ejecución fallida (de list_runs)'), reason: s('Por qué se da por buena') },
+    destructive: true,
+    alwaysConfirm: true,
   },
   { name: 'get_diagram', description: 'Describe el diagrama abierto: pasos (id, tipo, nombre, agente, tarea) y conexiones.', params: {}, readOnly: true },
   {

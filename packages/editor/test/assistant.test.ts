@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { ASSISTANT_TOOLS, CHANNELS, ContractError, parseRequest } from '../src';
 
 describe('SPEC-029 · catálogo y contrato del asistente', () => {
-  it('[R29.1] el catálogo tiene consultas, cambios y acciones destructivas con nombres únicos', () => {
+  it('[R29.1][R65.9] el catálogo tiene consultas, cambios y acciones destructivas con nombres únicos', () => {
     const names = ASSISTANT_TOOLS.map((t) => t.name);
     expect(new Set(names).size).toBe(names.length);
     expect(names).toEqual(expect.arrayContaining(['list_agents', 'get_diagram', 'create_agent', 'add_step', 'add_parallel', 'create_diagram', 'delete_agent', 'run_diagram']));
-    expect(ASSISTANT_TOOLS.filter((t) => t.destructive).map((t) => t.name).sort()).toEqual(['delete_agent', 'delete_context', 'delete_skill', 'open_terminal', 'remove_step', 'resume_run', 'run_diagram', 'test_mcp']);
+    expect(ASSISTANT_TOOLS.filter((t) => t.destructive).map((t) => t.name).sort()).toEqual(['accept_run', 'delete_agent', 'delete_context', 'delete_skill', 'open_terminal', 'remove_step', 'resume_run', 'run_diagram', 'test_mcp']);
     for (const t of ASSISTANT_TOOLS) expect(t.name).toMatch(/^[a-z_]+$/);
   });
 

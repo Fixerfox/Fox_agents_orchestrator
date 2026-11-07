@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArrowUp, Check, Eye, KeyRound, Loader2, MessageCircleQuestion, Search, ShieldAlert, Sparkles, Square, SquarePen, Undo2, Wand2, Workflow, X } from 'lucide-react';
 import { ASSISTANT_MAX_MESSAGES, t, type AssistantEvent, type AssistantMessage, type MessageKey, type ProjectApi } from '@orquestador/editor';
-import { isDestructive, isInteractive, isReadOnly, runAssistantTool, storeAssistantSecret, type AssistantHost, type ToolOutcome } from './assistantTools';
+import { alwaysConfirms, isDestructive, isInteractive, isReadOnly, runAssistantTool, storeAssistantSecret, type AssistantHost, type ToolOutcome } from './assistantTools';
 import { Markdown } from '../common';
 
 /** Un elemento de la conversación: mensaje o tarjeta de acción [R29.5]. */
@@ -106,7 +106,7 @@ export function AssistantPanel({ api, host, state, setState, onClose, where = 'd
           // Una línea discreta por lectura; no va al historial [R29.9].
           setState((s) => (s.turnId === turnId ? { ...s, items: [...s.items, { kind: 'read', id: nextId('r'), tool: e.tool, target: e.target, ok: e.ok }] } : s));
         } else if (e.type === 'tool') {
-          const ask = confirmRef.current && isDestructive(e.name);
+          const ask = isDestructive(e.name) && (confirmRef.current || alwaysConfirms(e.name));
           const waits = isInteractive(e.name);
           const status = waits ? (e.name === 'ask_user' ? 'choice' : 'secret') : ask ? 'ask' : 'running';
           setState((s) => ({ ...s, items: [...s.items, { kind: 'tool', id: e.callId, turnId, name: e.name, args: e.args, status }] }));
@@ -449,6 +449,7 @@ function askText(name: string, args: Record<string, unknown>): string {
   if (name === 'open_terminal') return v('program') === 'shell' ? t('as.ask.terminal', { program: t('term.shell') }) : v('prompt') ? t('as.ask.terminal.prompt', { prompt: v('prompt') }) : t('as.ask.terminal', { program: t('term.claude') });
   if (name === 'run_diagram') return t('as.ask.run', { input: v('input') });
   if (name === 'resume_run') return t('as.ask.resume', { id: v('runId') });
+  if (name === 'accept_run') return t('as.ask.accept', { id: v('runId'), reason: v('reason') });
   if (name === 'remove_step') return t('as.ask.remove', { node: v('nodeId') });
   return t('as.ask.delete', { id: v('id') });
 }

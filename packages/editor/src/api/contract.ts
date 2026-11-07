@@ -27,6 +27,7 @@ export const CHANNELS = {
   controlRun: 'run:control',
   resumeRun: 'run:resume',
   dismissRun: 'run:dismiss',
+  acceptRun: 'run:accept',
   proposeCorrection: 'run:correct-propose',
   correctRun: 'run:correct',
   previewFile: 'run:preview',

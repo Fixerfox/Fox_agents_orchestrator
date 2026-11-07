@@ -24,6 +24,14 @@ export interface RunMeta {
   correctedBy?: string[];
   /** Avisos de una ejecución que terminó bien con algo pendiente, p. ej. el entregable [R46.11]. */
   warnings?: string[];
+  /** Dada por buena tras fallar: quién, por qué, cuándo y el motivo del fallo [R65.5]. */
+  accepted?: RunAcceptance & { at: string; previousReason?: string };
+}
+
+/** Quién da por buena una ejecución fallida y por qué [R65.5]. */
+export interface RunAcceptance {
+  by: 'user' | 'assistant';
+  reason: string;
 }
 
 /** Ejecución arrancada: `logged` se cumple cuando su registro está cerrado. */
@@ -53,6 +61,8 @@ export interface RunRepository {
   readDiagram(runId: string): Promise<Diagram | null>;
   markResumedBy(runId: string, by: string): Promise<void>;
   markCorrectedBy(runId: string, by: string): Promise<void>;
+  /** Da por buena una ejecución fallida: añade `run.accepted` y la marca terminada bien; `false` si no había fallado [R65.5]. */
+  acceptRun(runId: string, acceptance: RunAcceptance): Promise<boolean>;
   /** Cierra como cancelada una ejecución interrumpida; `false` si ya había terminado [R41.3]. */
   dismissInterrupted(runId: string): Promise<boolean>;
   /** Copia lo que hizo un paso para enseñarlo siempre igual [R54.3]. */

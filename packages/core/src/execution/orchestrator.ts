@@ -35,7 +35,7 @@ export interface OrchestratorDeps {
   now?(): Date;
   newRunId?(): Id;
   /** Activa el Supervisor; `review` dice si revisa con IA, y se pregunta en cada paso [R60.1]. */
-  supervisor?: { review(): boolean; model?(): string; settleMs?: number; checkMs?: number };
+  supervisor?: { review(): boolean; model?(): string; humanChecks?(): 'warn' | 'fail'; settleMs?: number; checkMs?: number };
   /** Tipos de nodo; por defecto, los de la aplicación [R56.12]. */
   nodes?: NodeRegistry;
   /**
@@ -100,7 +100,7 @@ export class Orchestrator {
     let failReason: string | undefined;
     const watch = this.deps.supervisor;
     const supervisor = watch
-      ? new Supervisor({ order: typeof order === 'string' ? { text: order, files: [] } : order, ...(options.correction ? { correction: { text: options.correction.text, ...(options.correction.before ? { before: options.correction.before } : {}) } } : {}), ...(deliverable ? { deliverable: JSON.stringify(deliverable) } : {}), ...(watch.checkMs !== undefined ? { checkMs: watch.checkMs } : {}), emitter, decider: engine.decider, budget, limits: options.budget, signal: stop.signal, review: () => watch.review() && (engine.review?.() ?? true), ...(watch.model ? { model: () => watch.model!() } : {}), labelOf, ...(outputId !== undefined ? { outputId } : {}), ...(watch.settleMs !== undefined ? { settleMs: watch.settleMs } : {}) })
+      ? new Supervisor({ order: typeof order === 'string' ? { text: order, files: [] } : order, ...(options.correction ? { correction: { text: options.correction.text, ...(options.correction.before ? { before: options.correction.before } : {}) } } : {}), ...(deliverable ? { deliverable: JSON.stringify(deliverable) } : {}), ...(watch.checkMs !== undefined ? { checkMs: watch.checkMs } : {}), emitter, decider: engine.decider, budget, limits: options.budget, signal: stop.signal, review: () => watch.review() && (engine.review?.() ?? true), ...(watch.model ? { model: () => watch.model!() } : {}), ...(watch.humanChecks ? { humanChecks: () => watch.humanChecks!() } : {}), labelOf, ...(outputId !== undefined ? { outputId } : {}), ...(watch.settleMs !== undefined ? { settleMs: watch.settleMs } : {}) })
       : undefined;
     if (supervisor) bus.subscribe((e) => supervisor.observe(e));
     const services: RunServices = {

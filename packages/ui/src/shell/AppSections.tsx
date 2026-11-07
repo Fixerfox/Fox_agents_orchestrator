@@ -66,6 +66,7 @@ export function AppSections({ app }: { app: AppModel }) {
           onAnswerMain={(q, text) => void client.answer(q, text)}
           agentNames={designer.agentNames}
           onExport={(id, jsonl) => downloadText(`${id}.jsonl`, jsonl)}
+          onAskAssistant={(text) => app.askAssistant(text)}
         />
       )}
       {(section === 'agents' || section === 'knowledge') && (

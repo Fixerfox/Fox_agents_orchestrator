@@ -1,7 +1,7 @@
 import type { Diagram } from '../diagrams';
 import { type AgentAdapter, type Decider, Orchestrator, type RunEvent, type RunOptions } from '../execution';
 import type { AgentDefinition, ContextDefinition, McpServerDefinition, SkillDefinition } from '../knowledge';
-import type { AgentEngine, InputFile, LibraryReader, LoggedRun, PathPolicy, RunMeta, RunRepository, WorkspaceFiles } from '../ports';
+import type { AgentEngine, InputFile, LibraryReader, LoggedRun, PathPolicy, RunAcceptance, RunMeta, RunRepository, WorkspaceFiles } from '../ports';
 import { type Id, type Payload, safePreviewPath } from '../shared';
 import { MockAgent, MockDecider } from './mock';
 
@@ -111,6 +111,14 @@ export class MemoryRunRepository implements RunRepository {
   async markCorrectedBy(runId: string, by: string): Promise<void> {
     const { meta } = this.get(runId);
     meta.correctedBy = [...(meta.correctedBy ?? []).filter((id) => id !== by), by];
+  }
+  async acceptRun(runId: string, acceptance: RunAcceptance): Promise<boolean> {
+    const run = this.get(runId);
+    if (run.meta.status !== 'failed') return false;
+    const previousReason = run.meta.reason;
+    run.meta.status = 'succeeded';
+    run.meta.accepted = { ...acceptance, at: new Date().toISOString(), ...(previousReason !== undefined ? { previousReason } : {}) };
+    return true;
   }
   async dismissInterrupted(runId: string): Promise<boolean> {
     const { meta } = this.get(runId);

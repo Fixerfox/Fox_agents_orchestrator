@@ -138,6 +138,25 @@ export function memoryRuns(s: MemoryState, options: MemoryApiOptions) {
       correctedBy.set(runId, [...(correctedBy.get(runId) ?? []), r.runId]);
       return ok({ runId: r.runId });
     },
+    async acceptRun({ runId, by, reason }) {
+      // Igual que el almacén: se añade `run.accepted` y la ejecución pasa a terminada bien [R65.5][R65.6].
+      const text = reason.trim();
+      if (text === '' || text.length > 2000) return fail('bad-request', 'Escribe por qué la das por buena (hasta 2000 caracteres).');
+      const live = runs.get(runId);
+      const past = options.pastRuns?.find((p) => p.summary.runId === runId);
+      if (!live && !past) return missing();
+      const events = live?.events ?? past!.events;
+      const end = events.find((e): e is Extract<RunEvent, { type: 'run.finished' }> => e.type === 'run.finished');
+      if (!end) return fail('bad-request', 'Está en marcha: espera a que termine.');
+      if (end.status !== 'failed' || events.some((e) => e.type === 'run.accepted')) return ok(false);
+      const seq = events.reduce((m, e) => Math.max(m, e.seq), 0) + 1;
+      const ts = new Date().toISOString();
+      const event = { runId, seq, ts, type: 'run.accepted', by, reason: text, ...(end.reason !== undefined ? { previousReason: end.reason } : {}) } as RunEvent;
+      events.push(event);
+      if (live) for (const l of listeners) l(runId, [event]);
+      if (past) past.summary = { ...past.summary, status: 'succeeded', reason: text, accepted: { by, reason: text, at: ts, ...(end.reason !== undefined ? { previousReason: end.reason } : {}) } };
+      return ok(true);
+    },
     async dismissRun(runId) {
       const past = options.pastRuns?.find((p) => p.summary.runId === runId);
       if (!past || past.summary.status !== 'interrupted') return ok(false);
@@ -217,6 +236,7 @@ export function memoryRuns(s: MemoryState, options: MemoryApiOptions) {
     async listRuns() {
       const list: RunSummary[] = [...runs].map(([runId, r]) => {
         const end = r.events.find((e) => e.type === 'run.finished');
+        const accepted = r.events.find((e): e is Extract<RunEvent, { type: 'run.accepted' }> => e.type === 'run.accepted');
         const usage = { inputTokens: 0, outputTokens: 0, costUsd: 0 };
         for (const e of r.events)
           if (e.type === 'agent.usage') {
@@ -229,8 +249,9 @@ export function memoryRuns(s: MemoryState, options: MemoryApiOptions) {
           diagramId: r.diagramId,
           startedAt: r.events[0]?.ts ?? '',
           ...(end ? { finishedAt: end.ts } : {}),
-          status: end && end.type === 'run.finished' ? end.status : 'running',
-          ...(end && end.type === 'run.finished' && end.reason !== undefined ? { reason: end.reason } : {}),
+          status: accepted ? 'succeeded' : end && end.type === 'run.finished' ? end.status : 'running',
+          ...(accepted ? { reason: accepted.reason } : end && end.type === 'run.finished' && end.reason !== undefined ? { reason: end.reason } : {}),
+          ...(accepted ? { accepted: { by: accepted.by, reason: accepted.reason, at: accepted.ts, ...(accepted.previousReason !== undefined ? { previousReason: accepted.previousReason } : {}) } } : {}),
           usage,
           eventCount: r.events.length,
           order: r.order,

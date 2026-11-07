@@ -27,7 +27,12 @@ export interface AppSettings {
   supervisorReview?: boolean;
   /** Modelo del Supervisor; sin valor, el rápido y barato [R60.14]. */
   supervisorModel?: string;
+  /** Lo que solo puede comprobar una persona: avisar (por defecto) o hacer fallar la ejecución [R65.2]. */
+  supervisorHumanChecks?: HumanChecks;
 }
+
+export const HUMAN_CHECKS = ['warn', 'fail'] as const;
+export type HumanChecks = (typeof HUMAN_CHECKS)[number];
 
 /** Modelo del Supervisor si no se elige otro [R60.14]. */
 export const SUPERVISOR_MODEL = 'claude-haiku-5-5';
@@ -38,6 +43,9 @@ export const JUDGE_MODEL = 'claude-haiku-5-5';
 export const supervisorReviews = (settings: Pick<AppSettings, 'supervisorReview'>): boolean => settings.supervisorReview !== false;
 
 export const supervisorModel = (settings: Pick<AppSettings, 'supervisorModel'>): string => settings.supervisorModel ?? SUPERVISOR_MODEL;
+
+/** Qué hace la comprobación final con lo que solo puede comprobar una persona [R65.2]. */
+export const supervisorHumanChecks = (settings: Pick<AppSettings, 'supervisorHumanChecks'>): HumanChecks => settings.supervisorHumanChecks ?? 'warn';
 
 /** ¿Se carga la configuración de Claude Code? Activado salvo que se apague [R50.3]. */
 export const loadsClaudeConfig = (settings: Pick<AppSettings, 'claudeConfig'>): boolean => settings.claudeConfig !== false;
@@ -74,6 +82,7 @@ export function validateSettings(s: unknown): FieldProblem[] {
   if (s.claudeConfig !== undefined && typeof s.claudeConfig !== 'boolean') out.push({ field: 'claudeConfig', message: '«Cargar la configuración de Claude Code» no es válido' });
   if (s.supervisorReview !== undefined && typeof s.supervisorReview !== 'boolean') out.push({ field: 'supervisorReview', message: 'La revisión del Supervisor tiene que estar activa o no' });
   if (s.supervisorModel !== undefined && !known(s.supervisorModel)) out.push({ field: 'supervisorModel', message: 'Elige un modelo de la lista' });
+  if (s.supervisorHumanChecks !== undefined && !(HUMAN_CHECKS as readonly unknown[]).includes(s.supervisorHumanChecks)) out.push({ field: 'supervisorHumanChecks', message: 'Elige «Avisar» o «Hacer fallar la ejecución»' });
   return out;
 }
 
@@ -89,6 +98,7 @@ export function normalizeSettings(raw: unknown): AppSettings {
   if (Number.isInteger(raw.defaultMaxTokens) && (raw.defaultMaxTokens as number) > 0) out.defaultMaxTokens = raw.defaultMaxTokens as number;
   if (typeof raw.supervisorReview === 'boolean') out.supervisorReview = raw.supervisorReview;
   if (known(raw.supervisorModel)) out.supervisorModel = raw.supervisorModel as string;
+  if ((HUMAN_CHECKS as readonly unknown[]).includes(raw.supervisorHumanChecks)) out.supervisorHumanChecks = raw.supervisorHumanChecks as HumanChecks;
   // Ajustes anteriores a R47.8: «Modificar sin preguntar» pasa a automático y «preguntar todos los comandos», a preguntar.
   if ((PROJECT_PERMISSIONS as readonly unknown[]).includes(raw.permissions)) out.permissions = raw.permissions as ProjectPermission;
   else if (raw.askCommands === true) out.permissions = 'ask';

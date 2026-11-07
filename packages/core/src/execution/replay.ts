@@ -36,6 +36,11 @@ export function reduceRunState(events: readonly RunEvent[]): RunState {
         state.status = e.status;
         if (e.reason !== undefined) state.reason = e.reason;
         break;
+      case 'run.accepted':
+        // Dada por buena: termina bien y el motivo es el de quien la aceptó [R65.7].
+        state.status = 'succeeded';
+        state.reason = e.reason;
+        break;
       case 'node.queued':
         state.nodeStatus[pathKey(e.nodePath, e.nodeId)] = 'queued';
         break;

@@ -8,6 +8,8 @@ import type { SplitProblem } from './text/split';
 export type EventBody =
   | { type: 'run.started'; diagramId: Id; /** Ejecución que esta reanuda [R41.1]. */ resumedFrom?: string; /** Ejecución que esta corrige [R53.8]. */ correctedFrom?: string; /** Entregable efectivo [R46.3]. */ deliverable?: DeliverableSpec }
   | { type: 'run.finished'; status: RunStatus; reason?: string }
+  /** La persona (o el asistente, con su permiso) dio por buena una ejecución fallida; va después de `run.finished` [R65.5]. */
+  | { type: 'run.accepted'; by: 'user' | 'assistant'; reason: string; previousReason?: string }
   | { type: 'run.cancelled'; reason?: string }
   | { type: 'run.paused' }
   | { type: 'run.resumed' }
@@ -91,7 +93,7 @@ export type EventBody =
   /** El Supervisor detecta algo o frena una acción [R60.1]. */
   | { type: 'supervisor.alert'; nodeId?: Id; rule: string; severity: 'info' | 'warning'; detail: string }
   /** Si el resultado final cumple lo pedido [R62.9]. */
-  | { type: 'supervisor.verified'; met: boolean; detail: string }
+  | { type: 'supervisor.verified'; met: boolean; detail: string; /** Lo que queda para una persona [R65.3]. */ forPerson?: string }
   /** Entrada de la memoria de la ejecución [R60.18]. */
   | { type: 'supervisor.note'; nodeId: Id; text: string; files: string[]; /** Salió de una revisión con IA [R60.29]. */ reviewed?: boolean }
   /** El Supervisor empieza a vigilar [R60.28]. */
