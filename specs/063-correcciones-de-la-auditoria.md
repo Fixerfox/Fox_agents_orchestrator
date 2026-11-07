@@ -19,7 +19,7 @@ La auditoría del 07/11 (`docs` del proyecto: «auditoria-2026-11-07») encontr�
    - *Revisión:* el motor activo se ve en la barra y el diálogo lo cambia a propósito (R48); lo que falla es que una ejecución en marcha lo vuelva a leer.
    - *Segunda (elegida):* **el motor se fija al arrancar** la ejecución; cambiarlo vale para las siguientes, como ya decía R56.4.
 4. **Coste de las decisiones.** El router, sus condiciones y el evaluador de bucles son trabajo de la ejecución: cuentan en el presupuesto (a diferencia del Supervisor, R60.14). Las condiciones de un router por reglas se evalúan en una sola consulta.
-5. **Fuera de esta spec** (necesitan decisión o una spec propia): «Terminada con avisos» en lugar de fallida cuando la comprobación final no se cumple (choca con la decisión de SPEC-062), aislar las ramas en paralelo con `git worktree`, pausar de verdad el turno de Claude (hay que probarlo con el SDK real), escritura con búfer del registro, E2E con Playwright y CI, el rediseño de la navegación y de la vista de ejecución en ventanas pequeñas (artefacto «Propuestas UI/UX»), y quitar el estado de la barra superior en la vista de la ejecución: la barra lleva el medidor del presupuesto y la entrada al resumen (R15.9, R44.3–R44.5), que la cabecera no tiene.
+5. **Fuera de esta spec** (necesitan decisión o una spec propia): «Terminada con avisos» en lugar de fallida cuando la comprobación final no se cumple (choca con la decisión de SPEC-062), aislar las ramas en paralelo con `git worktree`, pausar de verdad el turno de Claude (hay que probarlo con el SDK real), escritura con búfer del registro, E2E con Playwright y CI, el rediseño de la navegación (artefacto «Propuestas UI/UX») y convertir el panel del paso y el asistente en hojas superpuestas, y quitar el estado de la barra superior en la vista de la ejecución: la barra lleva el medidor del presupuesto y la entrada al resumen (R15.9, R44.3–R44.5), que la cabecera no tiene.
 
 ## Requisitos
 ### Supervisor y memoria
@@ -56,6 +56,7 @@ La auditoría del 07/11 (`docs` del proyecto: «auditoria-2026-11-07») encontr�
 - **R63.27** [M13] Una región `aria-live` anuncia cuántas preguntas esperan respuesta y cuándo termina la ejecución que se está viendo.
 - **R63.28** [M13] «Confirmar antes de terminar» es una fila: la casilla junto a su texto.
 - **R63.29** [M13] Al elegir un paso que queda tapado o fuera de la vista, el lienzo se centra en él.
+- **R63.30** [M13] Con la ventana por debajo de 1280 px, abrir el asistente pliega el submenú de Ejecuciones (se vuelve a abrir con su botón; en el Diseñador el asistente ocupa el lateral derecho y la paleta se queda), si la vista de una ejecución baja de 760 px el panel del paso pasa debajo del lienzo, y en un lienzo de menos de 640 px el aviso de fin de la ejecución es una franja al pie que no tapa los pasos.
 
 ## Fuera de alcance
 Ver la decisión 5.

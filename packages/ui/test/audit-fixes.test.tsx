@@ -1,7 +1,9 @@
 // @vitest-environment jsdom
 import './setup';
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, renderHook, screen, within } from '@testing-library/react';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import userEvent from '@testing-library/user-event';
 import { newMcpServer, type Diagram } from '@orquestador/core';
 import { t } from '@orquestador/editor';
@@ -12,6 +14,7 @@ import { createMemoryApi } from '../src/memoryApi';
 import { FIT_VIEW, offscreen, subtitle } from '../src/diagrams/canvasView';
 import { crumbSection } from '../src/runs/runFormat';
 import { liveAnnouncement } from '../src/shell/Toolbar';
+import { WIDE_PX, useShellLayout } from '../src/shell/useShellLayout';
 
 const AGENTS = [{ id: 'sprites', name: 'Sprites', description: 'Dibuja', model: 'claude-sonnet-5-5' }];
 
@@ -101,5 +104,22 @@ describe('SPEC-063 · interfaz', () => {
     expect(offscreen({ x: 700, y: 100, width: 200, height: 60 }, vp, size)).toBe(true);
     expect(offscreen({ x: 100, y: 100, width: 200, height: 60 }, { x: -150, y: 0, zoom: 1 }, size)).toBe(true);
     expect(offscreen({ x: 400, y: 100, width: 200, height: 60 }, { x: 0, y: 0, zoom: 2 }, size)).toBe(true);
+  });
+
+  it('[R63.30] en una ventana estrecha, abrir el asistente pliega el submenú de Ejecuciones; la vista de la ejecución se reordena', () => {
+    const at = (width: number) => {
+      Object.defineProperty(window, 'innerWidth', { configurable: true, value: width });
+      const { result } = renderHook(() => useShellLayout(false));
+      act(() => result.current.setAssistOpen(true));
+      return result.current;
+    };
+    const narrow = at(WIDE_PX - 1);
+    expect([narrow.assistOpen, narrow.runsSub, narrow.leftOpen]).toEqual([true, false, true]);
+    const wide = at(WIDE_PX + 200);
+    expect([wide.assistOpen, wide.runsSub, wide.leftOpen]).toEqual([true, true, true]);
+    const css = readFileSync(join(__dirname, '..', 'src', 'styles.css'), 'utf8');
+    expect(css).toContain('.orq-run__canvas { position: relative; container-type: inline-size; }');
+    expect(css).toMatch(/@container \(max-width: 640px\) \{ \.orq-done \{[^}]*width: 100%/);
+    expect(css).toMatch(/@container \(max-width: 760px\) \{ \.orq-run__body \{ flex-direction: column; \}/);
   });
 });
