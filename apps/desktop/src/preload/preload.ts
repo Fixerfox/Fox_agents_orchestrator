@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import { ASSISTANT_EVENTS_CHANNEL, RUN_EVENTS_CHANNEL, TERMINAL_EVENTS_CHANNEL } from '@orquestador/editor';
+import { ASSISTANT_EVENTS_CHANNEL, OPEN_RUN_CHANNEL, RUN_EVENTS_CHANNEL, TERMINAL_EVENTS_CHANNEL, type OpenRunTarget } from '@orquestador/editor';
 import { buildApi, watchWindowTone } from './api';
 
 // Solo se expone la API tipada: nunca `ipcRenderer` ni módulos de Node [R19.2].
@@ -21,6 +21,11 @@ contextBridge.exposeInMainWorld(
       const handler = (_e: unknown, msg: { id: string; event: never }) => listener(msg.id, msg.event);
       ipcRenderer.on(TERMINAL_EVENTS_CHANNEL, handler);
       return () => void ipcRenderer.removeListener(TERMINAL_EVENTS_CHANNEL, handler);
+    },
+    (listener) => {
+      const handler = (_e: unknown, target: OpenRunTarget) => listener(target);
+      ipcRenderer.on(OPEN_RUN_CHANNEL, handler);
+      return () => void ipcRenderer.removeListener(OPEN_RUN_CHANNEL, handler);
     },
   ),
 );

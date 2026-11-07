@@ -153,6 +153,8 @@ export async function readRunLog(runDir: string): Promise<LoadedRunLog> {
       else corruptLines++;
     }
   });
+  // Las ejecuciones grabadas antes de R2.9 pueden tener eventos cambiados de sitio [R2.10].
+  events.sort((a, b) => a.seq - b.seq);
   return { events, truncated, corruptLines };
 }
 

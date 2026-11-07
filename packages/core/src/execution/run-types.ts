@@ -1,3 +1,4 @@
+import type { RunEvent } from './events';
 import type { DeliverableSpec } from '../diagrams';
 import type { Payload } from '../shared';
 
@@ -29,9 +30,19 @@ export interface RunOptions {
     outputs: Record<string, Payload>;
     /** Revisiones humanas ya aprobadas en la anterior: aprueban sin preguntar la primera vez [R53.9]. */
     approvedReviews?: string[];
+    /** Rastro de cada paso reutilizado [R41.7]. */
+    trail?: Record<string, readonly RunEvent[]>;
   };
   /** Corregir: el paso del nivel principal que recibe la corrección y su entrega anterior [R53.8]. */
-  correction?: { fromRunId: string; nodeId: string; text: string; previous: Payload; files?: string[] };
+  correction?: {
+    fromRunId: string;
+    nodeId: string;
+    text: string;
+    previous: Payload;
+    files?: string[];
+    /** Lo que entregaron en la anterior los pasos que se repiten [R62.16]. */
+    before?: { step: string; text: string; files: string[] }[];
+  };
   /** Entregable solo para esta ejecución; sustituye al del diagrama, y `null` lo quita [R46.3]. */
   deliverable?: DeliverableSpec | null;
 }

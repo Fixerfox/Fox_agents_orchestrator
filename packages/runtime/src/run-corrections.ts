@@ -1,4 +1,4 @@
-import { approvedReviews, canResume, correctionPlan, correctionTargets, resumePlan, type Orchestrator, type RunOptions, type RunRepository } from '@orquestador/core';
+import { approvedReviews, canResume, correctionPlan, correctionTargets, redoneSteps, resumePlan, reusedTrail, type Orchestrator, type RunOptions, type RunRepository } from '@orquestador/core';
 import { RunError } from './errors';
 import type { RunHistory, PastRun } from './run-history';
 import type { RunLauncher } from './run-launcher';
@@ -27,7 +27,8 @@ export class RunCorrections {
       throw new RunError('bad-request', meta.resumedBy ? 'Esta ejecución ya se reanudó: reanuda la nueva.' : 'Solo se reanuda una ejecución interrumpida, fallida o cancelada.');
     }
     const { diagram, events, order, deliverable } = await this.history.past(runId);
-    const options: RunOptions = { ...this.launcher.defaults(), reuse: { fromRunId: runId, outputs: resumePlan(diagram, events), approvedReviews: approvedReviews(diagram, events) }, ...(deliverable ? { deliverable } : {}) };
+    const outputs = resumePlan(diagram, events);
+    const options: RunOptions = { ...this.launcher.defaults(), reuse: { fromRunId: runId, outputs, approvedReviews: approvedReviews(diagram, events), trail: reusedTrail(outputs, events) }, ...(deliverable ? { deliverable } : {}) };
     // Reanudar hace una copia nueva de la biblioteca [R52.1].
     const snapshot = await this.launcher.snapshotOf(diagram);
     const { handle } = this.queue.launch(diagram, order, options, snapshot);
@@ -68,8 +69,8 @@ export class RunCorrections {
     }
     const options: RunOptions = {
       ...this.launcher.defaults(),
-      reuse: { fromRunId: runId, outputs: plan.outputs, approvedReviews: plan.approvedReviews },
-      correction: { fromRunId: runId, nodeId: req.nodeId, text, previous: plan.previous!, ...(files.length > 0 ? { files } : {}) },
+      reuse: { fromRunId: runId, outputs: plan.outputs, approvedReviews: plan.approvedReviews, trail: reusedTrail(plan.outputs, run.events) },
+      correction: { fromRunId: runId, nodeId: req.nodeId, text, previous: plan.previous!, before: redoneSteps(run.diagram, run.events, plan.outputs), ...(files.length > 0 ? { files } : {}) },
       ...(run.deliverable ? { deliverable: run.deliverable } : {}),
     };
     const snapshot = await this.launcher.snapshotOf(run.diagram);

@@ -139,6 +139,7 @@ export interface MockDeciderConfig {
   /** Sin esto, el simulado no revisa [R60.12]. */
   supervise?: NonNullable<Decider['supervise']>;
   judgeReview?: NonNullable<Decider['judgeReview']>;
+  verifyRun?: NonNullable<Decider['verifyRun']>;
 }
 
 export class MockDecider implements Decider {
@@ -171,6 +172,10 @@ export class MockDecider implements Decider {
   readonly blameCalls: { feedback: string; candidates: BlameCandidate[] }[] = [];
   get judgeReview(): Decider['judgeReview'] {
     return this.config.judgeReview;
+  }
+
+  get verifyRun(): Decider['verifyRun'] {
+    return this.config.verifyRun;
   }
 
   get supervise(): Decider['supervise'] {

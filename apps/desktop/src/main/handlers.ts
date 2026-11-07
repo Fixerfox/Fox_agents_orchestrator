@@ -47,6 +47,12 @@ export class DesktopHandlers {
     return this.state.runs?.previewAsset(url);
   }
 
+  /** Ejecuciones en marcha o en cola, las que se perderían al salir [R61.3]. */
+  activeRuns(): number {
+    const { runs } = this.state;
+    return runs ? runs.runningCount() + runs.queued().length : 0;
+  }
+
   /** Cierra las suscripciones (al cambiar de proyecto o salir). */
   dispose(): void {
     disposeHandlers(this.state);

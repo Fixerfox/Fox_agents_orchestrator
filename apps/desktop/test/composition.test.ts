@@ -184,12 +184,18 @@ describe('SPEC-056 · composición de la aplicación', () => {
       const system = options.systemPrompt ? promptText(options.systemPrompt) : '';
       calls.push({ system, model: options.model });
       // La primera revisión llega antes de que arranque el siguiente paso.
-      yield result(system.includes('Eres el Supervisor') ? '{"ok":false,"reason":"No hizo el plan","summary":"Decidió usar React"}' : 'Hecho');
+      yield result(system.includes('Eres el Supervisor') ? '{"ok":false,"reason":"No hizo el plan","summary":"Decidió usar React","met":true}' : 'Hecho');
     };
     const d = await store.diagrams.load('flujo');
-    const { events } = await composeOrchestrator(context('claude', undefined, {}), query).start(d, 'Pinta').result;
+    const handle = composeOrchestrator(context('claude', undefined, {}), query).start(d, 'Pinta');
+    handle.bus.subscribe((e) => {
+      if (e.type === 'agent.question') queueMicrotask(() => handle.answer(e.questionId, 'Seguir igualmente'));
+    });
+    const { events } = await handle.result;
     const reviews = calls.filter((c) => c.system.includes('Eres el Supervisor'));
-    expect(reviews).toHaveLength(2);
+    // Una por paso y la comprobación del resultado final [R62.9].
+    expect(reviews).toHaveLength(3);
+    expect(events.find((e) => e.type === 'supervisor.verified')).toMatchObject({ met: true });
     expect(reviews[0]!.model).toBe('claude-haiku-5-5');
     expect(events.find((e) => e.type === 'supervisor.alert')).toMatchObject({ nodeId: 'p', rule: 'ai-review', detail: 'No hizo el plan' });
     const worker = calls.filter((c) => !c.system.includes('Eres el Supervisor'));
@@ -232,10 +238,10 @@ describe('SPEC-056 · composición de la aplicación', () => {
       const review = (options.systemPrompt ? promptText(options.systemPrompt) : '').includes('Eres el Supervisor');
       seen.push(review);
       if (review) models.push(options.model);
-      yield result(review ? '{"ok":true,"summary":"bien"}' : 'Hecho');
+      yield result(review ? '{"ok":true,"summary":"bien","met":true}' : 'Hecho');
     };
     await composeOrchestrator(context('claude', undefined, { supervisorModel: 'claude-sonnet-5-5' }), query).start(flow, 'Pinta').result;
-    expect(models).toEqual(['claude-sonnet-5-5']);
+    expect(models).toEqual(['claude-sonnet-5-5', 'claude-sonnet-5-5']);
     seen.length = 0;
     await composeOrchestrator(context('claude', undefined, { supervisorReview: false }), query).start(flow, 'Pinta').result;
     expect(seen).toEqual([false]);

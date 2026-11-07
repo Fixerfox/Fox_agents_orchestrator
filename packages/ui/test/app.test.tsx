@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import './setup';
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { App } from '../src/App';
 import { createMemoryApi } from '../src/memoryApi';
@@ -13,6 +13,22 @@ const mount = (confirm = () => true) => {
   return { api, ...r };
 };
 const status = () => screen.getByText(/^(Guardado|Sin guardar|Guardando…)$/).textContent;
+
+describe('abrir una ejecución desde un aviso [R61.11]', () => {
+  it('[R61.11] lleva a Ejecuciones; en «En directo» si sigue en marcha y en «Historial» si ha terminado', async () => {
+    let open: Parameters<ReturnType<typeof createMemoryApi>['onOpenRun']>[0] | undefined;
+    const off = vi.fn();
+    const api = { ...createMemoryApi(), onOpenRun: (l: NonNullable<typeof open>) => ((open = l), off) };
+    const r = render(<App initialProject="Proyecto" api={api} agents={AGENTS} confirm={() => true} />);
+    await waitFor(() => expect(open).toBeDefined());
+    act(() => open!({ runId: 'nadie', live: true }));
+    expect(await screen.findByRole('button', { name: /En directo/, current: 'page' })).toBeTruthy();
+    act(() => open!({ runId: 'nadie', live: false }));
+    expect(await screen.findByRole('button', { name: /Historial/, current: 'page' })).toBeTruthy();
+    r.unmount();
+    expect(off).toHaveBeenCalled();
+  });
+});
 
 describe('aplicación [R14.1][R14.11]', () => {
   it('[R14.11] los nodos son enfocables y tienen nombre accesible con su tipo', async () => {

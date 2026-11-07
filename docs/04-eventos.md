@@ -34,6 +34,7 @@ interface EventBase { runId: Id; seq: number; ts: string; type: string; nodePath
 | `supervisor.reviewing` | `nodeId` | Empieza a revisar un paso con IA (SPEC-060) |
 | `supervisor.note` | `nodeId, text, files, reviewed?` | Entrada de la memoria de la ejecución (SPEC-060) |
 | `supervisor.skipped` | `count, reason: 'timeout' \| 'failed'` | Revisiones que no se pudieron hacer (SPEC-060) |
+| `supervisor.verified` | `met, detail` | Comprobó si el resultado final cumple lo pedido (SPEC-062) |
 | `node.retrying` | `nodeId, attempt, max, delayMs, message` | Reintento automático tras error temporal |
 | `workspace.merged` | `nodeId, files` | Cambios de un agente fusionados en el proyecto |
 | `workspace.conflict` | `nodeIds, files` | Conflicto entre agentes paralelos; requiere atención |
@@ -45,7 +46,7 @@ interface EventBase { runId: Id; seq: number; ts: string; type: string; nodePath
 | `agent.request` | `nodeId, agentId, attempt, input, task?, model?, confirm?, deliverable?, extra?, snapshot?, previousAnswers?` | Lo que recibe exactamente el agente en cada intento y la configuración usada |
 | `decision` | `nodeId, kind: route\|condition\|judge, request, response` | Decisión de IA fuera de los agentes de trabajo |
 | `transform.done` | `nodeId, mode: rules\|ai, format: json\|markdown\|text, attempts, ok, errors?, warnings?` | Resultado del nodo «Transformar» (SPEC-037), antes de su `node.finished` |
-| `agent.question` | `nodeId, questionId, text, options?, confirm?: { round }, kind?: 'question' \| 'permission' \| 'gate'` | El agente pregunta al usuario; el nodo pasa a `waiting_input`. Con `confirm` es la confirmación del paso (SPEC-043); `kind` dice si es una pregunta del agente, un permiso de la app o la supervisión de R39.4 (SPEC-045) |
+| `agent.question` | `nodeId, questionId, text, options?, confirm?: { round }, kind?: 'question' \| 'permission' \| 'gate' \| 'unfinished'` | El agente pregunta al usuario; el nodo pasa a `waiting_input`. Con `confirm` es la confirmación del paso (SPEC-043); `kind` dice si es una pregunta del agente, un permiso de la app la supervisión de R39.4 (SPEC-045) o un paso sin terminar (SPEC-062) |
 | `agent.answer` | `nodeId, questionId, text` | El usuario responde desde el chat del nodo |
 | `confirm.decided` | `nodeId, round, verdict: approved\|changes, text?` | Respuesta a «Confirmar antes de terminar» (SPEC-043); con `changes` el agente vuelve a trabajar |
 | `deliverable.done` | `nodeId, ok, fileName, markdown, json?, links?, items[]` | Entregable compuesto por la Salida del nivel principal (SPEC-046), antes de su `node.finished`; `store` lo guarda en `output/<fileName>.md` |

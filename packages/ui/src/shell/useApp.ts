@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { EditorSession, createDiagram, t, type ProjectApi } from '@orquestador/editor';
 import { DraftStore, type LibraryTarget, type OpenLibrary } from '../common';
 import type { AssistantHost, ChatState } from '../assistant';
@@ -38,6 +38,11 @@ export function useApp({ api, agents: builtIn = [], confirm = (m) => window.conf
     setRunsNav(nav);
   };
   const goDiagrams = useCallback(() => setSection('diagrams'), []);
+  // Pulsar un aviso del sistema lleva a su ejecución [R61.11].
+  useEffect(() => api.onOpenRun(({ runId, live }) => {
+    setSection('runs');
+    setRunsNav({ section: live ? 'live' : 'history', runId });
+  }), [api]);
 
   const [message, setMessage] = useState<string>();
   const fail = useCallback((m: string) => setMessage(m), []);
@@ -145,6 +150,13 @@ export function useApp({ api, agents: builtIn = [], confirm = (m) => window.conf
     setSection(path === 'folder' ? 'project' : 'diagrams');
     setWizard(path === 'folder');
   };
+  // Tras recargarse la interfaz se vuelve al proyecto abierto: abrirlo otra vez perdería las ejecuciones en marcha [R19.12].
+  useEffect(() => {
+    if (projectRef.current !== undefined) return;
+    void api.currentProject().then((res) => {
+      if (res.ok && res.value && projectRef.current === undefined) onOpened(res.value.name);
+    });
+  }, [api]);
   /** Pulsar en el rail: volver a pulsar la sección abierta pliega su panel lateral [R32.13]. */
   const goSection = (s: SectionId) => {
     if (s === 'diagrams' && section === 'diagrams') layout.setLeftOpen((v) => !v);

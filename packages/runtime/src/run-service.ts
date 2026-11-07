@@ -4,12 +4,12 @@ import { RunCorrections } from './run-corrections';
 import { RunFiles, type FilePreview, type OutputFile } from './run-files';
 import { RunHistory } from './run-history';
 import { RunLauncher } from './run-launcher';
-import { RunQueue, type QueuedRun } from './run-queue';
+import { RunQueue, type QueuedRun, type RunWatcher } from './run-queue';
 import { LiveRuns, type RunPorts, type StartRunInput } from './run-types';
 import type { RunSnapshots } from './snapshot';
 
 export type { StartRunInput, RunPorts } from './run-types';
-export type { QueuedRun } from './run-queue';
+export type { QueuedRun, RunWatcher } from './run-queue';
 export { MAX_READ_BYTES, PREVIEW_SCHEME, type FilePreview, type OutputFile } from './run-files';
 
 /** Arranca, controla y observa ejecuciones del proyecto abierto. Fachada de las piezas de R56.16. */
@@ -36,6 +36,16 @@ export class RunService {
     this.queue = new RunQueue(live, ports.runs, orchestrator, snapshots, (runId, key, files) => this.files.snapshotStep(runId, key, files));
     this.control = new RunControl(live);
     this.corrections = new RunCorrections(live, ports.runs, orchestrator, this.history, this.launcher, this.queue);
+  }
+
+  /** Escucha todas las ejecuciones, no solo la que muestra la interfaz [R61.9]. */
+  watch(watcher: RunWatcher): () => void {
+    return this.queue.watch(watcher);
+  }
+
+  /** Cuántas ejecuciones siguen en marcha [R61.9]. */
+  runningCount(): number {
+    return this.queue.runningCount();
   }
 
   /** Lanzamientos en cola, en orden [R52.3]. */

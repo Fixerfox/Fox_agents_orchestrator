@@ -46,6 +46,8 @@ function termSize(cols: unknown, rows: unknown, bad: (m: string) => Error): void
 
 /** Proyecto: abrir y cerrar, recientes, carpeta de trabajo y terminal integrada. */
 export interface ProjectSessionApi {
+  /** Proyecto abierto en el proceso principal, para volver a él al recargarse la interfaz [R19.12]. */
+  currentProject(): Promise<ApiResult<ProjectInfo | null>>;
   /** Diálogo del sistema; `null` si el usuario cancela. */
   createProject(): Promise<ApiResult<ProjectInfo | null>>;
   openProject(): Promise<ApiResult<ProjectInfo | null>>;
@@ -82,6 +84,7 @@ export interface ProjectSessionApi {
 
 export function parseProjectRequest(channel: string, payload: unknown, { bad, exact, str }: RequestCheck): unknown {
   switch (channel) {
+    case CHANNELS.currentProject:
     case CHANNELS.createProject:
     case CHANNELS.openProject:
     case CHANNELS.listRecent:

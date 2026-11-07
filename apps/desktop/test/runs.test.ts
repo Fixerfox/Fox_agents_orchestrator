@@ -54,6 +54,33 @@ async function openWithFlow() {
   await h.invoke(CHANNELS.saveDiagram, chain);
 }
 
+describe('proyecto abierto [R19.12]', () => {
+  it('[R19.12] dice cuál está abierto, para volver a él al recargar', async () => {
+    expect(val(await h.invoke(CHANNELS.currentProject, undefined))).toBeNull();
+    await openWithFlow();
+    expect(val<{ name: string }>(await h.invoke(CHANNELS.currentProject, undefined)).name).toBe('p');
+  });
+});
+
+describe('avisos del proceso principal [R61.9]', () => {
+  it('[R61.9] los eventos llegan sin que la interfaz se suscriba, con su diagrama, y se cuentan las activas', async () => {
+    const seen: { type: string; diagram: string }[] = [];
+    const own = new DesktopHandlers({
+      pickFolder: async () => join(dir, 'p2'),
+      createOrchestrator: createDemoOrchestrator,
+      watchRun: (e, d) => seen.push({ type: e.type, diagram: d.name }),
+    });
+    expect(own.activeRuns()).toBe(0);
+    await own.invoke(CHANNELS.createProject, undefined);
+    await own.invoke(CHANNELS.saveDiagram, chain);
+    val(await own.invoke(CHANNELS.startRun, { diagramId: 'flujo', order: 'hazme un juego' }));
+    expect(own.activeRuns()).toBe(1);
+    await vi.waitFor(() => expect(seen.some((e) => e.type === 'agent.question')).toBe(true), { timeout: 5000 });
+    expect(seen[0]).toEqual({ type: 'run.started', diagram: 'Flujo' });
+    own.dispose();
+  });
+});
+
 describe('ejecución por IPC [R19.7]', () => {
   it('[R19.7] iniciar, suscribirse, responder la pregunta y recibir todo en orden por lotes', async () => {
     await openWithFlow();

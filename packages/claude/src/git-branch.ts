@@ -9,6 +9,8 @@ type GitAction = ActionEvent['action'];
 /** Lo que dice un comando sobre las ramas [R58.3]. */
 export interface GitCommandEffect {
   created: string[];
+  /** De las creadas, las que además mueven `HEAD`: si no se movió, el comando falló [R58.3]. */
+  moves: string[];
   named: string[];
   /** Actúa en la rama de `HEAD`, sin nombrarla. */
   acts: boolean;
@@ -41,7 +43,7 @@ function withoutQuotes(command: string): string {
 
 /** Ramas que crea o usa un comando de terminal [R58.3]. */
 export function parseGitCommand(command: string): GitCommandEffect {
-  const out: GitCommandEffect = { created: [], named: [], acts: false, actions: [] };
+  const out: GitCommandEffect = { created: [], moves: [], named: [], acts: false, actions: [] };
   for (const segment of withoutQuotes(command).split(/&&|\|\||[;|\n]/)) {
     const words = segment.trim().split(/\s+/);
     const at = words.indexOf('git');
@@ -56,7 +58,10 @@ export function parseGitCommand(command: string): GitCommandEffect {
     if (sub === 'checkout' || sub === 'switch') {
       const flag = args.findIndex((a) => ['-b', '-B', '-c', '-C', '--create'].includes(a));
       const name = flag >= 0 ? args[flag + 1] : undefined;
-      if (name) out.created.push(name);
+      if (name) {
+        out.created.push(name);
+        out.moves.push(name);
+      }
     } else if (sub === 'branch') {
       if (args.length > 0 && plain.length === args.length) out.created.push(plain[0]!);
       else if (plain[0] && args.some((a) => a === '-d' || a === '-D' || a === '--delete')) out.actions.push({ action: 'delete', branch: plain[0] });
@@ -78,7 +83,7 @@ export function parseGitCommand(command: string): GitCommandEffect {
       if (sub === 'commit') out.actions.push({ action: 'commit' });
     }
   }
-  return { created: out.created.filter(validBranch), named: out.named.filter(validBranch), acts: out.acts, actions: out.actions.filter((a) => a.branch === undefined || validBranch(a.branch)) };
+  return { created: out.created.filter(validBranch), moves: out.moves.filter(validBranch), named: out.named.filter(validBranch), acts: out.acts, actions: out.actions.filter((a) => a.branch === undefined || validBranch(a.branch)) };
 }
 
 /** Dirección de la PR o el merge request en lo que respondió la herramienta [R58.14]. */
@@ -189,7 +194,8 @@ export class BranchTracker {
       const command = (input as { command?: unknown } | undefined)?.command;
       if ((tool === 'Bash' || tool === 'PowerShell') && typeof command === 'string') {
         const effect = parseGitCommand(command);
-        for (const branch of effect.created) found.push({ type: 'branch', branch, via: 'command', created: true });
+        const failed = (branch: string) => now !== undefined && now === this.head && now !== branch && effect.moves.includes(branch);
+        for (const branch of effect.created.filter((b) => !failed(b))) found.push({ type: 'branch', branch, via: 'command', created: true });
         for (const branch of effect.named) found.push({ type: 'branch', branch, via: 'command' });
         if (effect.acts && now) found.push({ type: 'branch', branch: now, via: 'command' });
         for (const a of effect.actions) {
@@ -212,6 +218,8 @@ export class BranchTracker {
       // El paso estaba en la rama que deja, aunque aún no hubiera hecho nada en ella [R58.2].
       if (this.head && !MAIN_BRANCH.test(this.head)) found.unshift({ type: 'branch', branch: this.head, via: 'ran' });
       this.head = now;
+      // Aunque ya se hubiera nombrado, tiene que quedar la última: es donde está el paso [R58.2].
+      this.told.delete(now);
       found.push({ type: 'branch', branch: now, via: 'head' });
       actions.push({ type: 'git_action', branch: now, action: 'switch' });
     }

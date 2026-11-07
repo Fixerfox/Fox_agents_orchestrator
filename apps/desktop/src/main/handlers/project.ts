@@ -39,6 +39,7 @@ async function setProject(h: HandlerState, root: string, store: ProjectStore): P
       apiKey: async () => (await h.deps.vault?.read()),
       mcpSecrets: async (id, scope) => (await h.deps.mcpVault?.read(mcpVaultKey(root, id, scope))) ?? {},
     }), () => ({ maxConcurrency: h.settings.maxParallel }), snapshots);
+  h.runs.watch((event, diagram) => h.deps.watchRun?.(event, diagram));
   store.useAppMcp(h.deps.appMcpDir);
   h.store = store; // como máximo un proyecto abierto: el anterior se sustituye [R19.5]
   h.root = root;
@@ -62,6 +63,8 @@ export function specKitTarget(store: ProjectStore): SpecKitTarget {
 
 export async function handleProject(h: HandlerState, channel: string, arg: unknown): Promise<unknown> {
   switch (channel) {
+    case CHANNELS.currentProject:
+      return h.store ? { name: (await h.store.info()).name } : null;
     case CHANNELS.createProject: {
       const root = await h.deps.pickFolder('create');
       if (!root) return null;

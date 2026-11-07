@@ -120,6 +120,8 @@ export interface NodeExtras {
   onOpenFile?: ((key: string, path: string) => void) | undefined;
   /** Vista previa pequeña de un archivo de un paso, para la tarjeta junto al nodo [R54.2]. */
   previewCard?: ((key: string, path: string) => ReactNode) | undefined;
+  /** Abre los avisos del Supervisor de un paso [R60.40]. */
+  onAlerts?: ((key: string) => void) | undefined;
 }
 
 /** Callbacks de los conectores de un agente [R33.10]. */
@@ -266,7 +268,7 @@ export function buildFlowNodes(
         ...(review ? { review } : {}),
         ...(gitActions ? { gitActions } : {}),
         ...(prUrl ? { prUrl } : {}),
-        ...(alerts ? { alerts } : {}),
+        ...(alerts ? { alerts, ...(extra.onAlerts ? { onAlerts: () => extra.onAlerts!(key) } : {}) } : {}),
         // Fichas con lo que hizo el paso, colgadas debajo [R54.1].
         ...((extra.stepFiles?.[key]?.length ?? 0) > 0
           ? {

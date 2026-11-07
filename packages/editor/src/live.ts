@@ -1,6 +1,6 @@
 import { branchesOf, type RunBranches } from './branches';
 import type { KnowledgeState } from './knowledge';
-import { pathKey, type Id, type NodeStatus, type Payload, type ReviewQuestion, type RunEvent, type RunStatus } from '@orquestador/core';
+import { pathKey, type Id, type NodeStatus, type Payload, type ReviewQuestion, type RunEvent, type RunStatus, type QuestionKind } from '@orquestador/core';
 
 export interface PendingItem {
   questionId: string;
@@ -248,7 +248,7 @@ export type TranscriptItem =
   | { kind: 'pass'; n: number; by?: Id; reason?: string }
   | { kind: 'text'; text: string }
   | { kind: 'tool'; tool: string; input?: unknown; ok?: boolean; output?: string }
-  | { kind: 'question'; questionId: string; text: string; options?: string[]; answer?: string; /** Confirmación del paso [R43.9]. */ confirm?: { round: number }; /** Tipo de pregunta [R45.3]. */ ask?: 'question' | 'permission' | 'gate'; /** Revisión humana [R53.15]. */ review?: ReviewQuestion }
+  | { kind: 'question'; questionId: string; text: string; options?: string[]; answer?: string; /** Confirmación del paso [R43.9]. */ confirm?: { round: number }; /** Tipo de pregunta [R45.3]. */ ask?: QuestionKind; /** Revisión humana [R53.15]. */ review?: ReviewQuestion }
   | { kind: 'retry'; attempt: number; max: number; message: string }
   | { kind: 'error'; message: string }
   | { kind: 'usage'; inputTokens: number; outputTokens: number; costUsd: number }

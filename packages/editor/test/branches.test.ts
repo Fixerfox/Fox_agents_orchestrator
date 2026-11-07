@@ -47,6 +47,13 @@ describe('SPEC-058 · ramas de una ejecución', () => {
     ]);
   });
 
+  it('[R58.6] un cambio de rama deja esa como la vigente, también en ejecuciones ya grabadas', () => {
+    const moved = { runId: 'r', seq: 9, ts: 't', type: 'git.action', nodeId: 'a', branch: 'nueva', action: 'switch' } as RunEvent;
+    const r = branchesOf([ev('a', 'nueva', 'command', { created: true }), ev('a', 'vieja', 'ran'), moved]);
+    expect(r.byStep).toEqual({ a: ['vieja', 'nueva'] });
+    expect(r.actions).toEqual({ a: ['switch'] });
+  });
+
   it('[R58.6] si los pasos solo corrieron en ella, sin actividad de git, no hay ramas', () => {
     expect(branchesOf([ev('a', 'main', 'ran'), ev('b', 'main', 'ran')])).toEqual({ byStep: {}, actions: {}, links: {}, list: [] });
     expect(branchesOf([ev('a', 'main', 'ran'), ev('b', 'main', 'head')]).byStep).toEqual({ a: ['main'], b: ['main'] });

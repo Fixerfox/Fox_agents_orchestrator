@@ -44,6 +44,7 @@ export function memoryProject(s: MemoryState, options: MemoryApiOptions) {
       termEmit(id, { type: 'exit', code: 0 });
       return ok(true);
     },
+    currentProject: async () => ok(null),
     onTerminalEvents(listener) {
       terminalListeners.add(listener);
       return () => void terminalListeners.delete(listener);

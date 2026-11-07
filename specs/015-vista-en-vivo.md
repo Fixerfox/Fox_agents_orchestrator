@@ -19,4 +19,5 @@
 - **R15.14** [M8f] Si un nodo se ejecuta más de una vez en la misma ejecución (retorno de una revisión), su transcripción se separa por pasadas: cada pasada a partir de la segunda empieza con un encabezado «Pasada N», con «· devuelto por <revisión>: <motivo>» cuando la devolvió una revisión, y la entrada dice «Recibió (pasada N, intento M)». Con una sola pasada se ve como hasta ahora («Recibió (intento M)»). El panel lateral y la ventana grande (R15.12) usan la misma transcripción.
 - **R15.15** [M12] Lo que llega durante una ejecución no hace parpadear el lienzo: cada nodo conserva su medida, y el que no ha cambiado no se vuelve a pintar.
 - **R15.16** [M12] El diagrama de una ejecución no se vacía mientras se abre: si llega más tarde qué diagrama es, lo que ya se ve sigue ahí.
+- **R15.17** [M12] La tarjeta «Recibió» del panel de un paso se pliega y despliega pulsando su título. Empieza desplegada y sigue como la dejó el usuario aunque lleguen más eventos.
 

@@ -8,7 +8,7 @@ import type { SettingsApi } from './settings';
 /** API que el renderer ve como `window.orquestador`. Solo ids, nunca rutas. Un contexto, una interfaz [R56.18]. */
 export type ProjectApi = ProjectSessionApi & DiagramsApi & RunsApi & KnowledgeApi & SettingsApi & AssistantApi;
 
-export type InvokeMethod = Exclude<keyof ProjectApi, 'onRunEvents' | 'onAssistantEvents' | 'onTerminalEvents'>;
+export type InvokeMethod = Exclude<keyof ProjectApi, 'onRunEvents' | 'onAssistantEvents' | 'onTerminalEvents' | 'onOpenRun'>;
 
 /** Contrato único de canales IPC (método → canal). */
 export const CHANNELS = {
@@ -84,6 +84,7 @@ export const CHANNELS = {
   saveSettings: 'settings:save',
   testConnection: 'settings:test-connection',
   draftWithClaude: 'ai:draft',
+  currentProject: 'project:current',
   getWorkFolder: 'workfolder:get',
   pickWorkFolder: 'workfolder:pick',
   stageAttachment: 'input:stage',
@@ -99,5 +100,7 @@ export const CHANNELS = {
 
 /** Canal por el que el proceso principal empuja lotes de eventos al renderer. */
 export const RUN_EVENTS_CHANNEL = 'run:events';
+/** Canal por el que el proceso principal pide abrir una ejecución al pulsar un aviso [R61.12]. */
+export const OPEN_RUN_CHANNEL = 'run:open';
 
 export type ChannelName = (typeof CHANNELS)[keyof typeof CHANNELS];

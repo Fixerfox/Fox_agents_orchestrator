@@ -56,6 +56,12 @@ export interface AgentProfile {
 /** Lo que el Supervisor revisa de un paso [R60.12]. */
 export interface SupervisorReview {
   step: string;
+  /** Lo que pidió la persona: es el criterio [R62.2]. */
+  order?: string;
+  /** Para qué sirve el agente según su ficha [R62.2]. */
+  purpose?: string;
+  /** Corrección que pidió la persona: es lo que le toca ahora [R62.15]. */
+  correction?: string;
   input: Payload;
   task?: string;
   actions: string[];
@@ -68,6 +74,27 @@ export interface SupervisorVerdict {
   reason: string;
   summary: string;
   outOfScope?: string;
+  usage?: { inputTokens: number; outputTokens: number; costUsd?: number };
+}
+
+/** Lo que se compara al final: lo pedido con lo hecho [R62.9]. */
+export interface RunVerification {
+  order: Payload;
+  /** Entregable acordado, si lo hay. */
+  deliverable?: string;
+  steps: { step: string; text: string; files: string[] }[];
+  /** Corrección que pidió la persona [R62.16]. */
+  correction?: string;
+  /** Lo que entregaron antes los pasos que la corrección repite [R62.16]. */
+  before?: { step: string; text: string; files: string[] }[];
+  /** Lo que decidió la persona durante la ejecución [R62.17]. */
+  decisions?: string[];
+}
+
+export interface RunVerdict {
+  met: boolean;
+  /** Qué falta, si no se cumple. */
+  missing: string;
   usage?: { inputTokens: number; outputTokens: number; costUsd?: number };
 }
 
@@ -101,7 +128,7 @@ export interface BlameCandidate {
   output?: Payload;
 }
 
-export type QuestionKind = 'question' | 'permission' | 'gate';
+export type QuestionKind = 'question' | 'permission' | 'gate' | 'unfinished';
 
 export interface AnsweredQuestion {
   question: string;
@@ -200,6 +227,8 @@ export interface Decider {
   judgeReview?(request: JudgeRequest, signal: AbortSignal): Promise<JudgeVerdict>;
   /** ¿Lo que hizo un paso corresponde a lo pedido? [R60.12] */
   supervise?(request: SupervisorReview, signal: AbortSignal): Promise<SupervisorVerdict>;
+  /** ¿El resultado cumple lo que pidió la persona? [R62.9] */
+  verifyRun?(request: RunVerification, signal: AbortSignal): Promise<RunVerdict>;
   /** Nodo «Transformar» con Claude: devuelve el texto convertido. Opcional: sin él, el nodo falla [R37.6]. */
   transform?(request: TransformRequest, signal: AbortSignal): Promise<{ text: string; usage?: TransformUsage }>;
 }

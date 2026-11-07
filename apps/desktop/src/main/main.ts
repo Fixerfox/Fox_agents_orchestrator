@@ -1,16 +1,37 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, net, protocol, safeStorage, session, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, net, Notification, protocol, safeStorage, session, shell, Tray } from 'electron';
+import { appendFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { spawn } from 'node:child_process';
-import { ASSISTANT_EVENTS_CHANNEL, CHANNELS, RUN_EVENTS_CHANNEL, TERMINAL_EVENTS_CHANNEL } from '@orquestador/editor';
+import { execFile, spawn } from 'node:child_process';
+import { ASSISTANT_EVENTS_CHANNEL, CHANNELS, OPEN_RUN_CHANNEL, RUN_EVENTS_CHANNEL, TERMINAL_EVENTS_CHANNEL } from '@orquestador/editor';
 import { sdkCreateAppServer, sdkQuery } from '@orquestador/claude';
 import { ApiKeyVault, McpSecretVault, RecentStore, SettingsStore } from '@orquestador/store';
+import { Background } from './background';
 import { composeOrchestrator } from './composition';
 import { DesktopHandlers } from './handlers';
 import { TerminalService, type SpawnPty } from './terminal';
 import { parseWindowTone, secureWebContents, titleBarOverlay, windowOptions, TITLEBAR, WINDOW_TONE_CHANNEL } from './window';
+import { APP_USER_MODEL_ID, appIdRegistration } from './windows-app-id';
 
+// Una sola instancia: abrir la app otra vez enseña la ventana que ya existe [R61.6].
+if (!app.requestSingleInstanceLock()) app.exit(0);
 let mainWindow: BrowserWindow | undefined;
+let tray: Tray | undefined;
+/** Electron suelta el aviso si nadie lo guarda, y entonces pulsarlo no hace nada [R61.11]. */
+const notices = new Set<Notification>();
+const ICON = join(__dirname, 'icon.png');
+
+/** Deja constancia de lo que no se ve: si la interfaz se cae, nadie llega a leer su consola [R19.11]. */
+const noteCrash = (what: string): void => {
+  const dir = join(app.getPath('userData'), 'logs');
+  void mkdir(dir, { recursive: true }).then(() => appendFile(join(dir, 'crash.log'), `${new Date().toISOString()} ${what}\n`)).catch(() => undefined);
+};
+
+// Sin identidad registrada, Windows descarta los avisos sin decir nada [R61.14].
+if (process.platform === 'win32') {
+  app.setAppUserModelId(APP_USER_MODEL_ID);
+  for (const args of appIdRegistration(ICON)) execFile('reg', args, () => {});
+}
 
 const dataDir = (): string => app.getPath('userData');
 const cipher = {
@@ -65,6 +86,7 @@ const handlers = new DesktopHandlers({
   push: (runId, events) => {
     if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(RUN_EVENTS_CHANNEL, { runId, events });
   },
+  watchRun: (event, diagram) => background.onRunEvent(event, diagram),
   async pickSkillFiles(kind) {
     const res = await dialog.showOpenDialog({
       title: kind === 'folder' ? 'Elige la carpeta de referencia' : 'Elige los archivos de referencia',
@@ -97,12 +119,62 @@ const handlers = new DesktopHandlers({
   },
 });
 
+const background = new Background({
+  window: () => mainWindow,
+  createWindow,
+  createTray({ open, quit }) {
+    tray = new Tray(nativeImage.createFromPath(ICON).resize({ width: process.platform === 'win32' ? 16 : 24 }));
+    tray.setToolTip('Orquestador');
+    tray.setContextMenu(Menu.buildFromTemplate([{ label: 'Abrir Orquestador', click: open }, { type: 'separator' }, { label: 'Salir', click: quit }]));
+    tray.on('click', open);
+  },
+  notify({ title, body }, onClick) {
+    if (!Notification.isSupported()) return;
+    const notice = new Notification({ title, body, icon: ICON });
+    const forget = () => void notices.delete(notice);
+    notices.add(notice);
+    notice.on('click', () => {
+      forget();
+      onClick();
+    });
+    notice.on('close', forget);
+    notice.on('failed', forget);
+    notice.show();
+  },
+  openRun(target) {
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(OPEN_RUN_CHANNEL, target);
+  },
+  activeRuns: () => handlers.activeRuns(),
+  async confirmQuit(active) {
+    const { response } = await dialog.showMessageBox({
+      type: 'warning',
+      title: 'Salir de Orquestador',
+      message: active === 1 ? 'Hay 1 ejecución en marcha o en cola.' : `Hay ${active} ejecuciones en marcha o en cola.`,
+      detail: 'Si sales ahora se interrumpirán.',
+      buttons: ['Salir', 'Seguir trabajando'],
+      defaultId: 1,
+      cancelId: 1,
+    });
+    return response === 0;
+  },
+  quit: () => app.quit(),
+});
+
 function createWindow(): void {
-  const win = new BrowserWindow(windowOptions(join(__dirname, 'preload.cjs')));
+  const win = new BrowserWindow(windowOptions(join(__dirname, 'preload.cjs'), process.platform, ICON));
   mainWindow = win;
+  win.on('close', (e) => background.onClose(e));
+  // Al apagar o cerrar sesión, Windows no espera a una ventana que se niega a cerrarse [R61.5].
+  win.on('session-end', () => background.onQuitting());
   const indexUrl = pathToFileURL(join(__dirname, 'renderer', 'index.html')).toString();
   secureWebContents(win.webContents, win.webContents.session, indexUrl, (url) => void shell.openExternal(url));
   win.once('ready-to-show', () => win.show());
+  // Una interfaz caída deja la ventana vacía: se recarga y vuelve al proyecto [R19.11][R19.12].
+  win.webContents.on('render-process-gone', (_e, details) => {
+    noteCrash(`interfaz caída: ${details.reason} (${details.exitCode})`);
+    if (details.reason !== 'clean-exit' && !win.isDestroyed()) win.reload();
+  });
+  win.on('unresponsive', () => noteCrash('la interfaz no responde'));
   // Sin menú del sistema (File, Edit…) en Windows y Linux [R19.8].
   if (process.platform !== 'darwin') win.removeMenu();
   void win.loadURL(indexUrl);
@@ -128,10 +200,15 @@ app.whenReady().then(() => {
     return abs ? net.fetch(pathToFileURL(abs).toString()) : new Response('No encontrado', { status: 404 });
   });
   createWindow();
+  // La bandeja es para Windows y Linux, los sistemas de la app.
+  if (process.platform !== 'darwin') background.start();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
 });
+
+app.on('second-instance', () => background.open());
+app.on('before-quit', () => background.onQuitting());
 
 app.on('window-all-closed', () => {
   handlers.dispose();

@@ -16,6 +16,7 @@
   "controlRun": "run:control",
   "correctRun": "run:correct",
   "createProject": "project:create",
+  "currentProject": "project:current",
   "deleteAgent": "agent:delete",
   "deleteContext": "context:delete",
   "deleteDiagram": "diagram:delete",
