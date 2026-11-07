@@ -132,6 +132,11 @@ export function McpForm({ api, drafts, draftKey, original, servers, agents, just
     setSecretMsg(t('mcp.secret.cleared', { name }));
     onAgentsChanged();
   };
+  const sendAsk = () => {
+    if (!askText.trim() || !onAskClaude) return;
+    onAskClaude(t('mcp.askbox.prompt', { name: draft.name, id: draft.id, text: askText.trim() }));
+    setAskText('');
+  };
   const runTest = async () => {
     setTest('busy');
     const r = await api.testMcp(draft.id);
@@ -398,20 +403,24 @@ export function McpForm({ api, drafts, draftKey, original, servers, agents, just
               {onAskClaude && (
                 <>
                   {!isNew && (
-                    <form
-                      className="orq-mcpf__askbox"
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        if (!askText.trim()) return;
-                        onAskClaude(t('mcp.askbox.prompt', { name: draft.name, id: draft.id, text: askText.trim() }));
-                        setAskText('');
-                      }}
-                    >
-                      <input aria-label={t('mcp.askbox')} placeholder={t('mcp.askbox.ph')} value={askText} onChange={(e) => setAskText(e.target.value)} />
-                      <button type="submit" className="orq-btn orq-btn--small" disabled={askText.trim() === '' || busy}>
+                    // Un <div> y no un <form>: va dentro del formulario de la ficha y enviar no debe guardarla [R63.21].
+                    <div className="orq-mcpf__askbox">
+                      <input
+                        aria-label={t('mcp.askbox')}
+                        placeholder={t('mcp.askbox.ph')}
+                        value={askText}
+                        onChange={(e) => setAskText(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key !== 'Enter') return;
+                          e.preventDefault();
+                          e.stopPropagation();
+                          sendAsk();
+                        }}
+                      />
+                      <button type="button" className="orq-btn orq-btn--small" disabled={askText.trim() === '' || busy} onClick={sendAsk}>
                         {t('mcp.askbox.send')}
                       </button>
-                    </form>
+                    </div>
                   )}
                   <button
                     type="button"

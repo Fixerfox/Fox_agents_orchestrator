@@ -39,6 +39,16 @@ interface Props extends DiagramControlsProps {
   assistantOpen?: boolean;
   /** Nuevo, deshacer, rehacer y guardar van en la cabecera del Diseñador, no aquí [R32.38]. */
   editInHeader?: boolean;
+  /** Estado con el que terminó la ejecución seguida, para anunciarlo aunque no se pinte aquí [R63.27]. */
+  finishedStatus?: LiveView['status'];
+}
+
+/** Lo que oye un lector de pantalla: preguntas que esperan y la ejecución que terminó [R63.27]. */
+export function liveAnnouncement(pending: number, finished: LiveView['status'] | undefined): string {
+  const parts: string[] = [];
+  if (pending > 0) parts.push(pending === 1 ? t('a11y.pending.one') : t('a11y.pending.many', { count: pending }));
+  if (finished && finished !== 'running' && finished !== 'idle') parts.push(t('a11y.run.finished', { status: t(`run.status.${finished}` as MessageKey) }));
+  return parts.join('. ');
 }
 
 const SZ = { size: 16, strokeWidth: 1.5, 'aria-hidden': true } as const;
@@ -60,9 +70,7 @@ export function Toolbar(p: Props) {
   const pending = p.pendingCount ?? live.pending.length;
   const runInfo = (
     <>
-      <span className="orq-runstatus" role="status" aria-live="polite">
-        {t(statusKey)}
-      </span>
+      <span className="orq-runstatus">{t(statusKey)}</span>
       <span className="orq-usage">
         {t('run.usage', { tokens, cost: live.usage.costUsd.toFixed(3).replace('.', ',') })}
         {left !== undefined && ` · ${live.budgetReached ? t('run.budget.reached') : left === 1 ? t('run.budget.left.one') : t('run.budget.left', { tokens: left })}`}
@@ -76,6 +84,10 @@ export function Toolbar(p: Props) {
   );
   return (
     <header className="orq-topbar" role="toolbar" aria-label={t('app.title')}>
+      {/* Siempre en el árbol, para que el lector anuncie los cambios [R63.27]. */}
+      <span className="orq-sr" role="status" aria-live="polite">
+        {liveAnnouncement(pending, p.finishedStatus ?? (live.status !== 'running' ? live.status : undefined))}
+      </span>
       <ProjectMenu {...p} />
       {/* El diagrama abierto y su guardado van en la cabecera del Diseñador, donde tienen sentido [R32.38]. */}
       <span className="orq-topbar__gap" />
@@ -103,7 +115,7 @@ export function Toolbar(p: Props) {
       {pending > 0 && (
         <button type="button" className="orq-chipbtn is-attention" onClick={p.onOpenRuns}>
           <MessageCircleQuestion {...SZ} />
-          <span role="status">{pending === 1 ? t('topbar.pending.one') : t('topbar.pending.many', { count: pending })}</span>
+          <span>{pending === 1 ? t('topbar.pending.one') : t('topbar.pending.many', { count: pending })}</span>
         </button>
       )}
       {live.needsAttention && <span className="orq-attention">{t('run.needsAttention')}</span>}

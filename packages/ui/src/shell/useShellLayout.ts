@@ -3,6 +3,8 @@ import { readSideWidth } from '../common';
 
 /** Por debajo de este ancho (px) el panel derecho empieza cerrado [R21.16]. */
 const NARROW_PX = 1100;
+/** Por debajo de este ancho (px), abrir el asistente pliega el submenú de Ejecuciones [R63.30]. */
+export const WIDE_PX = 1280;
 
 /** Paneles de la aplicación: paleta, submenú de Ejecuciones y lateral derecho [R21.16][R29.5][R33.6]. */
 export function useShellLayout(hasSelection: boolean) {
@@ -13,7 +15,15 @@ export function useShellLayout(hasSelection: boolean) {
   /** «Ajustes del diagrama»: el panel derecho sin nada seleccionado [R33.6]. */
   const [diagramPanel, setDiagramPanel] = useState(false);
   /** Asistente abierto: en Diagramas ocupa el lateral derecho; en el resto, un panel acoplado [R29.5][R38.1]. */
-  const [assistOpen, setAssistOpen] = useState(false);
+  const [assistOpen, setAssistState] = useState(false);
+  /**
+   * Abrir el asistente en una ventana estrecha pliega el submenú de Ejecuciones, donde el asistente se acopla al lado.
+   * En el Diseñador ocupa el lateral derecho y no quita sitio: la paleta se queda [R63.30].
+   */
+  const setAssistOpen = (open: boolean) => {
+    if (open && typeof window !== 'undefined' && window.innerWidth < WIDE_PX) setRunsSub(false);
+    setAssistState(open);
+  };
   useEffect(() => {
     if (typeof window.matchMedia !== 'function') return;
     const q = window.matchMedia(`(max-width: ${NARROW_PX}px)`);

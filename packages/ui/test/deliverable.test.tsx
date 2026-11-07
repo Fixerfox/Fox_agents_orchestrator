@@ -78,10 +78,10 @@ describe('SPEC-046 · entregable en el diagrama', () => {
     const nodes = buildFlowNodes(flow(SPEC), [], {}, undefined, { qa: 'QA' });
     const data = (id: string) => nodes.find((n) => n.id === id)!.data as { sub?: string; note?: string };
     expect(data('output').note).toBe('Entrega: enlaces + resumen .md');
-    expect(data('qa').sub).toBe('QA · entrega');
+    expect(data('qa').sub).toBe('entrega');
     expect(data('dis').sub).toBe('QA');
     const none = buildFlowNodes(flow({ ...SPEC, notify: 'none' }), [], {}, undefined, { qa: 'QA' });
-    expect((none.find((n) => n.id === 'qa')!.data as { sub?: string }).sub).toBe('QA');
+    expect((none.find((n) => n.id === 'qa')!.data as { sub?: string }).sub).toBeUndefined();
     const plain = buildFlowNodes(flow(), [], {}, undefined, { qa: 'QA' });
     expect((plain.find((n) => n.id === 'output')!.data as { note?: string }).note).not.toMatch(/Entrega/);
   });

@@ -67,7 +67,10 @@ export const agentHandler: NodeHandler = {
         // Un paso que no terminó lo pedido no pasa de largo: decide la persona [R62.4].
         // Sin ficha se revisa con lo demás: esto no debe fallar el paso.
         const profile = step.supervisor && node.agentId ? await step.agentProfile?.(node.agentId, node.extra, step.emitter.runId).catch(() => undefined) : undefined;
-        const missing = await step.supervisor?.check(node.id, path, out.output, profile?.purpose);
+        // Mientras espera a su revisión no ocupa hueco de concurrencia [R63.9].
+        const supervisor = step.supervisor;
+        const missing = supervisor ? await step.limiter.whileWaiting(turn.slot, step.signal, () => supervisor.check(node.id, path, out.output!, profile?.purpose)) : undefined;
+        if (step.signal.aborted) return { status: 'cancelled' };
         if (missing !== undefined) {
           let answer: string;
           try {

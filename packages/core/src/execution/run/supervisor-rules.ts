@@ -19,9 +19,11 @@ export interface RuleState {
   branch?: string;
   rejected: Map<string, number>;
   spent: Map<string, { tokens: number; costUsd: number }>;
+  /** Último reintento de cada paso, para saber si se agotaron al terminar [R63.4]. */
+  retries: Map<string, { attempt: number; max: number; message: string }>;
 }
 
-export const newRuleState = (): RuleState => ({ declared: new Map(), agents: new Set(), rejected: new Map(), spent: new Map() });
+export const newRuleState = (): RuleState => ({ declared: new Map(), agents: new Set(), rejected: new Map(), spent: new Map(), retries: new Map() });
 
 /** Veces que un Coordinador puede rechazar su reparto: la primera y sus 2 repeticiones [R59.8]. */
 const MAX_REJECTIONS = 3;
@@ -43,16 +45,29 @@ export function applyRules(state: RuleState, e: RunEvent, budget: RunOptions['bu
       const declared = state.declared.get(pathKey(path, e.nodeId));
       return declared && !withinDeclared(e.path, declared) ? alert(e.nodeId, 'undeclared-file', `Tocó ${e.path}, que no estaba entre sus archivos (${declared.join(', ')}).`) : [];
     }
-    case 'node.finished':
-      return e.status === 'succeeded' && state.agents.has(pathKey(path, e.nodeId)) && !e.output?.text.trim() ? alert(e.nodeId, 'empty-output', 'Terminó bien, pero sin entregar nada.') : [];
+    case 'node.finished': {
+      const key = pathKey(path, e.nodeId);
+      const retry = state.retries.get(key);
+      state.retries.delete(key);
+      // Agotó los reintentos: falló también el último intento [R63.4].
+      if (e.status === 'failed' && retry && retry.attempt + 1 >= retry.max) return alert(e.nodeId, 'retry-loop', `Agotó sus reintentos: ${retry.message}`);
+      return e.status === 'succeeded' && state.agents.has(key) && !e.output?.text.trim() ? alert(e.nodeId, 'empty-output', 'Terminó bien, pero sin entregar nada.') : [];
+    }
     case 'git.branch': {
       const before = state.branch;
       state.branch = e.branch;
       const explained = e.created === true || e.via === 'head';
       return !explained && before !== undefined && before !== e.branch ? alert(e.nodeId, 'unexpected-branch', `Actuó en la rama ${e.branch} y se venía trabajando en ${before}.`) : [];
     }
+    case 'error': {
+      // El aviso cuenta el error del último intento [R63.4].
+      const retry = e.nodeId !== undefined ? state.retries.get(pathKey(path, e.nodeId)) : undefined;
+      if (retry) retry.message = e.message;
+      return [];
+    }
     case 'node.retrying':
-      return e.attempt + 1 >= e.max ? alert(e.nodeId, 'retry-loop', `Agotó sus reintentos: ${e.message}`) : [];
+      state.retries.set(pathKey(path, e.nodeId), { attempt: e.attempt, max: e.max, message: e.message });
+      return [];
     case 'split.rejected': {
       const key = pathKey(path, e.nodeId);
       const times = (state.rejected.get(key) ?? 0) + 1;

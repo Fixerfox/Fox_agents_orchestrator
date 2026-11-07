@@ -3,7 +3,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
-const milestones = (process.env.SPEC_MILESTONES ?? 'M1,M2,M3,M3b,M4,M4c,M5a,M5b,M6a,M6b,M6c,M6d,M6e,M7a,M7b,M8a,M8b,M8c,M8d,M8e,M8f,M8g,M8h,M9a,M11a,M11b,M11c,M11d,M12').split(',').map((s) => s.trim());
+const milestones = (process.env.SPEC_MILESTONES ?? 'M1,M2,M3,M3b,M4,M4c,M5a,M5b,M6a,M6b,M6c,M6d,M6e,M7a,M7b,M8a,M8b,M8c,M8d,M8e,M8f,M8g,M8h,M9a,M11a,M11b,M11c,M11d,M12,M13').split(',').map((s) => s.trim());
 const root = new URL('..', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
 
 function walk(dir, filter, out = []) {

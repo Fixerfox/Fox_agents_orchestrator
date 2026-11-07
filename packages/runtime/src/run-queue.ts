@@ -66,6 +66,7 @@ export class RunQueue {
     );
     const done = () => {
       live.finished = true;
+      this.live.prune();
       this.snapshots?.delete(handle.runId);
       this.drain(diagram.id);
     };

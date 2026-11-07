@@ -19,8 +19,13 @@ export class PauseGate {
   async wait(signal: AbortSignal): Promise<void> {
     while (this.paused && !signal.aborted) {
       await new Promise<void>((resolve) => {
-        this.waiters.push(resolve);
-        signal.addEventListener('abort', () => resolve(), { once: true });
+        // Sin oyentes colgados en la señal de la ejecución [R63.14].
+        const done = () => {
+          signal.removeEventListener('abort', done);
+          resolve();
+        };
+        this.waiters.push(done);
+        signal.addEventListener('abort', done, { once: true });
       });
     }
   }

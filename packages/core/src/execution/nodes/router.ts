@@ -1,6 +1,6 @@
 import type { Edge } from '../../diagrams';
 import type { Id } from '../../shared';
-import { failStep, nodeStarted, type NodeHandler } from './handler';
+import { chargeDecision, failStep, nodeStarted, type NodeHandler } from './handler';
 
 /** Router: elige por las condiciones de las aristas o con la IA. */
 export const routerHandler: NodeHandler = {
@@ -14,8 +14,16 @@ export const routerHandler: NodeHandler = {
 
     if (mode === 'rules') {
       const results: { edgeId: Id; condition?: string; matched: boolean }[] = [];
+      const asked = outEdges.filter((e) => e.condition).map((e) => ({ edgeId: e.id, condition: e.condition! }));
+      // Todas las condiciones en una sola consulta si el motor sabe hacerlo [R63.16].
+      let batch: Record<Id, boolean> | undefined;
+      if (asked.length > 0 && decider.conditions) {
+        const res = await decider.conditions({ conditions: asked, input }, signal);
+        batch = res.results;
+        chargeDecision(step, node, path, res.usage);
+      }
       for (const edge of outEdges) {
-        const matched = edge.condition ? await decider.condition({ condition: edge.condition, input }, signal) : true;
+        const matched = edge.condition ? (batch ? batch[edge.id] === true : await decider.condition({ condition: edge.condition, input }, signal)) : true;
         results.push({ edgeId: edge.id, ...(edge.condition ? { condition: edge.condition } : {}), matched });
         if (matched) chosen.push(edge);
       }
@@ -23,8 +31,9 @@ export const routerHandler: NodeHandler = {
       reason = 'reglas de las aristas';
     } else {
       const candidates = outEdges.map((e) => ({ edgeId: e.id, to: e.to, label: nodeById.get(e.to)?.label ?? e.to }));
-      const res = await decider.route({ nodeId: node.id, candidates, input }, signal);
+      const { usage, ...res } = await decider.route({ nodeId: node.id, candidates, input }, signal);
       emitter.emit({ type: 'decision', nodeId: node.id, kind: 'route', request: { candidates, input }, response: res }, path);
+      chargeDecision(step, node, path, usage);
       const wanted = new Set(res.edgeIds);
       chosen = outEdges.filter((e) => wanted.has(e.id));
       reason = res.reason;

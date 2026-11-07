@@ -22,10 +22,10 @@ describe('SPEC-040 · modelo por paso en la interfaz', () => {
     expect([...select.options].map((o) => o.textContent)).toEqual(['El del agente (Sonnet 5.5)', 'Sonnet 5.5', 'Opus 5.5', 'Haiku 5.5']);
     await userEvent.selectOptions(select, 'Opus 5.5');
     expect((screen.getByLabelText('Modelo') as HTMLSelectElement).value).toBe('claude-opus-5-5');
-    expect(within(card).getByText('Sprites · Opus 5.5')).toBeTruthy();
+    // El paso se llama como su agente: solo el modelo [R63.25].
+    expect(within(card).getByText('Opus 5.5')).toBeTruthy();
     await userEvent.selectOptions(screen.getByLabelText('Modelo'), 'El del agente (Sonnet 5.5)');
     expect(within(card).queryByText(/Opus 5\.5/)).toBeNull();
-    expect(within(card).getByText('Sprites')).toBeTruthy();
   });
 
   it('[R40.6] la entrada de un intento dice el modelo cuando el paso tenía uno propio', () => {

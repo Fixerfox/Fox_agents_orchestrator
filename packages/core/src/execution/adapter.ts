@@ -209,18 +209,24 @@ export interface JudgeVerdict {
 
 /** Decisiones que toma la IA fuera de los agentes de trabajo: enrutado, condiciones y evaluador de bucles. */
 export interface Decider {
+  /** `usage`: lo que gastó la decisión, que cuenta en el presupuesto [R63.15]. */
   route(
     request: { nodeId: Id; candidates: RouteCandidate[]; input: Payload },
     signal: AbortSignal,
-  ): Promise<{ edgeIds: Id[]; reason: string }>;
+  ): Promise<{ edgeIds: Id[]; reason: string; usage?: TransformUsage }>;
   judge(
     request: { prompt: string; output: Payload; iteration: number },
     signal: AbortSignal,
-  ): Promise<{ done: boolean; reason: string }>;
+  ): Promise<{ done: boolean; reason: string; usage?: TransformUsage }>;
   condition(
     request: { condition: string; input: Payload },
     signal: AbortSignal,
   ): Promise<boolean>;
+  /** Todas las condiciones de un router en una sola consulta. Opcional: sin ella, `condition` una por una [R63.16]. */
+  conditions?(
+    request: { conditions: { edgeId: Id; condition: string }[]; input: Payload },
+    signal: AbortSignal,
+  ): Promise<{ results: Record<Id, boolean>; usage?: TransformUsage }>;
   /** Qué paso tiene que rehacer el trabajo según las correcciones del usuario. Opcional [R53.5][R53.17]. */
   blame?(request: { feedback: string; candidates: BlameCandidate[] }, signal: AbortSignal): Promise<{ nodeId: Id; reason: string }>;
   /** Decide una revisión sin veredicto escrito. Opcional: sin él, se usa `judge` [R34.26]. */

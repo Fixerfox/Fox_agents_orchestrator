@@ -32,6 +32,7 @@ export function AppToolbar({ app }: { app: AppModel }) {
       onOpenDiagram={(id) => void doc.openDiagram(id)}
       engine={app.config.engine}
       problems={snap.problems}
+      {...(run.runId && run.live.status !== 'running' && run.live.status !== 'idle' ? { finishedStatus: run.live.status } : {})}
       {...(section === 'diagrams'
         ? { onRun: () => void launcher.openLaunch(snap.diagram.id) }
         : {

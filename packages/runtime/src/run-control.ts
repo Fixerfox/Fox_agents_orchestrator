@@ -30,8 +30,10 @@ export class RunControl {
 
   /** Espera a que termine la ejecución y se haya escrito su registro (útil para tests y cierre). */
   async settled(runId: string): Promise<void> {
-    await this.live.get(runId).handle.result;
-    for (let i = 0; i < 200 && !this.live.get(runId).finished; i++) await new Promise((r) => setTimeout(r, 5));
-    await Promise.allSettled(this.live.get(runId).previews);
+    const live = this.live.get(runId);
+    await live.handle.result;
+    // Se sigue con la misma: al terminar puede soltarse de la sesión [R63.19].
+    for (let i = 0; i < 200 && !live.finished; i++) await new Promise((r) => setTimeout(r, 5));
+    await Promise.allSettled(live.previews);
   }
 }

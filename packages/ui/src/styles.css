@@ -976,7 +976,7 @@ button:disabled { opacity: 0.4; cursor: default; }
 .orq-runs2__st.is-running { color: var(--accent-text); }
 .orq-runs2__st.is-succeeded { color: var(--pos); }
 .orq-runs2__st.is-failed, .orq-runs2__st.is-interrupted { color: var(--neg); }
-.orq-run { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+.orq-run { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; container-type: inline-size; }
 .orq-run__head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 20px 12px; border-bottom: 1px solid var(--line); }
 .orq-run__head h1 { margin: 0; font-size: 17px; font-weight: 600; white-space: nowrap; }
 .orq-run__input { flex: 1; min-width: 160px; color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -1024,6 +1024,8 @@ button:disabled { opacity: 0.4; cursor: default; }
   .orq-run__side { width: 300px; }
   .orq-gantt__axis, .orq-gantt__row { grid-template-columns: 110px minmax(0, 1fr); }
 }
+/* Si la vista se estrecha (p. ej. con el asistente abierto), el panel del paso pasa debajo del lienzo [R63.30]. */
+@container (max-width: 760px) { .orq-run__body { flex-direction: column; } .orq-run__side { width: auto; max-height: 40%; border-left: 0; border-top: 1px solid var(--line); } }
 /* Asistente [R29.5] */
 .orq-topbar__assist.is-on { border-color: var(--accent); color: var(--accent-text); }
 .orq-assist { display: flex; flex-direction: column; height: 100%; min-height: 0; }
@@ -1620,7 +1622,9 @@ button:disabled { opacity: 0.4; cursor: default; }
 .orq-inbox__item.is-confirm { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
 .orq-t .orq-md > :first-child, .orq-chat .orq-md > :first-child { margin-top: 0; }
 .orq-t .orq-md > :last-child, .orq-chat .orq-md > :last-child { margin-bottom: 0; }
-.orq-run__canvas { position: relative; }
+.orq-run__canvas { position: relative; container-type: inline-size; }
+/* En un lienzo estrecho, el aviso de fin es una franja al pie y no tapa los pasos [R63.30]. */
+@container (max-width: 640px) { .orq-done { left: 0; bottom: 0; transform: none; width: 100%; border-radius: 0; padding: 6px 10px; gap: 8px; box-shadow: none; } .orq-done__icon { width: 24px; height: 24px; } .orq-done__text span { display: none; } }
 .orq-done.is-running { border-color: color-mix(in srgb, var(--accent) 40%, var(--line)); }
 .orq-done.is-running .orq-done__icon { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
 /* SPEC-045 · ficheros del paso, visor, auditoría, cronograma y relato */

@@ -11,7 +11,7 @@ import { RunDoneBanner } from './RunDoneBanner';
 import { useRunData } from './useRunData';
 import { StoppedActions, RunCanvas } from './RunSummary';
 import { type RunsScreenProps } from './runsTypes';
-import { SECTIONS, statusLabel } from './runFormat';
+import { SECTIONS, crumbSection, statusLabel } from './runFormat';
 import { type Btab } from './RunTabs';
 import { QuestionCard } from './QuestionCard';
 import { RunModalView } from './RunModal';
@@ -45,7 +45,8 @@ export function RunDetail(
   const openPreview = useCallback((key: string, path: string) => setPreviewing({ key, path }), []);
   const previewCard = useCallback((key: string, path: string) => <PreviewThumb api={p.api} runId={p.runId} stepKey={key} path={path} />, [p.api, p.runId]);
   const step = d.timeline.steps.find((s) => s.key === picked) ?? defaultStep(d.timeline.steps);
-  const back = SECTIONS.find((s) => s.id === p.nav.section)!;
+  const backId = crumbSection(p.nav, p.row);
+  const back = SECTIONS.find((s) => s.id === backId)!;
 
   if (!d.ready || !d.live) return <p className="orq-runs2__empty">{d.snap?.error ?? t('runs.loading')}</p>;
   const { live, running, status, reason, label, diagram } = d;
@@ -56,7 +57,7 @@ export function RunDetail(
   return (
     <div className="orq-run">
       <header className="orq-run__head">
-        <button type="button" className="orq-btn orq-btn--small" onClick={() => p.onNav({ section: p.nav.section })}>
+        <button type="button" className="orq-btn orq-btn--small" onClick={() => p.onNav({ section: backId })}>
           <ArrowLeft size={14} aria-hidden="true" />
           {t('runs.back', { section: t(back.label) })}
         </button>

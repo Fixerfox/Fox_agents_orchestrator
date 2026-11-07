@@ -38,7 +38,9 @@ export class RunHistory {
     if (!meta) throw new RunError('not-found', 'No existe esa ejecución');
     const events = await this.runs.readEvents(runId);
     const diagram = (await this.runs.readDiagram(runId)) ?? (await this.library.diagram(meta.diagramId));
-    const entry = events.find((e): e is Extract<RunEvent, { type: 'node.started' }> => e.type === 'node.started' && e.nodeId === 'entry' && !e.nodePath?.length);
+    // La entrada es la del nodo de tipo `entry`, tenga el id que tenga [R63.20].
+    const entryId = diagram.nodes.find((n) => n.kind === 'entry')?.id ?? 'entry';
+    const entry = events.find((e): e is Extract<RunEvent, { type: 'node.started' }> => e.type === 'node.started' && e.nodeId === entryId && !e.nodePath?.length);
     // El entregable con el que arrancó, aunque se hubiera cambiado solo para ella [R46.11].
     const started = events.find((e): e is Extract<RunEvent, { type: 'run.started' }> => e.type === 'run.started');
     return { meta, diagram, events, order: entry?.input ?? meta.order ?? '', ...(started?.deliverable ? { deliverable: started.deliverable } : {}) };

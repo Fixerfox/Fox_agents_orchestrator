@@ -1,4 +1,4 @@
-import { failStep, nodeStarted, type NodeHandler } from './handler';
+import { chargeDecision, failStep, nodeStarted, type NodeHandler } from './handler';
 
 /** Bucle: repite su cuerpo un número de veces o hasta que el evaluador diga que basta. */
 export const loopHandler: NodeHandler = {
@@ -20,8 +20,9 @@ export const loopHandler: NodeHandler = {
       let reason: string | undefined;
       if (cfg.mode === 'ai-judge') {
         const request = { prompt: cfg.prompt!, output: current, iteration: n };
-        const verdict = await step.decider.judge(request, signal);
+        const { usage, ...verdict } = await step.decider.judge(request, signal);
         emitter.emit({ type: 'decision', nodeId: node.id, kind: 'judge', request, response: verdict }, path);
+        chargeDecision(step, node, path, usage);
         if (signal.aborted) return { status: 'cancelled' };
         reason = verdict.reason;
         if (verdict.done) done = true;

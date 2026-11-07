@@ -259,9 +259,10 @@ export function Inspector({ session, snap, selection, agents, onError, onEditAge
                 </label>
                 <p className="orq-hint">{t('insp.model.hint')}</p>
                 {/* Confirmar antes de terminar, solo en este paso [R43.3]. */}
-                <label className="orq-insp__check">
+                {/* En fila, como los demás interruptores: `.orq-inspector label` lo apilaba [R63.28]. */}
+                <label className="orq-switch">
+                  <span>{t('insp.confirm')}</span>
                   <input type="checkbox" checked={node.confirm === true} onChange={(e) => patch(node.id, { confirm: e.target.checked })} />
-                  {t('insp.confirm')}
                 </label>
                 <p className="orq-hint">{t('insp.confirm.hint')}</p>
               </section>

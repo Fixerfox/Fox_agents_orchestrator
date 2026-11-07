@@ -32,13 +32,13 @@ El Supervisor es la otra pieza: **vigila toda ejecución, frena lo que se sale d
 
 ## Requisitos
 ### Reglas
-- **R60.1** [M12] Evento `supervisor.alert` (`nodeId?`, `rule`, `severity: 'info' | 'warning'`, `detail`). Cada aviso se emite una vez por paso y regla, salvo `blocked`.
+- **R60.1** [M12] Evento `supervisor.alert` (`nodeId?`, `rule`, `severity: 'info' | 'warning'`, `detail`). Cada aviso se emite una vez por paso y regla, salvo `blocked` (y por pasada desde R63.11).
 - **R60.2** [M12] Las reglas son una función pura de `core` (`applyRules`) que no llama al motor.
 - **R60.3** [M12] El Supervisor no cambia las entradas, y un fallo suyo no afecta a la ejecución. Solo cambia el flujo con los controles de SPEC-062.
 - **R60.4** [M12] Regla `undeclared-file`: una rama de reparto (SPEC-059) tocó un archivo que no declaró.
 - **R60.5** [M12] Regla `empty-output`: un agente terminó bien con la salida vacía.
 - **R60.6** [M12] Regla `unexpected-branch`: un paso actuó en una rama de git distinta de la anterior sin haberla creado ni haber cambiado a ella (SPEC-058).
-- **R60.7** [M12] Regla `retry-loop`: un paso agotó sus reintentos o el Coordinador repitió el reparto hasta el máximo.
+- **R60.7** [M12] Regla `retry-loop`: un paso agotó sus reintentos (salta al terminar fallido tras el último intento, R63.4) o el Coordinador repitió el reparto hasta el máximo.
 - **R60.8** [M12] Regla `budget-burn`: un solo paso gastó más de la mitad del presupuesto de la ejecución.
 - **R60.16** [M12] Antes de cada acción se bloquea escribir fuera de los `Archivos:` que declaró el Coordinador para esa rama, y se le dice al agente para que siga por otro camino. Ese bloqueo y lo que ya deniegan los permisos dan `supervisor.alert` con la regla `blocked`.
 
@@ -56,7 +56,7 @@ El Supervisor es la otra pieza: **vigila toda ejecución, frena lo que se sale d
 - **R60.21** [M12] Cada agente recibe el diario como «Memoria de la ejecución», marcado como contexto de fondo y como datos: no manda sobre su tarea.
 - **R60.22** [M12] Los agentes no pueden escribir en el diario.
 - **R60.23** [M12] Un paso ve el diario tal como estaba al arrancar: las ramas en paralelo no se ven entre sí.
-- **R60.24** [M12] El diario tiene un tope de 8.000 caracteres: al pasarse, las entradas más antiguas se quedan solo con el paso y sus archivos.
+- **R60.24** [M12] El diario tiene un tope de 8.000 caracteres: al pasarse, las entradas más antiguas se quedan solo con el paso y sus archivos, y si no basta se quitan enteras (R63.12).
 - **R60.25** [M12] Lo que recibió cada agente queda en `agent.request`.
 - **R60.26** [M12] La memoria empieza con la rama de git de la ejecución (`Rama de git: <rama>`, y `(creada por <paso>)` si un paso la creó). Sale de los eventos `git.branch`, no de la revisión con IA, así que está aunque la revisión esté apagada o no haya llegado. Vale la última rama avisada; `via: 'ran'` solo cuenta si aún no se conoce ninguna. El tope de R60.24 nunca la recorta.
 - **R60.27** [M12] El prompt explica al agente que esa es la rama en la que va el trabajo: si usa git, sigue en ella salvo que su tarea diga otra cosa.
