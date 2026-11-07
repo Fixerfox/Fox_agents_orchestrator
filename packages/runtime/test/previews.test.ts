@@ -2,6 +2,7 @@ import { promises as fs } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { portsOf } from './ports';
 import { MockAgent, MockDecider, Orchestrator, type Diagram } from '@orquestador/core';
 import { ProjectStore, encodeStepKey, previewDir, relativeAssets, snapshotStep } from '@orquestador/store';
 import { RunService } from '../src';
@@ -44,7 +45,7 @@ afterEach(() => fs.rm(dir, { recursive: true, force: true }));
 
 function service(files: string[]) {
   const agent = new MockAgent({ imp: { output: 'hecho', files } });
-  return new RunService(store, new Orchestrator({ getAdapter: () => agent, decider: new MockDecider() }));
+  return new RunService(portsOf(store), new Orchestrator({ getAdapter: () => agent, decider: new MockDecider() }));
 }
 
 describe('SPEC-054 · copia por ejecución y vista previa', () => {

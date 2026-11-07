@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { App } from '../src/App';
-import { InsertPicker, type InsertChoice } from '../src/InsertPicker';
+import { InsertPicker, type InsertChoice } from '../src/diagrams/InsertPicker';
 import { createMemoryApi } from '../src/memoryApi';
 
 const AGENTS = [{ id: 'sprites', name: 'Sprites', description: 'Dibuja' }];

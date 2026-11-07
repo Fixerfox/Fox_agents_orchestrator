@@ -1,3 +1,4 @@
+import { BranchTracker } from './git-branch';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { AgentError, effectivePermission, loadsClaudeConfig, mergeExtra, type FileChange, type AgentAdapter, type AgentRequest, type AgentStreamEvent, type AgentDefinition, type AppSettings, type ContextDefinition, type SkillDefinition } from '@orquestador/core';
@@ -8,7 +9,7 @@ import { buildSystemPrompt, buildUserPrompt, claudeCodePrompt } from './prompt';
 import type { PermissionResult, QueryFn } from './sdk-types';
 import { createMcpPolicy, sdkMcpConfig, type ResolvedMcp } from './mcp';
 import { KnowledgeTracker, describeKnowledge, planKnowledge } from './knowledge';
-import { agentTools, createWritePolicy, guardedPolicy, summarizeFolder, type WritePolicyDeps } from './workfolder';
+import { agentTools, createWritePolicy, withScope, guardedPolicy, summarizeFolder, type WritePolicyDeps } from './workfolder';
 import { CommandWatch } from './changes';
 import { classifyCommand } from './commands';
 
@@ -85,10 +86,15 @@ export class ClaudeAdapter implements AgentAdapter {
     const sent = new Set<string>();
     // Lo que cambian los comandos (un script que genera páginas, un build…) también se registra [R55.1].
     const watch = new CommandWatch(root);
+    // Qué rama de git crea o toca el agente [R58.2].
+    const branches = new BranchTracker(root);
     /** El agente ha preguntado y tiene respuesta en este intento [R39.4]. */
     let asked = false;
+    /** Acciones frenadas, para el Supervisor [R60.16]. */
+    const blocked: string[] = [];
     const note: WritePolicyDeps['note'] = (e) => {
       if (e.kind !== 'denied' && touched.get(e.path) !== 'created') touched.set(e.path, e.kind);
+      if (e.kind === 'denied') blocked.push(`${e.path}: ${e.reason ?? 'denegado'}`);
       this.env.onFileEvent?.(request.nodeId, e);
     };
     try {
@@ -105,7 +111,7 @@ export class ClaudeAdapter implements AgentAdapter {
           root,
           withMcp(
             mcpPolicy,
-            createWritePolicy({
+            withScope(request.scope, root, note, createWritePolicy({
             root,
             level,
             appDirs: [...new Set([path.join(root, '.orquestador'), path.join(this.env.projectRoot, '.orquestador')])],
@@ -117,7 +123,7 @@ export class ClaudeAdapter implements AgentAdapter {
             onAsked: () => {
               asked = true;
             },
-          }),
+          })),
           ),
         ),
       );
@@ -139,6 +145,8 @@ export class ClaudeAdapter implements AgentAdapter {
         systemPrompt: claudeCodePrompt(
           buildSystemPrompt(agent, contexts, skills, summary ?? { text: '(carpeta del proyecto)' }, plan, {
             ...(request.confirm ? { confirm: true } : {}),
+            ...(request.split ? { split: request.split } : {}),
+            ...(request.memory ? { memory: request.memory } : {}),
             ...(request.deliverable ? { deliverable: request.deliverable } : {}),
             level,
           }),
@@ -146,11 +154,13 @@ export class ClaudeAdapter implements AgentAdapter {
         // Sin tope práctico: el gancho puede estar esperando a que el usuario responda un permiso [R50.4].
         hooks: { PreToolUse: [{ hooks: [guard.hook], timeout: HOOK_TIMEOUT_S }] },
       };
+      await branches.start();
       for (const u of tracker.inlined()) yield { type: 'knowledge', kind: u.item.kind, id: u.item.id, via: u.via, required: true };
       for await (const msg of this.query({ prompt: buildUserPrompt(request.input, request.previousAnswers, request.task, missed.map((i) => `«${i.name}»`)), options })) {
         if (signal.aborted) return;
         for (const ev of mapper.map(msg)) {
           if (ev.type === 'tool_call') {
+            branches.called(ev.tool, ev.input);
             for (const u of tracker.observe(ev.tool, ev.input)) yield { type: 'knowledge', kind: u.item.kind, id: u.item.id, via: u.via, required: u.item.required };
           }
           if (ev.type === 'result') {
@@ -167,9 +177,12 @@ export class ClaudeAdapter implements AgentAdapter {
             finished = true;
             yield* touchedFiles(root, touched, sent, true);
             yield* commandFiles(await watch.closing('final'), touched, sent);
+            yield* branches.finished();
           }
           yield ev;
           if (ev.type === 'tool_result') {
+            yield* branches.settled(ev.tool, ev.ok, ev.output);
+            for (const detail of blocked.splice(0)) yield { type: 'blocked', detail };
             yield* touchedFiles(root, touched, sent, false);
             if (ev.tool === 'Bash') yield* commandFiles(await watch.closing('done', ev.id), touched, sent);
             else if (ev.tool === 'Agent' || ev.tool === 'Task') yield* commandFiles(await watch.closing('flush'), touched, sent);
@@ -181,6 +194,7 @@ export class ClaudeAdapter implements AgentAdapter {
       // Lo que ya escribió queda registrado también si el intento falla [R45.2].
       yield* touchedFiles(root, touched, sent, true);
       yield* commandFiles(await watch.closing('final').catch(() => []), touched, sent);
+      yield* branches.finished();
       if (signal.aborted) return;
       throw explainThrown(e, apiKey);
     } finally {

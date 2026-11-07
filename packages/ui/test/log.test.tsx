@@ -5,7 +5,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MockAgent, MockDecider, Orchestrator, type Diagram, type RunEvent } from '@orquestador/core';
 import { agentsIn, eventTypesIn, eventsToJsonl, filterEvents } from '@orquestador/editor';
-import { LogViewer } from '../src/LogViewer';
+import { LogViewer } from '../src/runs/LogViewer';
 
 const d: Diagram = {
   id: 'd', name: 'D', schemaVersion: 1,

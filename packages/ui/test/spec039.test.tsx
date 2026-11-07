@@ -23,10 +23,12 @@ describe('SPEC-039 · agente supervisado e icono en la interfaz', () => {
     const api = await mount();
     const s = await goLib('agents');
     await userEvent.click(s.getByRole('button', { name: 'Pixelador' }));
+    await userEvent.click(s.getByRole('button', { name: /^Qué puede hacer/ }));
     const sup = within(s.getByRole('region', { name: 'Supervisión' }));
     expect(sup.getByText(/Trabaja por su cuenta/)).toBeTruthy();
     await userEvent.click(sup.getByRole('switch', { name: /Preguntar siempre antes de implementar o decidir/ }));
     expect(sup.getByText(/te presenta su plan y espera tu respuesta/)).toBeTruthy();
+    await userEvent.click(s.getByRole('button', { name: /^Modelo y aspecto/ }));
     const look = within(s.getByRole('group', { name: 'Icono' }));
     await userEvent.click(look.getByRole('button', { name: 'Cambiar icono' }));
     expect(look.getByRole('radio', { name: 'Inicial' }).getAttribute('aria-checked')).toBe('true');
@@ -75,14 +77,16 @@ describe('SPEC-039 · agente supervisado e icono en la interfaz', () => {
 });
 
 describe('SPEC-039 · ficha del agente y panel del paso', () => {
-  it('[R39.10] la ficha tiene tres bloques y «Así se ve» resume icono, modelo, conocimiento y supervisión', async () => {
+  it('[R39.10][R57.5] los bloques quedan en sus secciones y «Así se ve» resume icono, modelo, conocimiento y supervisión', async () => {
     await mount({ agents: [{ ...newAgent('pix', 'Pixelador'), description: 'Pinta', askFirst: true, icon: 'palette' }] });
     const s = await goLib('agents');
     await userEvent.click(s.getByRole('button', { name: 'Pixelador' }));
-    for (const name of [/Quién es/, /Cómo trabaja/, /Lo que sabe y usa/]) expect(s.getByRole('region', { name })).toBeTruthy();
+    for (const name of [/Quién es/, /Cómo trabaja/]) expect(s.getByRole('region', { name })).toBeTruthy();
+    await userEvent.click(s.getByRole('button', { name: /^Qué sabe/ }));
     const know = within(s.getByRole('region', { name: /Lo que sabe y usa/ }));
     expect(know.getByRole('button', { name: 'Añadir skills…' })).toBeTruthy();
     expect(know.getByRole('button', { name: 'Añadir contextos…' })).toBeTruthy();
+    await userEvent.click(s.getByRole('button', { name: /^Modelo y aspecto/ }));
     const card = within(s.getByRole('region', { name: 'Así se ve' }));
     expect(card.getByText('Sonnet 5.5')).toBeTruthy();
     expect(card.getByText('0 skills · 0 contextos · 0 MCP')).toBeTruthy();

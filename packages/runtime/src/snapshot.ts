@@ -1,5 +1,4 @@
-import type { AgentDefinition, ContextDefinition, Diagram, Id, McpServerDefinition, SkillDefinition } from '@orquestador/core';
-import type { ProjectStore } from '@orquestador/store';
+import type { AgentDefinition, ContextDefinition, Diagram, Id, LibraryReader, McpServerDefinition, SkillDefinition } from '@orquestador/core';
 
 /** Copia de lo que usa una ejecución, tomada al lanzarla [R52.1]. */
 export interface LibrarySnapshot {
@@ -21,15 +20,15 @@ function templateIds(d: Diagram, out: Set<Id> = new Set()): Set<Id> {
 }
 
 /** Toma la copia de R52.1: definiciones de la biblioteca y subdiagramas alcanzables. */
-export async function takeSnapshot(store: ProjectStore, diagram: Diagram): Promise<LibrarySnapshot> {
-  const [agents, contexts, skills, mcp] = await Promise.all([store.listAgents(), store.listContexts(), store.listSkills(), store.listMcp()]);
+export async function takeSnapshot(library: LibraryReader, diagram: Diagram): Promise<LibrarySnapshot> {
+  const [agents, contexts, skills, mcp] = await Promise.all([library.agents(), library.contexts(), library.skills(), library.mcp()]);
   const templates = new Map<Id, Diagram>();
   const pending = [...templateIds(diagram)];
   while (pending.length > 0) {
     const id = pending.pop()!;
     if (templates.has(id) || id === diagram.id) continue;
     try {
-      const t = await store.diagrams.load(id);
+      const t = await library.diagram(id);
       templates.set(id, t);
       for (const next of templateIds(t)) if (!templates.has(next)) pending.push(next);
     } catch {
@@ -54,4 +53,17 @@ export class RunSnapshots {
   get size(): number {
     return this.byRun.size;
   }
+}
+
+/** Biblioteca que lee de la copia de la ejecución si la tiene y, si no, de `base` [R52.1][R56.3]. */
+export function snapshotLibrary(base: LibraryReader, snapshots: RunSnapshots | undefined): LibraryReader {
+  const snap = (runId?: Id) => snapshots?.get(runId);
+  return {
+    agents: async (runId) => snap(runId)?.agents ?? base.agents(),
+    contexts: async (runId) => snap(runId)?.contexts ?? base.contexts(),
+    skills: async (runId) => snap(runId)?.skills ?? base.skills(),
+    mcp: async (runId) => snap(runId)?.mcp ?? base.mcp(),
+    diagram: async (id, runId) => snap(runId)?.templates.get(id) ?? base.diagram(id),
+    diagramIds: () => base.diagramIds(),
+  };
 }

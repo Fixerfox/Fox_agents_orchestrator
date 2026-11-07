@@ -5,10 +5,10 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event';
 import type { EventBody, RunEvent } from '@orquestador/core';
 import { deriveLive, runTimeline, settleLive } from '@orquestador/editor';
-import { NodePanel } from '../src/NodePanel';
-import { AuditPanel } from '../src/AuditPanel';
-import { FileViewer, ProjectChanges } from '../src/RunFiles';
-import { Gantt, RunStory, axisTicks } from '../src/Timeline';
+import { NodePanel } from '../src/runs/NodePanel';
+import { AuditPanel } from '../src/runs/AuditPanel';
+import { FileViewer, ProjectChanges } from '../src/runs/RunFiles';
+import { Gantt, RunStory, axisTicks } from '../src/runs/Timeline';
 import { createMemoryApi } from '../src/memoryApi';
 
 const T0 = Date.parse('2026-11-05T16:52:00.000Z');

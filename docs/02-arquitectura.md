@@ -27,6 +27,22 @@
 | **AgentAdapter** | Interfaz común: `start(task, context, skills) → AsyncIterable<AgentEvent>`, `cancel()`. |
 | **Skill/Context Registry** | Catálogo de skills y contextos reutilizables y asignables a nodos. |
 
+## Hexagonal (SPEC-056)
+El núcleo no conoce a sus adaptadores. `packages/core` define los puertos y los demás paquetes dependen de él, nunca al revés.
+
+| Paquete | Papel | Puede importar de |
+|---|---|---|
+| `core` | Dominio, puertos y dobles en memoria | nadie |
+| `editor` | Lógica del editor sin React, contrato IPC | `core` |
+| `ui` | Pantallas | `core`, `editor` |
+| `claude`, `store`, `workspace` | Adaptadores: implementan puertos | `core` |
+| `runtime` | Casos de uso de las ejecuciones, sobre puertos | `core` |
+| `apps/desktop/src/main` | Composición: `composition.ts` crea y conecta los adaptadores | todos |
+
+Los puertos son `AgentEngine`, `RunRepository`, `LibraryReader`, `PathPolicy` y `WorkspaceFiles`. La matriz está en `scripts/architecture.json`: la usan el test de arquitectura y ESLint. `core` se organiza en contextos, descritos en [06-contextos.md](06-contextos.md).
+
+En el motor, cada tipo de nodo es un `NodeHandler` registrado en `NodeRegistry`. `Orchestrator` solo planifica el grafo. El comportamiento lo protegen 14 grabaciones de referencia en `packages/runtime/test/fixtures/golden/`.
+
 ## Principios
 1. La UI **solo** consume eventos y envía comandos; nunca llama a un agente directamente.
 2. Todo lo que ocurre en una ejecución es un evento persistido → permite replay y depuración.

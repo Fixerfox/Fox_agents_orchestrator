@@ -14,6 +14,9 @@ El bus es el **único contrato** entre el motor y la UI. Todo lo que ocurre en u
 - **R2.6** [M1] Antes de entrar en el log se ocultan claves sensibles (`apiKey`, `token`, `password`, `secret`, `authorization`…) y secretos reconocibles (`sk-…`, `Bearer …`, tokens de GitHub). El objeto original no se modifica.
 - **R2.7** [M1] En toda ejecución —también inválida, cancelada o con presupuesto agotado— `run.started` es el primer evento y `run.finished` el último.
 - **R2.8** [M1] Todo `node.started` tiene un `node.finished` posterior del mismo nodo (también si se cancela).
+- **R2.9** [M12] Los oyentes reciben los eventos en orden de `seq`, aunque uno de ellos emita otro mientras se entrega: el nuevo espera su turno. Así se graban en orden.
+- **R2.10** [M12] Al leer el log de una ejecución los eventos salen ordenados por `seq`, para abrir también las grabadas antes de R2.9.
+- **R2.11** [M12] `RunClient` enseña lo que pudo leer aunque el historial tenga un hueco, y dice que faltan eventos: nunca se queda cargando.
 
 ## Escenarios
 - **E2.a** *Dada* una UI que se conecta a una ejecución en curso con `fromSeq = 5`, *entonces* recibe los eventos 5..N del historial y luego los nuevos, en orden.

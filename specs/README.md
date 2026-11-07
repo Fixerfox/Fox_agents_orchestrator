@@ -16,6 +16,12 @@ El hito indica cuándo debe estar cubierto por tests. `npm run spec:check` exige
 ## Índice
 | Spec | Título | Hito | Estado |
 |---|---|---|---|
+| [062](062-control-de-lo-pedido.md) | Control de lo pedido: un paso que no terminó lo suyo se detiene antes de cerrarse y pregunta, y el resultado final se compara con lo que pidió la persona | M12 | Implementada |
+| [061](061-bandeja-y-avisos.md) | Bandeja del sistema y avisos de escritorio: cerrar deja la app en la bandeja, una sola instancia, y avisos cuando un agente necesita respuesta o acaba una ejecución | M12 | Implementada |
+| [060](060-supervisor-de-ejecucion.md) | Supervisor de la ejecución: pieza interna que frena con reglas lo que se sale de los límites, revisa con un modelo barato y configurable si cada paso hizo lo pedido, y escribe la memoria que leen los agentes | M12 | Implementada |
+| [059](059-repartir-entre-ramas.md) | Repartir el trabajo entre ramas en paralelo: el paso de origen divide su trabajo con `## Común` y `## Para <id>`, y cada rama recibe solo lo suyo | M8h | Implementada |
+| [058](058-ramas-en-el-diagrama.md) | Ramas en el diagrama: los pasos de cada rama van rodeados con rayas amarillas, el nodo marca commit, push, PR y demás, y el resumen las destaca | M8g | Implementada |
+| [057](057-crear-agente-por-pasos.md) | Crear un agente por pasos: bienvenida «¿Qué agente necesitas?» con ideas, el asistente redacta el primer borrador, cuatro pasos (qué hace, qué sabe, qué puede hacer, revisar) y una ficha por secciones para editar | M8g | Implementada |
 | [056](056-arquitectura-hexagonal.md) | Arquitectura hexagonal con contextos (DDD ligero): matriz de dependencias comprobada, puertos en `core`, composición en `apps/desktop`, un handler por tipo de nodo, `RunCtx` y `RunService` repartidos, contrato y UI por contexto | M11a–M11d | Borrador |
 | [055](055-cambios-por-comandos.md) | Archivos que cambian los comandos: un script o un build ejecutado con Bash también aparece en «Archivos» (con un comando, sin copia) | M8g | Implementada |
 | [054](054-vista-previa-de-pasos.md) | Vista previa de lo que hace cada paso: fichas de archivos bajo cada nodo, tarjeta con la web, imagen o documento ya mostrados, ventana grande (escritorio/móvil, comparar, abrir fuera), copia por ejecución y miniaturas en la revisión humana | M8g | Implementada |

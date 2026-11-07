@@ -26,6 +26,7 @@ await build({
   loader: { '.woff2': 'file', '.woff': 'file' },
   assetNames: '[name]-[hash]',
 });
+copyFileSync(join(app, 'assets/icon.png'), join(out, 'icon.png'));
 copyFileSync(join(app, 'src/renderer/index.html'), join(out, 'renderer', 'index.html'));
 copyFileSync(join(app, 'src/renderer/theme-init.js'), join(out, 'renderer', 'theme-init.js'));
 console.log('Compilado en', out);

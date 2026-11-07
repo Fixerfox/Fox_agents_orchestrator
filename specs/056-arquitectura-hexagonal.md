@@ -1,6 +1,6 @@
 # SPEC-056 · Arquitectura hexagonal con contextos (DDD ligero) y responsabilidades separadas
 
-**Estado:** Borrador · **Hito:** M11a, M11b, M11c, M11d · **Paquetes:** todos
+**Estado:** Hecho · **Hito:** M11a, M11b, M11c, M11d · **Paquetes:** todos
 
 ## Propósito
 El 05/11 el usuario pidió una arquitectura que escale («hexagonal no está mal», «DDD ligero») y que no haya clases monolíticas. Revisión del código (05/11, 23:20):
@@ -71,22 +71,25 @@ Esta spec no añade funcionalidad. Cambia la estructura para que añadir un tipo
   - `WorkspaceFiles`: lo que `runtime` toma hoy de `workspace` (`manifestOf`, `resolveInside`).
 - **R56.4** [M11a] `runtime` solo depende de `core`. `RunService`, `jobsOf`, `takeSnapshot` y el orquestador por motor reciben puertos. `createEngineOrchestrator(ctx, engines: AgentEngine[])` elige el motor por `settings().engine` en cada paso, como hoy (R27.1), y ya no construye `ClaudeAdapter`.
 - **R56.5** [M11a] `apps/desktop/src/main/composition.ts` es el único lugar que crea `ProjectStore`, `ClaudeAdapter` y `ClaudeDecider` y los conecta con los puertos (incluido el actual `claudeEnvironment`). `store` implementa `RunRepository` y `LibraryReader`, y `workspace` implementa `WorkspaceFiles`. `claude` exporta `createClaudeEngine(env, query): AgentEngine` y su `PathPolicy`.
-- **R56.6** [M11a] Grabación de referencia: 14 diagramas en `packages/runtime/test/fixtures/golden/`. Son lineal; paralelo con agente que junta; router por reglas y con IA; bucle por veces y con evaluador; revisión con retorno por IA; revisión humana («Lo reviso yo»); subdiagrama; transformar; confirmar antes de terminar; entregable; reanudar una ejecución parada. Se ejecutan con `MockAgent`, reloj e ids deterministas, y la secuencia normalizada de eventos (decisión 8) es igual a la grabada. Se graba antes del primer cambio de estructura y no se regraba en esta spec.
+- **R56.6** [M11a] Grabación de referencia: 14 diagramas en `packages/runtime/test/fixtures/golden/`. Son lineal; paralelo con agente que junta; router por reglas y con IA; bucle por veces y con evaluador; revisión con retorno por IA; revisión humana («Lo reviso yo»); subdiagrama; transformar; confirmar antes de terminar; entregable; reanudar una ejecución parada; corregir una ejecución terminada. Se ejecutan con `MockAgent`, reloj e ids deterministas, y la secuencia normalizada de eventos (decisión 8) es igual a la grabada. Se graba antes del primer cambio de estructura y no se regraba en esta spec.
 - **R56.7** [M11a] `eslint.config.js` replica la matriz de R56.1 y R56.2 con `no-restricted-imports` por paquete, y `npm run check` incluye el test de arquitectura.
+
+- **R56.21** [M11a] Las escrituras atómicas de `store` sobreviven a lecturas simultáneas. En Windows, `rename` sobre un archivo que alguien está leyendo falla con `EPERM`, `EACCES` o `EBUSY`. Es lo que pasa cuando la lista de ejecuciones lee `meta.json` mientras una termina: el error se perdía en el bus, `meta.json` se quedaba sin el estado final y `logged` no se cumplía, así que la ejecución seguía «en marcha» y su cola no avanzaba. Se reintenta unos milisegundos y, si sigue ocupado, se escribe directamente sobre el archivo. No es funcionalidad nueva: sin esto `npm run check` no puede estar en verde en Windows (decisión 5).
 
 ### B · Contextos (M11b)
 - **R56.8** [M11b] `core/src` se organiza en contextos, cada uno con su `index.ts` público:
-  - `shared/`: ids, `Payload`, ocultar secretos, utilidades.
-  - `diagrams/`: modelo del diagrama, validación, recorrido del grafo (`forwardEdges`, `returnEdges`, `finalSteps`…).
-  - `knowledge/`: agentes, contextos, skills, MCP, biblioteca, instalación de paquetes, Spec Kit.
-  - `settings/`: ajustes, niveles de permisos, modelos.
+  - `shared/`: ids, `Payload`, ocultar secretos, utilidades y lo que varios contextos necesitan y no es de ninguno: catálogo de modelos, niveles de permisos, referencias de conocimiento (`KnowledgeExtra`) y JSON Schema. Si estuvieran en `settings` o `knowledge`, `diagrams` tendría que importarlos y R56.9 lo prohíbe.
+  - `diagrams/`: modelo del diagrama, validación (también la de la configuración de transformar y del entregable), recorrido del grafo (`forwardEdges`, `returnEdges`, `finalSteps`…).
+  - `knowledge/`: agentes, contextos, skills, MCP, biblioteca, instalación de paquetes. Spec Kit sigue en `editor`, que es donde está hoy.
+  - `settings/`: ajustes, efecto de los permisos, proyectos recientes.
   - `execution/`: orquestador, catálogo de eventos, reanudar, revisión, correcciones, transformar, entregable, replay.
-  - `ports/` y `testing/`: los de R56.3.
+  - `ports/` y `testing/`: los de R56.3. `testing/` también guarda `MockAgent` y `MockDecider`.
 - **R56.9** [M11b] Reglas entre contextos, comprobadas por el test de arquitectura:
   - `shared` no importa de ningún otro.
   - `diagrams`, `knowledge` y `settings` solo importan de `shared`.
   - `execution` puede importar de todos los anteriores.
-  - `ports` solo importa tipos.
+  - `ports` solo importa tipos; puede nombrar los de `execution` porque describe contratos del motor.
+  - `testing` puede importar de todos y nadie importa de él salvo el `index` de `core`.
   - Desde fuera de un contexto solo se importa su `index.ts`. Por ejemplo, nunca `execution/nodes/agent`.
 - **R56.10** [M11b] `@orquestador/core` exporta exactamente los mismos nombres que antes de M11b. Un test compara la lista de exportaciones con una instantánea; en esta fase no cambia ningún import fuera de `core`.
 - **R56.11** [M11b] `docs/06-contextos.md` describe cada contexto: qué hace, qué expone, de quién depende y su lenguaje común (paso, pasada, intento, entregable, enchufado, revisión, corrección…). El test de arquitectura falla si una carpeta de contexto no aparece en ese documento.
@@ -116,7 +119,7 @@ Esta spec no añade funcionalidad. Cambia la estructura para que añadir un tipo
 
 ### D · Contrato y UI por contexto (M11d)
 - **R56.18** [M11d] `editor/src/api.ts` se reparte en `editor/src/api/` por contexto: `project`, `diagrams`, `runs`, `knowledge`, `settings` y `assistant`. `ProjectApi` es la unión (`&`) de esas interfaces. Un test compara la lista de métodos de `ProjectApi` con una instantánea: no se renombra ni se quita ninguno, así que el preload y los canales IPC no cambian. `ui/src/memoryApi.ts` y `apps/desktop/src/main/handlers.ts` se reparten igual.
-- **R56.19** [M11d] `ui/src` se organiza en carpetas por contexto: `shell` (navegación, rail, layout), `diagrams`, `runs`, `knowledge`, `settings` y `assistant`, con las mismas reglas de R56.9 (los componentes comunes en `ui/src/common/`). `App.tsx` solo compone la navegación, el layout y los proveedores. `AgentsScreen` y `RunsScreen` se parten en subcomponentes (lista, ficha, pestañas).
+- **R56.19** [M11d] `ui/src` se organiza en carpetas por contexto: `shell` (navegación, rail, layout), `diagrams`, `runs`, `knowledge`, `settings` y `assistant`, con las mismas reglas de R56.9 (los componentes comunes en `ui/src/common/`; la API en memoria de R56.18 se queda en `ui/src/memory/` con `ui/src/memoryApi.ts` como entrada). Quién puede importar de quién: `common` de nadie; `diagrams`, `knowledge` y `settings` de `common`; `runs` de `common` y `diagrams`; `assistant` de `common` y `runs`; `shell` de todos. `App.tsx` solo compone la navegación, el layout y los proveedores. `AgentsScreen` y `RunsScreen` se parten en subcomponentes (lista, ficha, pestañas).
 - **R56.20** [M11d] Presupuesto de tamaño en `ui` y `apps/desktop`: ningún archivo de `src` pasa de 600 líneas, con las excepciones en la lista del test.
 
 ## Escenarios

@@ -1,4 +1,4 @@
-import { CHANNELS, type AssistantEvent, type TerminalEvent, type InvokeMethod, type ProjectApi } from '@orquestador/editor';
+import { CHANNELS, type AssistantEvent, type OpenRunTarget, type TerminalEvent, type InvokeMethod, type ProjectApi } from '@orquestador/editor';
 import type { RunEvent } from '@orquestador/core';
 
 /**
@@ -10,6 +10,7 @@ export function buildApi(
   subscribe: (listener: (runId: string, events: RunEvent[]) => void) => () => void = () => () => {},
   subscribeAssistant: (listener: (turnId: string, event: AssistantEvent) => void) => () => void = () => () => {},
   subscribeTerminal: (listener: (id: string, event: TerminalEvent) => void) => () => void = () => () => {},
+  subscribeOpenRun: (listener: (target: OpenRunTarget) => void) => () => void = () => () => {},
 ): ProjectApi {
   const call =
     <K extends InvokeMethod>(method: K) =>
@@ -20,6 +21,7 @@ export function buildApi(
   api.onRunEvents = subscribe;
   api.onAssistantEvents = subscribeAssistant;
   api.onTerminalEvents = subscribeTerminal;
+  api.onOpenRun = subscribeOpenRun;
   return api as unknown as ProjectApi;
 }
 

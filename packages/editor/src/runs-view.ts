@@ -1,4 +1,5 @@
-import { pathKey, type Id, type RunEvent } from '@orquestador/core';
+import { t } from './i18n';
+import { describeSplitProblem, pathKey, type Id, type RunEvent } from '@orquestador/core';
 import type { RunSummary } from './api';
 import type { LiveNodeStatus } from './live';
 
@@ -254,6 +255,12 @@ export function runTimeline(events: readonly RunEvent[], now: number, opts: { se
         break;
       case 'node.retrying':
         mark(key, 'retry', e.ts, `Reintento ${e.attempt} de ${e.max}: ${e.message}`);
+        break;
+      case 'supervisor.alert':
+        mark(key, 'retry', e.ts, t('sup.mark', { detail: e.detail }));
+        break;
+      case 'split.rejected':
+        mark(key, 'retry', e.ts, t('split.rejected', { problems: e.problems.map(describeSplitProblem).join(' ') }));
         break;
       case 'error':
         mark(key, 'error', e.ts, e.message);

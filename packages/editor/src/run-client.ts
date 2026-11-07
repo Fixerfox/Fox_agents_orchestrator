@@ -1,5 +1,6 @@
 import type { RunEvent } from '@orquestador/core';
 import type { ProjectApi, RunAction, StartRunRequest } from './api';
+import { t } from './i18n';
 import { deriveLive, EMPTY_LIVE, type LiveView } from './live';
 
 export interface RunSnapshot {
@@ -62,7 +63,10 @@ export class RunClient {
     let added = false;
     for (const e of batch) {
       if (e.seq <= this.lastSeq) continue; // duplicado
-      if (e.seq !== this.lastSeq + 1) return false; // hueco: hay que resincronizar
+      if (e.seq !== this.lastSeq + 1) {
+        if (added) this.changed(); // lo leído hasta aquí se enseña igual [R2.11]
+        return false; // hueco: hay que resincronizar
+      }
       this.events = [...this.events, e];
       this.lastSeq = e.seq;
       added = true;
@@ -105,16 +109,18 @@ export class RunClient {
     this.buffer = [];
     this.attaching = true;
     this.changed();
+    let complete: boolean;
     try {
       const res = await this.api.subscribeRun({ runId, fromSeq: 1 });
       if (!res.ok) return this.fail(res.error.message);
-      this.ingest(res.value);
+      complete = this.ingest(res.value);
     } finally {
       this.attaching = false;
     }
     const pending = this.buffer.sort((a, b) => a.seq - b.seq);
     this.buffer = [];
     if (!this.ingest(pending)) await this.resync([]);
+    if (!complete) this.fail(t('runs.gap'));
   }
 
   async start(req: StartRunRequest): Promise<string | undefined> {

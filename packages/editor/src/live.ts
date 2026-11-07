@@ -1,5 +1,6 @@
+import { branchesOf, type RunBranches } from './branches';
 import type { KnowledgeState } from './knowledge';
-import { pathKey, type Id, type NodeStatus, type Payload, type ReviewQuestion, type RunEvent, type RunStatus } from '@orquestador/core';
+import { pathKey, type Id, type NodeStatus, type Payload, type ReviewQuestion, type RunEvent, type RunStatus, type QuestionKind } from '@orquestador/core';
 
 export interface PendingItem {
   questionId: string;
@@ -56,6 +57,14 @@ export interface LiveView {
   /** Texto de salida de la ejecución (nodo `output` raíz). */
   finalOutput?: string;
   produced: { nodeId: Id; path: string; nodePath: Id[] }[];
+  /** Ramas de git de cada paso, por orden de uso [R58.6]. */
+  branches: Record<string, string[]>;
+  /** Lo que hizo cada paso en las ramas: commit, push… [R58.12]. */
+  gitActions: RunBranches['actions'];
+  /** PR o merge request que creó cada paso [R58.15]. */
+  gitLinks: RunBranches['links'];
+  /** Avisos del Supervisor de cada paso [R60.9]. */
+  alerts: Record<string, string[]>;
   needsAttention: boolean;
 }
 
@@ -71,6 +80,10 @@ export const EMPTY_LIVE: LiveView = {
   usage: { inputTokens: 0, outputTokens: 0, costUsd: 0 },
   pending: [],
   produced: [],
+  branches: {},
+  gitActions: {},
+  gitLinks: {},
+  alerts: {},
   needsAttention: false,
 };
 
@@ -79,7 +92,7 @@ const textOf = (p: Payload | undefined): string | undefined => (p ? p.text : und
 /** Estado visible de una ejecución, reconstruido solo con sus eventos (vivo o replay). */
 export function deriveLive(events: readonly RunEvent[]): LiveView {
   if (events.length === 0) return EMPTY_LIVE;
-  const v: LiveView = { ...EMPTY_LIVE, knowledge: {}, status: 'running', nodeStatus: {}, edges: new Set(), loops: {}, reviews: {}, exhausted: [], usage: { inputTokens: 0, outputTokens: 0, costUsd: 0 }, pending: [], produced: [] };
+  const v: LiveView = { ...EMPTY_LIVE, knowledge: {}, status: 'running', nodeStatus: {}, edges: new Set(), loops: {}, reviews: {}, exhausted: [], usage: { inputTokens: 0, outputTokens: 0, costUsd: 0 }, pending: [], produced: [], alerts: {} };
   const open = new Map<string, PendingItem>();
   // Orden en que empezó cada paso y se recorrió cada conexión, para reiniciar la vuelta al volver atrás [R38.18].
   const startedAt = new Map<string, number>();
@@ -181,11 +194,21 @@ export function deriveLive(events: readonly RunEvent[]): LiveView {
       case 'workspace.conflict':
         v.needsAttention = true;
         break;
+      case 'supervisor.alert':
+        if (e.nodeId !== undefined) {
+          const key = pathKey(np, e.nodeId);
+          v.alerts[key] = [...(v.alerts[key] ?? []), e.detail];
+        }
+        break;
       default:
         break;
     }
   }
   v.pending = [...open.values()];
+  const git = branchesOf(events);
+  v.branches = git.byStep;
+  v.gitActions = git.actions;
+  v.gitLinks = git.links;
   return v;
 }
 
@@ -220,12 +243,12 @@ export function budgetRemaining(live: LiveView, limits: BudgetLimits): { tokens?
 
 export type TranscriptItem =
   /** `pass` solo aparece cuando el nodo se ejecutó más de una vez [R15.14]. */
-  | { kind: 'input'; attempt: number; pass?: number; agentId: Id; text: string; config?: unknown; model?: string }
+  | { kind: 'input'; attempt: number; pass?: number; agentId: Id; text: string; config?: unknown; model?: string; /** La memoria que recibió [R60.37]. */ memory?: string }
   /** Empieza la pasada `n` (≥ 2); `by` y `reason`, si la devolvió una revisión [R15.14]. */
   | { kind: 'pass'; n: number; by?: Id; reason?: string }
   | { kind: 'text'; text: string }
   | { kind: 'tool'; tool: string; input?: unknown; ok?: boolean; output?: string }
-  | { kind: 'question'; questionId: string; text: string; options?: string[]; answer?: string; /** Confirmación del paso [R43.9]. */ confirm?: { round: number }; /** Tipo de pregunta [R45.3]. */ ask?: 'question' | 'permission' | 'gate'; /** Revisión humana [R53.15]. */ review?: ReviewQuestion }
+  | { kind: 'question'; questionId: string; text: string; options?: string[]; answer?: string; /** Confirmación del paso [R43.9]. */ confirm?: { round: number }; /** Tipo de pregunta [R45.3]. */ ask?: QuestionKind; /** Revisión humana [R53.15]. */ review?: ReviewQuestion }
   | { kind: 'retry'; attempt: number; max: number; message: string }
   | { kind: 'error'; message: string }
   | { kind: 'usage'; inputTokens: number; outputTokens: number; costUsd: number }
@@ -262,7 +285,7 @@ export function transcriptItems(events: readonly RunEvent[], nodeId: Id, nodePat
         returned = undefined;
         break;
       case 'agent.request':
-        items.push({ kind: 'input', attempt: e.attempt, pass: Math.max(1, pass), agentId: e.agentId, text: e.input.text, ...(e.snapshot ? { config: e.snapshot } : {}), ...(e.model ? { model: e.model } : {}) });
+        items.push({ kind: 'input', attempt: e.attempt, pass: Math.max(1, pass), agentId: e.agentId, text: e.input.text, ...(e.snapshot ? { config: e.snapshot } : {}), ...(e.model ? { model: e.model } : {}), ...(e.memory ? { memory: e.memory } : {}) });
         break;
       case 'token.stream': {
         const last = items[items.length - 1];
@@ -296,6 +319,7 @@ export function transcriptItems(events: readonly RunEvent[], nodeId: Id, nodePat
         items.push({ kind: 'error', message: e.message });
         break;
       case 'agent.usage':
+        if (e.source) break;
         sawUsage = true;
         usage.inputTokens += e.inputTokens;
         usage.outputTokens += e.outputTokens;

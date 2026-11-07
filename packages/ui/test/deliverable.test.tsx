@@ -5,13 +5,13 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event';
 import type { DeliverableSpec, Diagram, RunEvent } from '@orquestador/core';
 import { EditorSession, summarizeRun } from '@orquestador/editor';
-import { buildFlowNodes } from '../src/Canvas';
-import { Inspector } from '../src/Inspector';
-import { RunDialog } from '../src/RunDialog';
-import { RunModal } from '../src/RunsScreen';
-import { deliverableFromArgs, runAssistantTool } from '../src/assistantTools';
+import { buildFlowNodes } from '../src/diagrams/Canvas';
+import { Inspector } from '../src/diagrams/Inspector';
+import { RunDialog } from '../src/runs/RunDialog';
+import { RunModal } from '../src/runs/RunModal';
+import { deliverableFromArgs, runAssistantTool } from '../src/assistant/assistantTools';
 import { createMemoryApi } from '../src/memoryApi';
-import { useSession } from '../src/useSession';
+import { useSession } from '../src/diagrams/useSession';
 
 const AGENTS = [{ id: 'qa', name: 'QA', description: 'Revisa', model: 'claude-sonnet-5-5' }];
 const SPEC: DeliverableSpec = { items: [{ kind: 'links' }, { kind: 'summary' }] };

@@ -1,0 +1,597 @@
+{
+  "name": "bucle-veces",
+  "order": "global",
+  "diagram": {
+    "id": "bucle-veces",
+    "name": "bucle-veces",
+    "schemaVersion": 1,
+    "nodes": [
+      {
+        "id": "entry",
+        "kind": "entry"
+      },
+      {
+        "id": "l",
+        "kind": "loop",
+        "label": "l",
+        "loop": {
+          "mode": "count",
+          "count": 3,
+          "maxIterations": 4,
+          "body": {
+            "id": "cuerpo",
+            "name": "cuerpo",
+            "schemaVersion": 1,
+            "nodes": [
+              {
+                "id": "entry",
+                "kind": "entry"
+              },
+              {
+                "id": "a",
+                "kind": "agent",
+                "agentId": "a",
+                "label": "a"
+              },
+              {
+                "id": "output",
+                "kind": "output"
+              }
+            ],
+            "edges": [
+              {
+                "id": "entry->a",
+                "from": "entry",
+                "to": "a"
+              },
+              {
+                "id": "a->output",
+                "from": "a",
+                "to": "output"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "output",
+        "kind": "output"
+      }
+    ],
+    "edges": [
+      {
+        "id": "entry->l",
+        "from": "entry",
+        "to": "l"
+      },
+      {
+        "id": "l->output",
+        "from": "l",
+        "to": "output"
+      }
+    ]
+  },
+  "runs": [
+    [
+      {
+        "type": "run.started",
+        "diagramId": "bucle-veces",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.queued",
+        "nodeId": "entry",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.started",
+        "nodeId": "entry",
+        "input": {
+          "text": "pedido inicial",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "node.finished",
+        "nodeId": "entry",
+        "status": "succeeded",
+        "output": {
+          "text": "pedido inicial",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "edge.traversed",
+        "edgeId": "entry->l",
+        "fromNodeId": "entry",
+        "toNodeId": "l",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.queued",
+        "nodeId": "l",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.started",
+        "nodeId": "l",
+        "input": {
+          "text": "pedido inicial",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "node.queued",
+        "nodeId": "entry",
+        "runId": "run-1",
+        "nodePath": [
+          "l"
+        ]
+      },
+      {
+        "type": "node.started",
+        "nodeId": "entry",
+        "input": {
+          "text": "pedido inicial",
+          "files": []
+        },
+        "runId": "run-1",
+        "nodePath": [
+          "l"
+        ]
+      },
+      {
+        "type": "node.finished",
+        "nodeId": "entry",
+        "status": "succeeded",
+        "output": {
+          "text": "pedido inicial",
+          "files": []
+        },
+        "runId": "run-1",
+        "nodePath": [
+          "l"
+        ]
+      },
+      {
+        "type": "edge.traversed",
+        "edgeId": "entry->a",
+        "fromNodeId": "entry",
+        "toNodeId": "a",
+        "runId": "run-1",
+        "nodePath": [
+          "l"
+        ]
+      },
+      {
+        "type": "node.queued",
+        "nodeId": "a",
+        "runId": "run-1",
+        "nodePath": [
+          "l"
+        ]
+      },
+      {
+        "type": "node.started",
+        "nodeId": "a",
+        "input": {
+          "text": "pedido inicial",
+          "files": []
+        },
+        "runId": "run-1",
+        "nodePath": [
+          "l"
+        ]
+      },
+      {
+        "type": "agent.request",
+        "nodeId": "a",
+        "agentId": "a",
+        "attempt": 1,
+        "input": {
+          "text": "pedido inicial",
+          "files": []
+        },
+        "runId": "run-1",
+        "nodePath": [
+          "l"
+        ]
+      },
+      {
+        "type": "node.finished",
+        "nodeId": "a",
+        "status": "succeeded",
+        "output": {
+          "text": "[a] pedido inicial",
+          "files": []
+        },
+        "runId": "run-1",
+        "nodePath": [
+          "l"
+        ]
+      },
+      {
+        "type": "edge.traversed",
+        "edgeId": "a->output",
+        "fromNodeId": "a",
+        "toNodeId": "output",
+        "runId": "run-1",
+        "nodePath": [
+          "l"
+        ]
+      },
+      {
+        "type": "node.queued",
+        "nodeId": "output",
+        "runId": "run-1",
+        "nodePath": [
+          "l"
+        ]
+      },
+      {
+        "type": "node.started",
+        "nodeId": "output",
+        "input": {
+          "text": "[a] pedido inicial",
+          "files": []
+        },
+        "runId": "run-1",
+        "nodePath": [
+          "l"
+        ]
+      },
+      {
+        "type": "node.finished",
+        "nodeId": "output",
+        "status": "succeeded",
+        "output": {
+          "text": "[a] pedido inicial",
+          "files": []
+        },
+        "runId": "run-1",
+        "nodePath": [
+          "l"
+        ]
+      },
+      {
+        "type": "loop.iteration",
+        "loopId": "l",
+        "n": 1,
+        "max": 3,
+        "verdict": "continue",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.queued",
+        "nodeId": "entry",
+        "runId": "run-1",
+        "nodePath": [
+          "l"
+        ]
+      },
+      {
+        "type": "node.started",
+        "nodeId": "entry",
+        "input": {
+          "text": "[a] pedido inicial",
+          "files": []
+        },
+        "runId": "run-1",
+        "nodePath": [
+          "l"
+        ]
+      },
+      {
+        "type": "node.finished",
+        "nodeId": "entry",
+        "status": "succeeded",
+        "output": {
+          "text": "[a] pedido inicial",
+          "files": []
+        },
+        "runId": "run-1",
+        "nodePath": [
+          "l"
+        ]
+      },
+      {
+        "type": "edge.traversed",
+        "edgeId": "entry->a",
+        "fromNodeId": "entry",
+        "toNodeId": "a",
+        "runId": "run-1",
+        "nodePath": [
+          "l"
+        ]
+      },
+      {
+        "type": "node.queued",
+        "nodeId": "a",
+        "runId": "run-1",
+        "nodePath": [
+          "l"
+        ]
+      },
+      {
+        "type": "node.started",
+        "nodeId": "a",
+        "input": {
+          "text": "[a] pedido inicial",
+          "files": []
+        },
+        "runId": "run-1",
+        "nodePath": [
+          "l"
+        ]
+      },
+      {
+        "type": "agent.request",
+        "nodeId": "a",
+        "agentId": "a",
+        "attempt": 1,
+        "input": {
+          "text": "[a] pedido inicial",
+          "files": []
+        },
+        "runId": "run-1",
+        "nodePath": [
+          "l"
+        ]
+      },
+      {
+        "type": "node.finished",
+        "nodeId": "a",
+        "status": "succeeded",
+        "output": {
+          "text": "[a] [a] pedido inicial",
+          "files": []
+        },
+        "runId": "run-1",
+        "nodePath": [
+          "l"
+        ]
+      },
+      {
+        "type": "edge.traversed",
+        "edgeId": "a->output",
+        "fromNodeId": "a",
+        "toNodeId": "output",
+        "runId": "run-1",
+        "nodePath": [
+          "l"
+        ]
+      },
+      {
+        "type": "node.queued",
+        "nodeId": "output",
+        "runId": "run-1",
+        "nodePath": [
+          "l"
+        ]
+      },
+      {
+        "type": "node.started",
+        "nodeId": "output",
+        "input": {
+          "text": "[a] [a] pedido inicial",
+          "files": []
+        },
+        "runId": "run-1",
+        "nodePath": [
+          "l"
+        ]
+      },
+      {
+        "type": "node.finished",
+        "nodeId": "output",
+        "status": "succeeded",
+        "output": {
+          "text": "[a] [a] pedido inicial",
+          "files": []
+        },
+        "runId": "run-1",
+        "nodePath": [
+          "l"
+        ]
+      },
+      {
+        "type": "loop.iteration",
+        "loopId": "l",
+        "n": 2,
+        "max": 3,
+        "verdict": "continue",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.queued",
+        "nodeId": "entry",
+        "runId": "run-1",
+        "nodePath": [
+          "l"
+        ]
+      },
+      {
+        "type": "node.started",
+        "nodeId": "entry",
+        "input": {
+          "text": "[a] [a] pedido inicial",
+          "files": []
+        },
+        "runId": "run-1",
+        "nodePath": [
+          "l"
+        ]
+      },
+      {
+        "type": "node.finished",
+        "nodeId": "entry",
+        "status": "succeeded",
+        "output": {
+          "text": "[a] [a] pedido inicial",
+          "files": []
+        },
+        "runId": "run-1",
+        "nodePath": [
+          "l"
+        ]
+      },
+      {
+        "type": "edge.traversed",
+        "edgeId": "entry->a",
+        "fromNodeId": "entry",
+        "toNodeId": "a",
+        "runId": "run-1",
+        "nodePath": [
+          "l"
+        ]
+      },
+      {
+        "type": "node.queued",
+        "nodeId": "a",
+        "runId": "run-1",
+        "nodePath": [
+          "l"
+        ]
+      },
+      {
+        "type": "node.started",
+        "nodeId": "a",
+        "input": {
+          "text": "[a] [a] pedido inicial",
+          "files": []
+        },
+        "runId": "run-1",
+        "nodePath": [
+          "l"
+        ]
+      },
+      {
+        "type": "agent.request",
+        "nodeId": "a",
+        "agentId": "a",
+        "attempt": 1,
+        "input": {
+          "text": "[a] [a] pedido inicial",
+          "files": []
+        },
+        "runId": "run-1",
+        "nodePath": [
+          "l"
+        ]
+      },
+      {
+        "type": "node.finished",
+        "nodeId": "a",
+        "status": "succeeded",
+        "output": {
+          "text": "[a] [a] [a] pedido inicial",
+          "files": []
+        },
+        "runId": "run-1",
+        "nodePath": [
+          "l"
+        ]
+      },
+      {
+        "type": "edge.traversed",
+        "edgeId": "a->output",
+        "fromNodeId": "a",
+        "toNodeId": "output",
+        "runId": "run-1",
+        "nodePath": [
+          "l"
+        ]
+      },
+      {
+        "type": "node.queued",
+        "nodeId": "output",
+        "runId": "run-1",
+        "nodePath": [
+          "l"
+        ]
+      },
+      {
+        "type": "node.started",
+        "nodeId": "output",
+        "input": {
+          "text": "[a] [a] [a] pedido inicial",
+          "files": []
+        },
+        "runId": "run-1",
+        "nodePath": [
+          "l"
+        ]
+      },
+      {
+        "type": "node.finished",
+        "nodeId": "output",
+        "status": "succeeded",
+        "output": {
+          "text": "[a] [a] [a] pedido inicial",
+          "files": []
+        },
+        "runId": "run-1",
+        "nodePath": [
+          "l"
+        ]
+      },
+      {
+        "type": "loop.iteration",
+        "loopId": "l",
+        "n": 3,
+        "max": 3,
+        "verdict": "done",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.finished",
+        "nodeId": "l",
+        "status": "succeeded",
+        "output": {
+          "text": "[a] [a] [a] pedido inicial",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "edge.traversed",
+        "edgeId": "l->output",
+        "fromNodeId": "l",
+        "toNodeId": "output",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.queued",
+        "nodeId": "output",
+        "runId": "run-1"
+      },
+      {
+        "type": "node.started",
+        "nodeId": "output",
+        "input": {
+          "text": "[a] [a] [a] pedido inicial",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "node.finished",
+        "nodeId": "output",
+        "status": "succeeded",
+        "output": {
+          "text": "[a] [a] [a] pedido inicial",
+          "files": []
+        },
+        "runId": "run-1"
+      },
+      {
+        "type": "run.finished",
+        "status": "succeeded",
+        "runId": "run-1"
+      }
+    ]
+  ]
+}

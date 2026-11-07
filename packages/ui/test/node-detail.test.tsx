@@ -5,9 +5,9 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { RunEvent } from '@orquestador/core';
 import { deriveLive } from '@orquestador/editor';
-import { NodeDialog } from '../src/NodeDialog';
-import { NodePanel } from '../src/NodePanel';
-import { ResizeHandle } from '../src/ResizeHandle';
+import { NodeDialog } from '../src/runs/NodeDialog';
+import { NodePanel } from '../src/runs/NodePanel';
+import { ResizeHandle } from '../src/common/ResizeHandle';
 
 const ev = (seq: number, body: object): RunEvent => ({ runId: 'r', seq, ts: 't', ...body }) as RunEvent;
 const LONG = Array.from({ length: 40 }, (_, i) => `línea ${i + 1}`).join('\n');
@@ -150,6 +150,21 @@ describe('SPEC-015 · pasadas en la ventana grande [R15.14]', () => {
     expect(sep.textContent).toContain('Pasada 2 · devuelto por Revisión');
     expect(sep.textContent).toContain('Motivo: No hay nada construido');
     expect(d.getByText('Correcciones de la revisión')).toBeTruthy();
+  });
+
+  it('[R15.17] «Recibió» se pliega y despliega, y sigue plegada aunque lleguen más eventos', async () => {
+    const panel = (events: typeof twice) => <NodePanel events={events} live={deriveLive(events)} nodeId="a" nodePath={[]} label="Diseñador" onAnswer={vi.fn()} />;
+    const { rerender } = render(panel(twice.slice(0, 2)));
+    const title = screen.getByText(/^Recibió/);
+    const fold = title.closest('details')!;
+    expect(fold.open).toBe(true);
+    await userEvent.click(title);
+    expect(fold.open).toBe(false);
+    rerender(panel(twice));
+    expect(screen.getAllByText(/^Recibió/)[0]!.closest('details')).toBe(fold);
+    expect(fold.open).toBe(false);
+    await userEvent.click(title);
+    expect(fold.open).toBe(true);
   });
 
   it('[R15.14] el panel lateral rotula cada entrada con su pasada', () => {

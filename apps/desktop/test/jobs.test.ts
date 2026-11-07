@@ -6,7 +6,8 @@ import type { QueryFn, SdkMessage } from '@orquestador/claude';
 import { promptText } from '@orquestador/claude';
 import { defaultSettings, newAgent, type Diagram } from '@orquestador/core';
 import { CHANNELS, parseRequest, type JobInfo, type QueuedRunView, type RunSummary } from '@orquestador/editor';
-import { createDemoOrchestrator, createEngineOrchestrator } from '@orquestador/runtime';
+import { createDemoOrchestrator } from '@orquestador/runtime';
+import { composeOrchestrator } from '../src/main/composition';
 import { SettingsStore } from '@orquestador/store';
 import { DesktopHandlers } from '../src/main/handlers';
 
@@ -71,14 +72,14 @@ describe('SPEC-052 · copia de lo que usa cada ejecución', () => {
       if (systems.length === 1) await gate;
       yield result('hecho');
     };
-    h = new DesktopHandlers({ pickFolder: async () => join(dir, 'p'), createOrchestrator: (ctx) => createEngineOrchestrator(ctx, query), claudeQuery: query, settings: new SettingsStore(join(dir, 'config')) });
+    h = new DesktopHandlers({ pickFolder: async () => join(dir, 'p'), createOrchestrator: (ctx) => composeOrchestrator(ctx, query), claudeQuery: query, settings: new SettingsStore(join(dir, 'config')) });
     void gate;
     gate = gate.then(() => undefined);
   });
 
   it('[R52.1] editar agentes y subdiagramas a mitad de una ejecución no la cambia; la siguiente usa lo nuevo', async () => {
     val(await h.invoke(CHANNELS.createProject, undefined));
-    val(await h.invoke(CHANNELS.saveSettings, { ...defaultSettings(), engine: 'claude' }));
+    val(await h.invoke(CHANNELS.saveSettings, { ...defaultSettings(), supervisorReview: false, engine: 'claude' }));
     val(await h.invoke(CHANNELS.saveAgent, { ...newAgent('pintor', 'Pintor'), instructions: 'Pinta' }));
     val(await h.invoke(CHANNELS.saveAgent, { ...newAgent('revisor', 'Revisor'), instructions: 'REVISA-VIEJO' }));
     val(await h.invoke(CHANNELS.saveAgent, { ...newAgent('otro', 'Otro'), instructions: 'OTRO-AGENTE' }));

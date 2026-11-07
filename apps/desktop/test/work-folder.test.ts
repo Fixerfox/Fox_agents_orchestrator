@@ -6,7 +6,7 @@ import type { QueryFn, SdkMessage } from '@orquestador/claude';
 import { promptText } from '@orquestador/claude';
 import { defaultSettings, newAgent, type AppSettings, type Diagram, type RunEvent } from '@orquestador/core';
 import { CHANNELS } from '@orquestador/editor';
-import { createEngineOrchestrator } from '@orquestador/runtime';
+import { composeOrchestrator } from '../src/main/composition';
 import { ApiKeyVault, SettingsStore } from '@orquestador/store';
 import { DesktopHandlers } from '../src/main/handlers';
 
@@ -52,7 +52,7 @@ beforeEach(async () => {
   script = async () => 'Hecho';
   h = new DesktopHandlers({
     pickFolder: async (purpose) => (purpose === 'work' ? workPick : join(dir, 'proyecto')),
-    createOrchestrator: (ctx) => createEngineOrchestrator(ctx, query),
+    createOrchestrator: (ctx) => composeOrchestrator(ctx, query),
     claudeQuery: query,
     settings: new SettingsStore(join(dir, 'config')),
     vault: new ApiKeyVault(join(dir, 'config'), cipher),
@@ -74,7 +74,7 @@ async function open(settings: Partial<AppSettings> = {}) {
   val(await h.invoke(CHANNELS.createProject, undefined));
   val(await h.invoke(CHANNELS.saveAgent, { ...newAgent('dev', 'Dev'), instructions: 'Programa el juego' }));
   val(await h.invoke(CHANNELS.saveDiagram, flow));
-  val(await h.invoke(CHANNELS.saveSettings, { ...defaultSettings(), engine: 'claude', permissions: 'ask', ...settings }));
+  val(await h.invoke(CHANNELS.saveSettings, { ...defaultSettings(), supervisorReview: false, engine: 'claude', permissions: 'ask', ...settings }));
 }
 const startRun = async () => {
   const { runId } = val<{ runId: string }>(await h.invoke(CHANNELS.startRun, { diagramId: 'flujo', order: 'Añade una nave' }));

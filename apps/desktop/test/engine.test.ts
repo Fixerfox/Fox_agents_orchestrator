@@ -6,7 +6,7 @@ import type { AppToolDef, ClaudeQueryOptions, CreateAppServer, QueryFn, SdkMessa
 import { promptText } from '@orquestador/claude';
 import { defaultSettings, newAgent, newContext, newMcpServer, type AppSettings, type Diagram, type RunEvent } from '@orquestador/core';
 import { CHANNELS, type AssistantEvent } from '@orquestador/editor';
-import { createEngineOrchestrator } from '@orquestador/runtime';
+import { composeOrchestrator } from '../src/main/composition';
 import { ApiKeyVault, McpSecretVault, SettingsStore } from '@orquestador/store';
 import { DesktopHandlers } from '../src/main/handlers';
 import type { TerminalService } from '../src/main/terminal';
@@ -47,7 +47,7 @@ beforeEach(async () => {
   reply = [result('Héroe dibujado')];
   h = new DesktopHandlers({
     pickFolder: async () => join(dir, 'p'),
-    createOrchestrator: (ctx) => createEngineOrchestrator(ctx, query),
+    createOrchestrator: (ctx) => composeOrchestrator(ctx, query),
     claudeQuery: query,
     settings: new SettingsStore(join(dir, 'config')),
     vault: new ApiKeyVault(join(dir, 'config'), cipher),
@@ -65,7 +65,7 @@ const val = <T,>(r: unknown) => {
   if (!x.ok) throw new Error(JSON.stringify(x.error));
   return x.value as T;
 };
-const setEngine = async (engine: AppSettings['engine'], extra: Partial<AppSettings> = {}) => val(await h.invoke(CHANNELS.saveSettings, { ...defaultSettings(), engine, ...extra }));
+const setEngine = async (engine: AppSettings['engine'], extra: Partial<AppSettings> = {}) => val(await h.invoke(CHANNELS.saveSettings, { ...defaultSettings(), supervisorReview: false, engine, ...extra }));
 
 async function openProject() {
   val(await h.invoke(CHANNELS.createProject, undefined));
@@ -155,7 +155,7 @@ describe('SPEC-027 · probar conexión por IPC', () => {
     reply = [];
     const failing = new DesktopHandlers({
       pickFolder: async () => join(dir, 'q'),
-      createOrchestrator: (ctx) => createEngineOrchestrator(ctx, query),
+      createOrchestrator: (ctx) => composeOrchestrator(ctx, query),
       claudeQuery: throwing(`401 invalid x-api-key sk-ant-api03-SECRETSECRETSECRET en ${dir}`),
       settings: new SettingsStore(join(dir, 'config')),
       vault: new ApiKeyVault(join(dir, 'config'), cipher),
@@ -169,7 +169,7 @@ describe('SPEC-027 · probar conexión por IPC', () => {
 
   it('[R27.12] sin proyecto abierto o sin motor disponible falla con claridad', async () => {
     expect(await h.invoke(CHANNELS.testConnection, undefined)).toMatchObject({ ok: false, error: { code: 'not-found' } });
-    const bare = new DesktopHandlers({ pickFolder: async () => join(dir, 'z'), createOrchestrator: (ctx) => createEngineOrchestrator(ctx, query) });
+    const bare = new DesktopHandlers({ pickFolder: async () => join(dir, 'z'), createOrchestrator: (ctx) => composeOrchestrator(ctx, query) });
     val(await bare.invoke(CHANNELS.createProject, undefined));
     expect(await bare.invoke(CHANNELS.testConnection, undefined)).toMatchObject({ ok: false, error: { code: 'unavailable' } });
     bare.dispose();
@@ -194,7 +194,7 @@ describe('SPEC-026 · redactar con Claude por IPC', () => {
     val(await h.invoke(CHANNELS.createProject, undefined));
     const failing = new DesktopHandlers({
       pickFolder: async () => join(dir, 'q'),
-      createOrchestrator: (ctx) => createEngineOrchestrator(ctx, query),
+      createOrchestrator: (ctx) => composeOrchestrator(ctx, query),
       claudeQuery: throwing(`401 invalid x-api-key sk-ant-api03-SECRETSECRETSECRET en ${dir}`),
     });
     val(await failing.invoke(CHANNELS.createProject, undefined));
@@ -253,7 +253,7 @@ describe('SPEC-026 · redactar con Claude por IPC', () => {
 
   it('[R26.5] sin proyecto abierto o sin motor disponible falla con claridad', async () => {
     expect(await h.invoke(CHANNELS.draftWithClaude, { kind: 'agent', instruction: 'x' })).toMatchObject({ ok: false });
-    const bare = new DesktopHandlers({ pickFolder: async () => join(dir, 'z'), createOrchestrator: (ctx) => createEngineOrchestrator(ctx, query) });
+    const bare = new DesktopHandlers({ pickFolder: async () => join(dir, 'z'), createOrchestrator: (ctx) => composeOrchestrator(ctx, query) });
     val(await bare.invoke(CHANNELS.createProject, undefined));
     expect(await bare.invoke(CHANNELS.draftWithClaude, { kind: 'agent', instruction: 'x' })).toMatchObject({ ok: false, error: { code: 'unavailable' } });
     bare.dispose();
@@ -311,7 +311,7 @@ describe('SPEC-030 · MCP por IPC', () => {
       appMcpDir: join(dir, 'config', 'mcp'),
       ...extra,
       pickFolder: async () => join(dir, 'p'),
-      createOrchestrator: (ctx) => createEngineOrchestrator(ctx, q),
+      createOrchestrator: (ctx) => composeOrchestrator(ctx, q),
       claudeQuery: q,
       settings: new SettingsStore(join(dir, 'config')),
       vault: new ApiKeyVault(join(dir, 'config'), cipher),
@@ -412,7 +412,7 @@ describe('SPEC-029 · asistente por IPC', () => {
     assistantEvents.length = 0;
     h = new DesktopHandlers({
       pickFolder: async () => join(dir, 'p'),
-      createOrchestrator: (ctx) => createEngineOrchestrator(ctx, q),
+      createOrchestrator: (ctx) => composeOrchestrator(ctx, q),
       claudeQuery: q,
       createAppServer: server,
       pushAssistant: (turnId, event) => assistantEvents.push({ turnId, event }),

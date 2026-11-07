@@ -1,3 +1,4 @@
+import { withinDeclared } from '@orquestador/core';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import type { AgentQuestion } from '@orquestador/core';
@@ -170,6 +171,23 @@ async function exists(abs: string): Promise<boolean> {
 function pathOf(input: Record<string, unknown>): string | undefined {
   for (const key of ['file_path', 'notebook_path', 'path']) if (typeof input[key] === 'string') return input[key] as string;
   return undefined;
+}
+
+/** Límites del paso: no escribe fuera de lo que declaró el Coordinador, y se le dice por qué [R60.16]. */
+export function withScope(scope: readonly string[] | undefined, root: string, note: WritePolicyDeps['note'], inner: (tool: string, input: Record<string, unknown>) => Promise<PermissionResult>): (tool: string, input: Record<string, unknown>) => Promise<PermissionResult> {
+  if (!scope) return inner;
+  return async (tool, input) => {
+    const target = (WRITE_TOOLS as readonly string[]).includes(tool) ? pathOf(input) : undefined;
+    if (target !== undefined) {
+      const rel = path.relative(root, path.resolve(root, target)).split(path.sep).join('/');
+      if (!withinDeclared(rel, scope)) {
+        const reason = `fuera de los archivos de este paso (${scope.join(', ')})`;
+        note?.({ kind: 'denied', path: rel, reason });
+        return deny(`El Supervisor ha bloqueado esta escritura: ${rel} está ${reason}. Sigue con lo tuyo, y si de verdad hace falta, dilo en tu respuesta.`);
+      }
+    }
+    return inner(tool, input);
+  };
 }
 
 /**

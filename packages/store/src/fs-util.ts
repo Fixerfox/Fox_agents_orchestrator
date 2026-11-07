@@ -7,6 +7,12 @@ export interface FsOps {
   rm(path: string): Promise<void>;
 }
 
+/** Códigos con los que Windows rechaza sustituir un archivo que alguien tiene abierto [R56.21]. */
+const BUSY_CODES = new Set(['EPERM', 'EACCES', 'EBUSY']);
+const isBusy = (err: unknown): boolean => BUSY_CODES.has((err as NodeJS.ErrnoException).code ?? '');
+const RENAME_TRIES = 5;
+const RENAME_WAIT_MS = 2;
+
 const tmpName = (file: string) => `${file}.tmp-${process.pid}-${Math.random().toString(36).slice(2)}`;
 
 const defaultOps: FsOps = {
@@ -30,7 +36,19 @@ export async function atomicWrite(file: string, data: string, ops: Partial<FsOps
   const tmp = tmpName(file);
   try {
     await o.writeFile(tmp, data);
-    await o.rename(tmp, file);
+    for (let attempt = 1; ; attempt++) {
+      try {
+        await o.rename(tmp, file);
+        return;
+      } catch (err) {
+        if (!isBusy(err)) throw err;
+        if (attempt >= RENAME_TRIES) break;
+        await new Promise((r) => setTimeout(r, RENAME_WAIT_MS));
+      }
+    }
+    // Sigue ocupado: se escribe encima, porque perder el dato es peor que perder la atomicidad [R56.21].
+    await o.writeFile(file, data);
+    await o.rm(tmp);
   } catch (err) {
     await o.rm(tmp).catch(() => undefined);
     throw err;
@@ -42,7 +60,19 @@ export function atomicWriteSync(file: string, data: string): void {
   const tmp = tmpName(file);
   try {
     writeFileSync(tmp, data, 'utf8');
-    renameSync(tmp, file);
+    for (let attempt = 1; ; attempt++) {
+      try {
+        renameSync(tmp, file);
+        return;
+      } catch (err) {
+        if (!isBusy(err)) throw err;
+        if (attempt >= RENAME_TRIES) break;
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, RENAME_WAIT_MS);
+      }
+    }
+    // Sigue ocupado: se escribe encima, porque perder el dato es peor que perder la atomicidad [R56.21].
+    writeFileSync(file, data, 'utf8');
+    rmSync(tmp, { force: true });
   } catch (err) {
     rmSync(tmp, { force: true });
     throw err;

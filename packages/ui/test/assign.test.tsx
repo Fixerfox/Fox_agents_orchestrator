@@ -22,6 +22,8 @@ const openAgent = async (name: string) => {
   await userEvent.click(screen.getByRole('button', { name: 'Agentes' }));
   const s = within(await screen.findByTestId('content'));
   await userEvent.click(await s.findByRole('button', { name }));
+  // la ficha enseña una sección cada vez; lo asignado está en «Qué sabe» [R57.5]
+  await userEvent.click(s.getByRole('button', { name: /^Qué sabe/ }));
   return s;
 };
 const SKILLS = [skill('pixel', 'Pixel art', 'Dibuja sprites con paleta limitada'), skill('rev', 'Revisión', 'Revisa textos largos')];
@@ -95,7 +97,9 @@ describe('SPEC-022 · asignar skills y contextos desde una pantalla aparte', () 
   it('[R22.16] «Crear una skill nueva» abre la pestaña Skills sin perder el borrador del agente', async () => {
     await mount({ agents: [agent('a', 'A')] });
     const s = await openAgent('A');
+    await userEvent.click(s.getByRole('button', { name: /^Qué hace/ }));
     await userEvent.type(s.getByLabelText('Para qué sirve'), 'pendiente');
+    await userEvent.click(s.getByRole('button', { name: /^Qué sabe/ }));
     await userEvent.click(s.getByRole('button', { name: 'Añadir skills…' }));
     await userEvent.click(s.getByRole('button', { name: 'Crear una skill nueva' }));
     expect(s.getByRole('tab', { name: /Skills/ }).getAttribute('aria-selected')).toBe('true');

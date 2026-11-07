@@ -24,10 +24,14 @@ describe('SPEC-047 · permisos en la ficha del agente', () => {
     const api = await mount({}, 'ask');
     const s = await goLib('agents');
     await userEvent.click(s.getByRole('button', { name: 'Revisor' }));
+    await userEvent.click(s.getByRole('button', { name: /^Qué puede hacer/ }));
     const perms = within(s.getByRole('group', { name: 'Qué puede hacer sin preguntarte' }));
     expect(perms.getAllByRole('radio')).toHaveLength(5);
     await waitFor(() => expect((perms.getByRole('radio', { name: /^El del proyecto \(Preguntar\)/ }) as HTMLInputElement).checked).toBe(true));
     await userEvent.click(perms.getByRole('radio', { name: /^Solo lectura/ }));
+    // el resumen de la sección y la tarjeta (en «Modelo y aspecto») lo dicen [R57.5]
+    expect(s.getByRole('button', { name: /^Qué puede hacer/ }).textContent).toContain('Solo lectura');
+    await userEvent.click(s.getByRole('button', { name: /^Modelo y aspecto/ }));
     expect(s.getByText('Permisos: Solo lectura')).toBeTruthy();
     await userEvent.click(s.getAllByRole('button', { name: 'Guardar' }).find((b) => b.getAttribute('type') === 'submit')!);
     await waitFor(() => expect(api.agents.get('rev')).toMatchObject({ permissions: 'readonly' }));
@@ -37,6 +41,7 @@ describe('SPEC-047 · permisos en la ficha del agente', () => {
     const api = await mount({ agents: [{ ...newAgent('rev', 'Revisor'), description: 'Revisa', permissions: 'full' }] });
     const s = await goLib('agents');
     await userEvent.click(s.getByRole('button', { name: 'Revisor' }));
+    await userEvent.click(s.getByRole('button', { name: /^Qué puede hacer/ }));
     const perms = within(s.getByRole('group', { name: 'Qué puede hacer sin preguntarte' }));
     expect((perms.getByRole('radio', { name: /^Sin preguntar nunca/ }) as HTMLInputElement).checked).toBe(true);
     expect(perms.getByText(/podrán borrar archivos/)).toBeTruthy();

@@ -5,11 +5,11 @@ import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { QuestionCard } from '../src/RunsScreen';
+import { QuestionCard } from '../src/runs/QuestionCard';
 
 const css = readFileSync(join(__dirname, '..', 'src', 'styles.css'), 'utf8');
 const rule = (sel: string) => css.split('\n').find((l) => l.startsWith(`${sel} {`)) ?? '';
-const src = readFileSync(join(__dirname, '..', 'src', 'RunsScreen.tsx'), 'utf8');
+const src = readFileSync(join(__dirname, '..', 'src', 'runs', 'RunDetail.tsx'), 'utf8');
 
 /** Un permiso con un comando enorme, como el heredoc de gen.py que dejaba los botones fuera de la pantalla. */
 const LONG = '¿Puedo ejecutar este comando?\n\n' + Array.from({ length: 200 }, (_, i) => `linea_${i} = 'texto muy largo de un comando'`).join('\n');

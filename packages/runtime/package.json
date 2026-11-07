@@ -7,8 +7,10 @@
   "types": "src/index.ts",
   "sideEffects": false,
   "dependencies": {
+    "@orquestador/core": "*"
+  },
+  "devDependencies": {
     "@orquestador/claude": "*",
-    "@orquestador/core": "*",
     "@orquestador/store": "*",
     "@orquestador/workspace": "*"
   }

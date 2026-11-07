@@ -34,7 +34,7 @@ describe('ventana segura [R19.1]', () => {
   });
 
   it('[R19.1] deniega ventanas nuevas, bloquea navegación externa e inyecta la CSP', () => {
-    let open: (() => { action: 'deny' }) | undefined;
+    let open: Parameters<WebContentsLike['setWindowOpenHandler']>[0] | undefined;
     const listeners: Record<string, unknown> = {};
     let headers: Parameters<SessionLike['webRequest']['onHeadersReceived']>[0] | undefined;
     const wc: WebContentsLike = {
@@ -45,7 +45,7 @@ describe('ventana segura [R19.1]', () => {
     const session: SessionLike = { webRequest: { onHeadersReceived: (l) => void (headers = l) } };
     secureWebContents(wc, session, APP);
 
-    expect(open!()).toEqual({ action: 'deny' });
+    expect(open!({ url: 'https://evil.example/' })).toEqual({ action: 'deny' });
 
     const blocked = { preventDefault: vi.fn() };
     nav(blocked, 'https://evil.example/');
@@ -57,6 +57,17 @@ describe('ventana segura [R19.1]', () => {
     const cb = vi.fn();
     headers!({ responseHeaders: { 'X-Test': ['1'] } }, cb);
     expect(cb).toHaveBeenCalledWith({ responseHeaders: { 'X-Test': ['1'], 'Content-Security-Policy': [CSP] } });
+  });
+
+  it('[R58.15] solo salen al navegador las direcciones de una PR o merge request', () => {
+    let open: Parameters<WebContentsLike['setWindowOpenHandler']>[0] | undefined;
+    const wc: WebContentsLike = { setWindowOpenHandler: (h) => void (open = h), on: (() => {}) as WebContentsLike['on'] };
+    const opened: string[] = [];
+    secureWebContents(wc, { webRequest: { onHeadersReceived: () => {} } }, APP, (url) => opened.push(url));
+    const good = ['https://github.com/o/r/pull/2', 'https://gitlab.com/g/p/-/merge_requests/7', 'https://bitbucket.org/o/r/pull-requests/3'];
+    const bad = ['https://evil.example/', 'http://github.com/o/r/pull/2', 'https://github.com/o/r/pull/2?x=1', 'file:///c/pull/2', 'javascript:alert(1)//pull/2'];
+    for (const url of [...good, ...bad]) expect(open!({ url })).toEqual({ action: 'deny' });
+    expect(opened).toEqual(good);
   });
 
   it('[R54.4] las vistas previas van en un marco del protocolo propio, con su política y sin salir de su copia', () => {

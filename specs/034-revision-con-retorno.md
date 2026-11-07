@@ -25,7 +25,10 @@ Ejemplo: Entrada → diseñador → qa-diseñador → **Revisión** —✓ Aprob
 - **R34.5** [M8b] Una revisión con retorno necesita ⏱ Agotado conectado → si no, `review-no-exhausted`. Dos tramos que se solapan sin que uno contenga al otro → `review-return-crossed`.
 
 ### Ejecución (`core`)
-- **R34.6** [M8b] Modo `verdict`: se usa el **último** `VEREDICTO: APROBADO|RECHAZADO` (también `VERDICT: APPROVED|REJECTED`, sin distinguir mayúsculas) de la entrada. Si no aparece, y siempre en modo `ai`, se llama a `decider.judge({ prompt: criteria o el criterio por defecto, output: entrada, iteration: vuelta })` y se emite `decision` (`kind: 'judge'`); `done` = aprobado.
+- **R34.6** [M8b] Modo `verdict`: se usa el **último** `VEREDICTO: APROBADO|RECHAZADO` (también `VERDICT: APPROVED|REJECTED`, sin distinguir mayúsculas) de la entrada. Si no aparece, y siempre en modo `ai`, decide el Juez (R34.26) y se emite `decision` (`kind: 'judge'`); `done` = aprobado.
+- **R34.26** [M12] El Juez es una pieza interna, fija y no editable: no es un nodo ni aparece en Agentes, y su prompt solo cambia con esta spec. Es una consulta de un solo turno, sin herramientas, siempre con Haiku 5.5 (`Decider.judgeReview`). Lo que juzga va como datos, no como instrucciones. Con un motor que no lo tenga, se usa `decider.judge` con el criterio por defecto.
+- **R34.27** [M12] El Juez es práctico: rechaza solo por fallos importantes que se pueden corregir en esta vuelta o por algo pedido que no se hizo. No rechaza por mejoras menores, por lo que el revisor no pudo comprobar, por lo que depende de una decisión del usuario ni por preguntas finales. Si aprueba con algo pendiente, lo dice en su motivo. El `criteria` del nodo se le añade como criterio del diagrama.
+- **R34.28** [M12] Lo que gasta el Juez sale como `agent.usage` con `source: 'judge'`: cuenta en el total de la ejecución sin disparar su límite.
 - **R34.7** [M8b] Aprobado: el flujo sigue solo por ✓; la salida de la revisión es su entrada (como el router).
 - **R34.8** [M8b] Rechazado con retorno y vuelta < `maxRounds`: se recorre el retorno, todo el tramo vuelve a estar pendiente y el destino se ejecuta otra vez; ✓ y ⏱ no se resuelven todavía.
 - **R34.9** [M8b] Rechazado en la vuelta `maxRounds`: el flujo sale por ⏱ Agotado con la última entrega.

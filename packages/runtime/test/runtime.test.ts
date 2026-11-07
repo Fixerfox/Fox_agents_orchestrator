@@ -2,6 +2,7 @@ import { promises as fs } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { portsOf } from './ports';
 import {
   MockAgent,
   MockDecider,
@@ -35,9 +36,87 @@ afterEach(() => fs.rm(dir, { recursive: true, force: true }));
 function service(scripts: ConstructorParameters<typeof MockAgent>[0] = { a: { output: 'hecho', tokens: ['he', 'cho'] } }) {
   const agent = new MockAgent(scripts);
   const orch = new Orchestrator({ getAdapter: () => agent, decider: new MockDecider() });
-  return { svc: new RunService(store, orch), agent };
+  return { svc: new RunService(portsOf(store), orch), agent };
 }
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+describe('reanudar y corregir traen el rastro [R41.7]', () => {
+  const two = () => D([ENTRY, A, { id: 'b', kind: 'agent', agentId: 'b' }, OUT], [
+    { id: 'e1', from: 'entry', to: 'a' },
+    { id: 'e2', from: 'a', to: 'b' },
+    { id: 'e3', from: 'b', to: 'output' },
+  ]);
+  const scripts = { a: { output: 'uno', files: ['a.md'], branches: [{ branch: 'feature/x', via: 'command' as const, created: true }] }, b: { output: 'dos', failTimes: 1, failRetriable: false } };
+  const eventsOf = async (svc: RunService, runId: string) => (await svc.subscribe(runId, 1, () => {})).backlog;
+
+  it('[R41.7] al reanudar, la nueva ejecución tiene la rama y los archivos del paso reutilizado', async () => {
+    const { svc } = service(scripts);
+    await store.diagrams.save(two());
+    const first = await svc.start({ diagramId: 'd', order: 'hola' });
+    await svc.settled(first.runId);
+    const next = await svc.resumeRun(first.runId);
+    await svc.settled(next.runId);
+    const events = await eventsOf(svc, next.runId);
+    expect(reduceRunState(events).status).toBe('succeeded');
+    expect(events.filter((e) => e.type === 'git.branch')).toMatchObject([{ nodeId: 'a', branch: 'feature/x', created: true }]);
+    expect(events.filter((e) => e.type === 'file.produced')).toMatchObject([{ nodeId: 'a', path: 'a.md', reused: true }]);
+  });
+
+  it('[R62.16] corregir guarda lo que entregaron los pasos que se repiten', async () => {
+    const seen: { before?: { text: string }[] }[] = [];
+    const agent = new MockAgent({ ...scripts, b: { output: 'dos' } });
+    const orch = new Orchestrator({ getAdapter: () => agent, decider: new MockDecider({ supervise: () => Promise.resolve({ ok: true, reason: '', summary: 'ok' }), verifyRun: (r) => (seen.push(r), Promise.resolve({ met: true, missing: '' })) }), supervisor: { review: () => true } });
+    const svc = new RunService(portsOf(store), orch);
+    await store.diagrams.save(two());
+    const first = await svc.start({ diagramId: 'd', order: 'hola' });
+    await svc.settled(first.runId);
+    const next = await svc.correctRun(first.runId, { text: 'Cambia esto', nodeId: 'b' });
+    await svc.settled(next.runId);
+    expect(seen[1]!.before!.map((s) => s.text)).toEqual(['dos']);
+  });
+
+  it('[R41.7] al corregir, también', async () => {
+    const { svc } = service({ ...scripts, b: { output: 'dos' } });
+    await store.diagrams.save(two());
+    const first = await svc.start({ diagramId: 'd', order: 'hola' });
+    await svc.settled(first.runId);
+    const next = await svc.correctRun(first.runId, { text: 'Cambia esto', nodeId: 'b' });
+    await svc.settled(next.runId);
+    expect((await eventsOf(svc, next.runId)).filter((e) => e.type === 'git.branch')).toMatchObject([{ nodeId: 'a', branch: 'feature/x' }]);
+  });
+});
+
+describe('observar todas las ejecuciones [R61.9]', () => {
+  it('[R61.9] entrega cada evento con su diagrama aunque nadie se suscriba a esa ejecución', async () => {
+    const { svc } = service();
+    await store.diagrams.save(simple());
+    const seen: [string, string, string][] = [];
+    const stop = svc.watch((e, d) => seen.push([e.runId, e.type, d.name]));
+    const first = await svc.start({ diagramId: 'd', order: 'una' });
+    expect(svc.runningCount()).toBe(1);
+    const second = await svc.start({ diagramId: 'd', order: 'otra' });
+    await Promise.all([svc.settled(first.runId), svc.settled(second.runId)]);
+    expect(svc.runningCount()).toBe(0);
+    expect(seen).toContainEqual([first.runId, 'run.finished', 'D']);
+    expect(seen).toContainEqual([second.runId, 'run.finished', 'D']);
+    stop();
+    const count = seen.length;
+    const third = await svc.start({ diagramId: 'd', order: 'tercera' });
+    await svc.settled(third.runId);
+    expect(seen).toHaveLength(count);
+  });
+
+  it('[R61.9] un oyente que falla no rompe la ejecución', async () => {
+    const { svc } = service();
+    await store.diagrams.save(simple());
+    svc.watch(() => {
+      throw new Error('fallo del oyente');
+    });
+    const { runId } = await svc.start({ diagramId: 'd', order: 'hola' });
+    await svc.settled(runId);
+    expect(reduceRunState((await svc.subscribe(runId, 1, () => {})).backlog).status).toBe('succeeded');
+  });
+});
 
 describe('arranque [R20.1]', () => {
   it('[R20.1] ejecuta un diagrama del proyecto y deja el registro en disco', async () => {
@@ -259,7 +338,7 @@ describe('demostración [R20.7]', () => {
       ],
     );
     await store.diagrams.save(ex);
-    const svc = new RunService(store, createDemoOrchestrator());
+    const svc = new RunService(portsOf(store), createDemoOrchestrator());
     const { runId } = await svc.start({ diagramId: 'd', order: 'hazme un juego' });
     await vi.waitFor(() => expect(svc.pending(runId)).toHaveLength(1));
     expect(svc.pending(runId)[0]!.options).toEqual(['Pixel art', 'Vectorial', 'Realista']);
@@ -319,7 +398,7 @@ describe('reanudar y cancelar [R41.2][R41.3]', () => {
       },
     };
     const orch = new Orchestrator({ getAdapter: () => adapter as never, decider: new MockDecider(), retry: { maxAttempts: 1, baseDelayMs: 0 } } as never);
-    return { svc: new RunService(store, orch), calls, fix: () => void (failB = false) };
+    return { svc: new RunService(portsOf(store), orch), calls, fix: () => void (failB = false) };
   }
 
   it('[R41.2] reanuda una fallida con la misma entrada, reutiliza lo hecho y enlaza las dos; no se reanuda dos veces', async () => {

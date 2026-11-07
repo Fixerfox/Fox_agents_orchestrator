@@ -355,3 +355,16 @@ describe('transcripción por pasadas [R15.14]', () => {
     expect(elsewhere).toContainEqual({ kind: 'pass', n: 2 });
   });
 });
+
+describe('historial con un hueco [R2.11]', () => {
+  it('[R2.11] enseña lo que pudo leer y dice que faltan eventos', async () => {
+    const at = (seq: number) => ({ runId: 'r1', seq, ts: 't', type: 'node.queued', nodeId: 'a' }) as RunEvent;
+    const client = new RunClient(fakeApi([at(1), at(2), at(4)]).api);
+    let notified = 0;
+    client.subscribe(() => notified++);
+    await client.attach('r1');
+    expect(client.getSnapshot().events.map((e) => e.seq)).toEqual([1, 2]);
+    expect(client.getSnapshot().error).toContain('Faltan eventos');
+    expect(notified).toBeGreaterThan(1);
+  });
+});

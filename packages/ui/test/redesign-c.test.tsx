@@ -6,7 +6,7 @@ import userEvent from '@testing-library/user-event';
 import { newAgent, newContext, type AgentDefinition, type RunEvent } from '@orquestador/core';
 import { createDiagram, type DraftRequest } from '@orquestador/editor';
 import { App } from '../src/App';
-import { ProjectChanges } from '../src/RunsScreen';
+import { ProjectChanges } from '../src/runs/RunFiles';
 import { createMemoryApi, type MemoryApiOptions } from '../src/memoryApi';
 import { goLib } from './nav';
 

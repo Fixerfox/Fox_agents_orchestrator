@@ -6,9 +6,9 @@ import userEvent from '@testing-library/user-event';
 import type { Diagram, RunEvent } from '@orquestador/core';
 import { addNode, connect, createDiagram, deriveLive, disconnect, updateNode } from '@orquestador/editor';
 import { App } from '../src/App';
-import { buildFlowEdges, buildFlowNodes } from '../src/Canvas';
-import { InsertPicker } from '../src/InsertPicker';
-import { ResultsPanel } from '../src/ResultsPanel';
+import { buildFlowEdges, buildFlowNodes } from '../src/diagrams/Canvas';
+import { InsertPicker } from '../src/diagrams/InsertPicker';
+import { ResultsPanel } from '../src/runs/ResultsPanel';
 import { createMemoryApi } from '../src/memoryApi';
 
 const AGENTS = [

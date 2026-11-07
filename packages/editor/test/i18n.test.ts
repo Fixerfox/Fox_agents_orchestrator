@@ -41,7 +41,7 @@ describe('catálogo de textos [R14.10]', () => {
   });
 
   it('[R14.10] cada código de validación del núcleo tiene mensaje en español', () => {
-    const src = readFileSync(join(root, 'core', 'src', 'validation.ts'), 'utf8');
+    const src = readFileSync(join(root, 'core', 'src', 'diagrams', 'validation.ts'), 'utf8');
     const codes = [...src.matchAll(/add\(\s*'([a-z-]+)'/g)].map((m) => m[1]!);
     expect(codes.length).toBeGreaterThan(10);
     const missing = codes.filter((c) => !(`problem.${c}` in es));

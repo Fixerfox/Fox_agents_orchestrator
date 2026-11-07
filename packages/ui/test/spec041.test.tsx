@@ -5,7 +5,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { newAgent, newSkill, type AgentDefinition, type Diagram, type RunEvent } from '@orquestador/core';
 import { ASSISTANT_TOOLS, createDiagram, t, type RunSummary } from '@orquestador/editor';
-import { isDestructive, runAssistantTool, type AssistantHost } from '../src/assistantTools';
+import { isDestructive, runAssistantTool, type AssistantHost } from '../src/assistant/assistantTools';
 import { createMemoryApi } from '../src/memoryApi';
 import { App } from '../src/App';
 import { goLib } from './nav';
@@ -58,6 +58,7 @@ describe('SPEC-039 · «Obligatoria» en la ficha del agente [R39.13]', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Crear proyecto' }));
     const lib = await goLib('agents');
     await userEvent.click((await lib.findAllByRole('button', { name: /Implementador/ }))[0]!);
+    await userEvent.click(lib.getByRole('button', { name: /^Qué sabe/ }));
     const toggle = await screen.findByRole('button', { name: t('assign.required', { name: 'Implementar' }) });
     expect(toggle.getAttribute('aria-pressed')).toBe('false');
     await userEvent.click(toggle);

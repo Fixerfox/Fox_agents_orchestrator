@@ -43,7 +43,7 @@ export interface SecureWebPreferences {
   preload: string;
 }
 
-export function windowOptions(preload: string, platform: string = process.platform) {
+export function windowOptions(preload: string, platform: string = process.platform, icon?: string) {
   const webPreferences: SecureWebPreferences = {
     contextIsolation: true,
     sandbox: true,
@@ -59,6 +59,7 @@ export function windowOptions(preload: string, platform: string = process.platfo
     minHeight: 600,
     title: 'Orquestador',
     show: false,
+    ...(icon ? { icon } : {}),
     // Ventana propia: sin barra de título ni menú del sistema; la barra superior de la app hace de barra de título [R19.8].
     titleBarStyle: 'hidden' as const,
     autoHideMenuBar: true,
@@ -101,7 +102,7 @@ export function isAllowedNavigation(url: string, appUrl: string): boolean {
 }
 
 export interface WebContentsLike {
-  setWindowOpenHandler(handler: () => { action: 'deny' }): void;
+  setWindowOpenHandler(handler: (details: { url: string }) => { action: 'deny' }): void;
   on(event: 'will-navigate', listener: (e: { preventDefault(): void }, url: string) => void): void;
   /** Navegación dentro de un marco (la vista previa) [R54.4]. */
   on(event: 'will-frame-navigate', listener: (e: { preventDefault(): void; url: string; isMainFrame: boolean }) => void): void;
@@ -117,9 +118,15 @@ export interface SessionLike {
   };
 }
 
+/** Lo único que sale al navegador: la dirección de una PR o un merge request [R58.15]. */
+export const isReviewUrl = (url: string): boolean => /^https:\/\/[^\s/]+\/[^\s?#]+\/(?:pull|pull-requests|-\/merge_requests)\/\d+$/.test(url);
+
 /** Bloquea ventanas nuevas y navegación externa, e impone la política de contenido. */
-export function secureWebContents(wc: WebContentsLike, session: SessionLike, appUrl: string): void {
-  wc.setWindowOpenHandler(() => ({ action: 'deny' }));
+export function secureWebContents(wc: WebContentsLike, session: SessionLike, appUrl: string, openLink: (url: string) => void = () => {}): void {
+  wc.setWindowOpenHandler(({ url }) => {
+    if (isReviewUrl(url)) openLink(url);
+    return { action: 'deny' };
+  });
   wc.on('will-navigate', (e, url) => {
     if (!isAllowedNavigation(url, appUrl)) e.preventDefault();
   });

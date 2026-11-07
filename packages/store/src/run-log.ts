@@ -10,37 +10,15 @@ import {
   type RunEvent,
   type RunHandle,
   type RunOptions,
+  type RunMeta,
   type RunResult,
-  type RunStatus,
 } from '@orquestador/core';
 import { atomicWriteSync } from './fs-util';
 import type { ProjectStore } from './project';
 
-export const RUN_META_VERSION = 1;
+export type { RunMeta } from '@orquestador/core';
 
-export interface RunMeta {
-  schemaVersion: number;
-  runId: string;
-  diagramId: string;
-  startedAt: string;
-  finishedAt?: string;
-  status: RunStatus | 'interrupted';
-  reason?: string;
-  usage: { inputTokens: number; outputTokens: number; costUsd: number };
-  eventCount: number;
-  /** Extracto de la orden, sin secretos. */
-  order?: string;
-  /** Nombre del diagrama al arrancar (R35.16). */
-  diagramName?: string;
-  /** Ejecución que esta reanuda, y la que reanudó a esta [R41.2]. */
-  resumedFrom?: string;
-  resumedBy?: string;
-  /** Ejecución que esta corrige, y las que corrigieron a esta [R53.11]. */
-  correctedFrom?: string;
-  correctedBy?: string[];
-  /** Avisos de una ejecución que terminó bien con algo pendiente, p. ej. el entregable [R46.11]. */
-  warnings?: string[];
-}
+export const RUN_META_VERSION = 1;
 
 /** Copia del diagrama tal como estaba al arrancar la ejecución (R35.16). */
 export const RUN_DIAGRAM_FILE = 'diagram.json';
@@ -175,6 +153,8 @@ export async function readRunLog(runDir: string): Promise<LoadedRunLog> {
       else corruptLines++;
     }
   });
+  // Las ejecuciones grabadas antes de R2.9 pueden tener eventos cambiados de sitio [R2.10].
+  events.sort((a, b) => a.seq - b.seq);
   return { events, truncated, corruptLines };
 }
 

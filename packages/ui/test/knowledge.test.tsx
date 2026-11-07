@@ -6,8 +6,8 @@ import userEvent from '@testing-library/user-event';
 import { newAgent, newContext, newMcpServer, newSkill, type Diagram, type KnowledgeExtra } from '@orquestador/core';
 import { createDiagram, deriveLive, EMPTY_LIVE, type LiveView } from '@orquestador/editor';
 import { App } from '../src/App';
-import { resourceEdges, resourceNodes } from '../src/Canvas';
-import { ExtraKnowledge, type KnowledgeCatalog } from '../src/ExtraKnowledge';
+import { resourceEdges, resourceNodes } from '../src/diagrams/Canvas';
+import { ExtraKnowledge, type KnowledgeCatalog } from '../src/diagrams/ExtraKnowledge';
 import { createMemoryApi } from '../src/memoryApi';
 
 const catalog: KnowledgeCatalog = { skills: [{ id: 'trazo', name: 'Trazo' }], contexts: [{ id: 'guia', name: 'Guía' }], mcp: [{ id: 'pixel', name: 'Pixelart' }] };

@@ -2,7 +2,7 @@
 import './setup';
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
-import { NavRail } from '../src/NavRail';
+import { NavRail } from '../src/shell/NavRail';
 
 describe('orden del rail [R32.13]', () => {
   it('[R32.13] Ejecuciones, Trabajos, Diseñador, Diagramas, Agentes, Conocimiento y Proyecto, en ese orden', () => {

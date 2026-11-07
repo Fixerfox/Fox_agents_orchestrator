@@ -15,12 +15,18 @@ describe('SPEC-049 · cerrar los avisos de error', () => {
     await userEvent.click(screen.getByRole('button', { name: /^Proyecto «/ }));
     await userEvent.click(screen.getByRole('menuitem', { name: 'Abrir proyecto' }));
     await waitFor(() => expect(api.saved.has('principal')).toBe(true));
-    api.saveDiagram = async () => ({ ok: false, error: { code: 'io', message: 'disco lleno' } }) as never;
+    // El guardado automático reintenta cada poco: mientras se cierra el aviso, el disco deja de fallar para no pisarlo.
+    const save = api.saveDiagram.bind(api);
+    let full = true;
+    api.saveDiagram = (async (...args: Parameters<typeof save>) => (full ? { ok: false, error: { code: 'io', message: 'disco lleno' } } : save(...args))) as never;
     await userEvent.click(screen.getByRole('button', { name: '+ Router' }));
     fireEvent.keyDown(window, { key: 's', ctrlKey: true });
     await waitFor(() => expect(errorAlert()).toBeTruthy());
+    full = false;
     await userEvent.click(screen.getByRole('button', { name: 'Cerrar aviso' }));
     expect(errorAlert()).toBeUndefined();
+    full = true;
+    await userEvent.click(screen.getByRole('button', { name: '+ Router' }));
     fireEvent.keyDown(window, { key: 's', ctrlKey: true });
     await waitFor(() => expect(errorAlert()).toBeTruthy());
   });

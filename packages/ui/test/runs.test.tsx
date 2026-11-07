@@ -6,9 +6,10 @@ import userEvent from '@testing-library/user-event';
 import { MockAgent, MockDecider, Orchestrator, type Diagram, type RunEvent } from '@orquestador/core';
 import { EMPTY_LIVE, type RunSummary } from '@orquestador/editor';
 import { App } from '../src/App';
-import { RunsScreen, type RunsNav } from '../src/RunsScreen';
+import { RunsScreen } from '../src/runs/RunsScreen';
+import { type RunsNav } from '../src/runs/runsTypes';
 import { createMemoryApi } from '../src/memoryApi';
-import type { RunsIndex } from '../src/useRunsIndex';
+import type { RunsIndex } from '../src/runs/useRunsIndex';
 
 const T0 = Date.parse('2026-11-05T08:30:00.000Z');
 const at = (s: number) => new Date(T0 + s * 1000).toISOString();

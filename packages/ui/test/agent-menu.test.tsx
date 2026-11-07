@@ -71,6 +71,7 @@ describe('SPEC-032 · agentes a mano', () => {
     const s = await goLib('agents');
     await userEvent.click(s.getByRole('button', { name: 'Pixelador' }));
     await userEvent.type(s.getByLabelText('Instrucciones'), 'pendiente');
+    await userEvent.click(s.getByRole('button', { name: /^Qué sabe/ }));
     await userEvent.click(s.getByRole('button', { name: 'Abrir «Paleta»' }));
     const k = within(await screen.findByRole('region', { name: 'Conocimiento' }));
     await waitFor(() => expect((k.getByLabelText('Nombre') as HTMLInputElement).value).toBe('Paleta'));

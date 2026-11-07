@@ -11,7 +11,7 @@ import { goLib } from './nav';
 
 // xterm.js necesita un navegador de verdad: en jsdom una pantalla falsa que guarda lo escrito y deja teclear.
 const screens: { text: string; input?: (d: string) => void }[] = [];
-vi.mock('../src/terminalScreen', () => ({
+vi.mock('../src/shell/terminalScreen', () => ({
   createTerminalScreen: (el: HTMLElement) => {
     const s: { text: string; input?: (d: string) => void } = { text: '' };
     screens.push(s);

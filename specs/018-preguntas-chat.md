@@ -19,7 +19,7 @@ Cuando un agente tiene dudas puede **hacer una petición al usuario**. El nodo q
 - **R18.11** [M1] Si un intento falla y se reintenta, el nuevo intento recibe `previousAnswers` con las preguntas ya respondidas para no repetirlas.
 - **R18.12** [M4] Al hacer clic en un nodo, su panel muestra el chat: las preguntas del agente, las respuestas del usuario y una caja para responder; las `options` se ofrecen como botones.
 - **R18.13** [M4] Un nodo con pregunta pendiente se resalta en el diagrama; hay un contador global de preguntas pendientes.
-- **R18.17** [M4b] Notificación de escritorio cuando un agente hace una pregunta.
+- **R18.17** [M4b] Notificación de escritorio cuando un agente hace una pregunta (hecha en SPEC-061).
 - **R18.14** [M4] Al reabrir la app o recargar la vista, las preguntas pendientes reaparecen (`pendingQuestions()`).
 - **R18.15** [M6] El adapter de Claude traduce la herramienta de preguntas del SDK a `ask`.
 - **R18.16** [M7] *(Futuro)* Mensajes iniciados por el usuario a un agente en curso, no solo respuestas.

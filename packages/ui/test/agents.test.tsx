@@ -31,10 +31,12 @@ describe('SPEC-022 · pantalla de agentes', () => {
     const api = await mount();
     const screenEl = await openAgents();
     await userEvent.click(screenEl.getByRole('button', { name: 'Nuevo agente' }));
+    await userEvent.click(screenEl.getByRole('button', { name: 'Escribir' }));
     await userEvent.type(screenEl.getByLabelText('Nombre'), 'Pintor de héroes');
-    expect(screenEl.getByText('pintor-de-heroes')).toBeTruthy();
     await userEvent.type(screenEl.getByLabelText('Para qué sirve'), 'Dibuja personajes');
     await userEvent.type(screenEl.getByLabelText('Instrucciones'), 'Usa píxel art');
+    await userEvent.click(screenEl.getByRole('button', { name: 'Qué puede hacer' }));
+    expect(screenEl.getByText('pintor-de-heroes')).toBeTruthy();
     await userEvent.selectOptions(screenEl.getByLabelText('Modelo'), 'claude-opus-5-5');
     await userEvent.click(screenEl.getByRole('button', { name: 'Guardar' }));
     await waitFor(() => expect(api.agents.get('pintor-de-heroes')).toMatchObject({ name: 'Pintor de héroes', description: 'Dibuja personajes', model: 'claude-opus-5-5', instructions: 'Usa píxel art' }));
@@ -46,6 +48,7 @@ describe('SPEC-022 · pantalla de agentes', () => {
     const api = await mount({ agents: [agent('pintor', 'Pintor')] });
     const screenEl = await openAgents();
     await userEvent.click(screenEl.getByRole('button', { name: 'Nuevo agente' }));
+    await userEvent.click(screenEl.getByRole('button', { name: 'Escribir' }));
     await userEvent.type(screenEl.getByLabelText('Nombre'), 'Pintor');
     await userEvent.click(screenEl.getByRole('button', { name: 'Guardar' }));
     await waitFor(() => expect([...api.agents.keys()].sort()).toEqual(['pintor', 'pintor-2']));
@@ -55,6 +58,7 @@ describe('SPEC-022 · pantalla de agentes', () => {
     const api = await mount();
     const screenEl = await openAgents();
     await userEvent.click(screenEl.getByRole('button', { name: 'Nuevo agente' }));
+    await userEvent.click(screenEl.getByRole('button', { name: 'Escribir' }));
     await userEvent.click(screenEl.getByRole('button', { name: 'Guardar' }));
     const name = screenEl.getByLabelText('Nombre');
     const field = name.closest('.orq-field') as HTMLElement;
@@ -69,6 +73,7 @@ describe('SPEC-022 · pantalla de agentes', () => {
     await userEvent.click(await screenEl.findByRole('button', { name: 'A' }));
     await userEvent.clear(screenEl.getByLabelText('Nombre'));
     await userEvent.type(screenEl.getByLabelText('Nombre'), 'Agente A');
+    await userEvent.click(screenEl.getByRole('button', { name: /^Qué sabe/ }));
     await userEvent.click(screenEl.getByRole('button', { name: 'Añadir contextos…' }));
     await userEvent.click(screenEl.getByRole('button', { name: 'Añadir Guía de estilo' }));
     await userEvent.click(screenEl.getByRole('button', { name: 'Listo' }));
@@ -144,6 +149,7 @@ describe('SPEC-022 · pantalla de agentes', () => {
     expect(await gallery.findByText('Dibuja personajes')).toBeTruthy();
     await userEvent.click(gallery.getByRole('button', { name: 'Crear agente' }));
     const screenEl = within(await screen.findByTestId('content'));
+    await userEvent.click(await screenEl.findByRole('button', { name: 'Escribir' }));
     await userEvent.type(screenEl.getByLabelText('Nombre'), 'Nuevo');
     await userEvent.click(screenEl.getByRole('button', { name: 'Guardar' }));
     await waitFor(() => expect(api.agents.has('nuevo')).toBe(true));
@@ -416,6 +422,7 @@ describe('SPEC-024 · skills en la pantalla', () => {
     const api = await mount({ skills: [skill('pixel', 'Pixel art')], agents: [agent('a', 'A')] });
     const s = await openAgents();
     await userEvent.click(await s.findByRole('button', { name: 'A' }));
+    await userEvent.click(s.getByRole('button', { name: /^Qué sabe/ }));
     await userEvent.click(s.getByRole('button', { name: 'Añadir skills…' }));
     await userEvent.click(s.getByRole('button', { name: 'Añadir Pixel art' }));
     await userEvent.click(s.getByRole('button', { name: 'Listo' }));
@@ -427,6 +434,9 @@ describe('SPEC-024 · skills en la pantalla', () => {
     await mount();
     const s = await openAgents();
     await userEvent.click(s.getByRole('button', { name: 'Nuevo agente' }));
+    await userEvent.click(s.getByRole('button', { name: 'Escribir' }));
+    await userEvent.type(s.getByLabelText('Nombre'), 'Nuevo');
+    await userEvent.click(s.getByRole('button', { name: 'Siguiente' }));
     expect(s.getByText('Este agente no usa ninguna skill.')).toBeTruthy();
     await userEvent.click(s.getByRole('button', { name: 'Añadir skills…' }));
     expect(s.getByText(/Todavía no hay skills en el proyecto/)).toBeTruthy();
