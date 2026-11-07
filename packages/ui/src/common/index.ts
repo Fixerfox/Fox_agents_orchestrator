@@ -10,4 +10,5 @@ export { permissionName, PermissionPicker } from './PermissionPicker';
 export type { LibraryTab, LibraryTarget, OpenLibrary } from './navigation';
 export { SideResizeHandle, readSideWidth } from './sidePanel';
 export { useOutside } from './useOutside';
+export { ErrorBoundary } from './ErrorBoundary';
 export { PrLink } from './PrLink';

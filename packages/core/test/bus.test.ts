@@ -6,6 +6,30 @@ const emit5 = (bus: EventBus) => {
 };
 
 describe('SPEC-002 · bus de eventos', () => {
+  it('[R2.9] un evento emitido por un oyente espera su turno: todos los reciben en orden', () => {
+    const bus = new EventBus('r');
+    bus.subscribe((e) => {
+      if (e.type === 'node.queued' && e.nodeId === 'a') bus.emit({ type: 'node.queued', nodeId: 'hijo' });
+    });
+    const seen: number[] = [];
+    bus.subscribe((e) => seen.push(e.seq));
+    bus.emit({ type: 'node.queued', nodeId: 'a' });
+    bus.emit({ type: 'node.queued', nodeId: 'b' });
+    expect(seen).toEqual([1, 2, 3]);
+    expect(bus.history().map((e) => e.seq)).toEqual([1, 2, 3]);
+  });
+
+  it('[R2.9] un oyente que falla no deja el bus sin entregar', () => {
+    const bus = new EventBus('r');
+    bus.subscribe(() => {
+      throw new Error('roto');
+    });
+    const seen: number[] = [];
+    bus.subscribe((e) => seen.push(e.seq));
+    emit5(bus);
+    expect(seen).toEqual([1, 2, 3, 4, 5]);
+  });
+
   it('[R2.1] seq empieza en 1 y crece de uno en uno', () => {
     const bus = new EventBus('r');
     emit5(bus);

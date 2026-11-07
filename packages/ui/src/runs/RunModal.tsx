@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect } from 'react';
-import { CheckCircle2, Loader2, XCircle, Copy, X } from 'lucide-react';
+import { CheckCircle2, Loader2, ShieldAlert, XCircle, Copy, X } from 'lucide-react';
 import { type ProjectApi, type RunSnapshot, summarizeRun, t, formatDuration, type MessageKey } from '@orquestador/editor';
 import { FileViewer } from './RunFiles';
 import { useRunData, type RunData } from './useRunData';
@@ -12,9 +12,11 @@ export function RunModal({ api, runId, main, now = Date.now, onClose, onPick, on
 }
 
 /** El modal amplio con la cabecera de la ejecución y sus mismas pestañas [R44.1]. */
-export function RunModalView({ data: d, api, runId, initialTab = 'summary', onClose, onPick, onOpenRuns, onExport, focusSupervisor = false }: { focusSupervisor?: boolean; data: RunData; api: ProjectApi; runId: string; initialTab?: Btab; onClose: () => void; onPick: (key: string) => void; onOpenRuns?: () => void; onExport: (runId: string, jsonl: string) => void }) {
+export function RunModalView({ data: d, api, runId, initialTab = 'summary', onClose, onPick, onOpenRuns, onExport, focusAlert }: { focusAlert?: string | undefined; data: RunData; api: ProjectApi; runId: string; initialTab?: Btab; onClose: () => void; onPick: (key: string) => void; onOpenRuns?: () => void; onExport: (runId: string, jsonl: string) => void }) {
   const ref = useRef<HTMLDivElement>(null);
   const [tab, setTab] = useState<Btab>(initialTab);
+  /** Paso cuyos avisos se abren en la pestaña «Supervisor» [R60.40]. */
+  const [focus, setFocus] = useState(focusAlert);
   const [viewing, setViewing] = useState<string>();
   /** «Abrir entregable»: pasa a Resultados con ese archivo abierto [R46.15]. */
   const [openPath, setOpenPath] = useState<string>();
@@ -72,14 +74,19 @@ export function RunModalView({ data: d, api, runId, initialTab = 'summary', onCl
           </div>
         </header>
         <div className="orq-run__tabs orq-rmodal__tabs" role="tablist" aria-label={t('runs.btab')}>
-          {BTABS.map((b) => (
-            <button key={b} type="button" role="tab" aria-selected={tab === b} onClick={() => setTab(b)}>
-              {t(`runs.btab.${b}` as MessageKey)}
-            </button>
-          ))}
+          {BTABS.filter((b) => b !== 'supervisor' || summary?.supervisor).map((b) => {
+            const alerts = b === 'supervisor' ? (summary?.supervisor?.alerts.length ?? 0) : 0;
+            return (
+              <button key={b} type="button" role="tab" aria-selected={tab === b} className={b === 'supervisor' ? `orq-run__tab-sup${alerts > 0 ? ' has-alerts' : ''}` : undefined} onClick={() => setTab(b)}>
+                {b === 'supervisor' && <ShieldAlert size={14} aria-hidden="true" />}
+                {t(`runs.btab.${b}` as MessageKey)}
+                {alerts > 0 && <span className="orq-run__tabcount">{alerts}</span>}
+              </button>
+            );
+          })}
         </div>
         <div className="orq-detail__body" role="tabpanel" aria-label={t(`runs.btab.${tab}` as MessageKey)}>
-          {d.ready ? <RunTabBody focusSupervisor={focusSupervisor} tab={tab} data={d} api={api} runId={runId} onPick={onPick} onExport={onExport} wide onOpenFile={setViewing} onOpenDeliverable={(path) => (setOpenPath(path), setTab('result'))} openPath={openPath} /> : <p className="orq-hint">{d.snap?.error ?? t('runs.loading')}</p>}
+          {d.ready ? <RunTabBody focusAlert={focus} onAlert={(key) => (setFocus(key), setTab('supervisor'))} tab={tab} data={d} api={api} runId={runId} onPick={onPick} onExport={onExport} wide onOpenFile={setViewing} onOpenDeliverable={(path) => (setOpenPath(path), setTab('result'))} openPath={openPath} /> : <p className="orq-hint">{d.snap?.error ?? t('runs.loading')}</p>}
         </div>
       </div>
       {viewing !== undefined && <FileViewer api={api} runId={runId} events={d.events} path={viewing} labelOf={d.label} onClose={() => setViewing(undefined)} />}

@@ -8,10 +8,10 @@ import { ENTRY, OUTPUT, agent, chain, diagram, edge, ofType } from './helpers';
 const OK: SupervisorVerdict = { ok: true, reason: '', summary: 'Hizo lo pedido' };
 type Scripts = ConstructorParameters<typeof MockAgent>[0];
 
-function rig(scripts: Scripts, supervise?: NonNullable<ConstructorParameters<typeof MockDecider>[0]>['supervise'], settleMs?: number) {
+function rig(scripts: Scripts, supervise?: NonNullable<ConstructorParameters<typeof MockDecider>[0]>['supervise'], settleMs?: number, checkMs?: number) {
   const agents = new MockAgent(scripts);
   const decider = new MockDecider(supervise ? { supervise } : {});
-  const orch = new Orchestrator({ getAdapter: () => agents, decider, supervisor: { review: () => true, ...(settleMs !== undefined ? { settleMs } : {}) } });
+  const orch = new Orchestrator({ getAdapter: () => agents, decider, supervisor: { review: () => true, ...(settleMs !== undefined ? { settleMs } : {}), ...(checkMs !== undefined ? { checkMs } : {}) } });
   return { agents, orch };
 }
 
@@ -106,7 +106,11 @@ describe('SPEC-060 · revisión con IA', () => {
 
   it('[R60.12][R60.17] avisa si no corresponde a lo pedido o hizo algo ajeno', async () => {
     const { orch } = rig({ a: { output: 'x' } }, () => Promise.resolve({ ok: false, reason: 'Pidió un cielo y pintó el mar', outOfScope: 'Borró el README', summary: 'Pintó el mar' }));
-    const { events } = await orch.start(chain(['a']), 'Pedido').result;
+    const handle = orch.start(chain(['a']), 'Pedido');
+    handle.bus.subscribe((e) => {
+      if (e.type === 'agent.question') queueMicrotask(() => handle.answer(e.questionId, 'Seguir igualmente'));
+    });
+    const { events } = await handle.result;
     expect(alerts(events)).toMatchObject([
       { nodeId: 'a', rule: 'ai-review', detail: 'Pidió un cielo y pintó el mar' },
       { nodeId: 'a', rule: 'out-of-scope', detail: 'Borró el README' },
@@ -120,12 +124,11 @@ describe('SPEC-060 · revisión con IA', () => {
     expect(alerts(events)).toEqual([]);
   });
 
-  it('[R60.13] los pasos siguen sin esperarla, y lo que no llega se dice', async () => {
-    const { orch, agents } = rig({ a: { output: 'uno' }, b: { output: 'dos' } }, () => new Promise(() => {}), 20);
-    const r = await orch.start(chain(['a', 'b']), 'Pedido').result;
-    expect(r.status).toBe('succeeded');
-    expect(agents.callsOf('b')).toHaveLength(1);
-    expect(ofType(r.events, 'supervisor.skipped')).toMatchObject([{ count: 2, reason: 'timeout' }]);
+  it('[R60.13] la revisión de un paso que falla no bloquea, y lo que no llega se dice', async () => {
+    const { orch } = rig({ a: { failTimes: 1, failRetriable: false } }, () => new Promise(() => {}), 20);
+    const r = await orch.start(chain(['a']), 'Pedido').result;
+    expect(r.status).toBe('failed');
+    expect(ofType(r.events, 'supervisor.skipped')).toMatchObject([{ count: 1, reason: 'timeout' }]);
     const types = r.events.map((e) => e.type);
     expect(types.indexOf('supervisor.skipped')).toBeLessThan(types.indexOf('run.finished'));
   });
@@ -157,14 +160,12 @@ describe('SPEC-060 · revisión con IA', () => {
     expect(normalizeSettings({ ...defaultSettings(), supervisorReview: false, supervisorModel: 'claude-sonnet-5-5' })).toMatchObject({ supervisorReview: false, supervisorModel: 'claude-sonnet-5-5' });
   });
 
-  it('[R60.15] si falla una revisión, la ejecución sigue y deja de revisar', async () => {
-    let calls = 0;
-    const { orch } = rig({ a: { output: 'uno' }, b: { output: 'dos' } }, () => (calls++, Promise.reject(new Error('sin red'))));
-    const r = await orch.start(chain(['a', 'b']), 'Pedido').result;
-    expect(r.status).toBe('succeeded');
-    expect(calls).toBe(1);
+  it('[R60.15] si falla la revisión de un paso que falló, no afecta y se dice', async () => {
+    const { orch } = rig({ a: { failTimes: 1, failRetriable: false } }, () => Promise.reject(new Error('sin red')));
+    const r = await orch.start(chain(['a']), 'Pedido').result;
+    expect(r.status).toBe('failed');
     expect(ofType(r.events, 'supervisor.skipped')).toMatchObject([{ reason: 'failed' }]);
-    expect(ofType(r.events, 'supervisor.note')).toHaveLength(2);
+    expect(ofType(r.events, 'supervisor.note')).toHaveLength(1);
   });
 });
 
@@ -271,11 +272,11 @@ describe('SPEC-060 · memoria', () => {
     expect(agents.callsOf('j')[0]!.memory).toContain('- b: b');
   });
 
-  it('[R60.26] empieza con la rama y quién la creó, aunque la revisión siga pendiente', async () => {
-    const { orch, agents } = rig({ a: { output: 'uno', branches: [{ branch: 'feature/login', via: 'command', created: true }] }, b: { output: 'dos' } }, () => new Promise<SupervisorVerdict>(() => {}), 1);
+  it('[R60.26] empieza con la rama y quién la creó, aunque la revisión no llegue', async () => {
+    const { orch, agents } = rig({ a: { output: 'uno', branches: [{ branch: 'feature/login', via: 'command', created: true }] }, b: { output: 'dos' } }, () => new Promise<SupervisorVerdict>(() => {}), 1, 10);
     await orch.start(chain(['a', 'b']), 'Pedido').result;
     expect(agents.callsOf('a')[0]!.memory).toBeUndefined();
-    expect(agents.callsOf('b')[0]!.memory).toBe('Rama de git: feature/login (creada por a)');
+    expect(agents.callsOf('b')[0]!.memory!.split('\n')[0]).toBe('Rama de git: feature/login (creada por a)');
   });
 
   it('[R60.26] sin revisión con IA también la lleva, delante del diario', async () => {
@@ -302,7 +303,7 @@ describe('SPEC-060 · memoria', () => {
   it('[R60.24] al pasarse del tope, lo más antiguo se queda solo con el paso y sus archivos', () => {
     const bus = new EventBus('r');
     const stop = new AbortController();
-    const sup = new Supervisor({ emitter: new RunEmitter(bus), decider: new MockDecider({ supervise: () => Promise.resolve({ ...OK, summary: 'x'.repeat(3000) }) }), budget: { track: () => {} } as never, limits: undefined, signal: stop.signal, review: () => false, labelOf: (id) => id });
+    const sup = new Supervisor({ order: { text: 'x', files: [] }, emitter: new RunEmitter(bus), decider: new MockDecider({ supervise: () => Promise.resolve({ ...OK, summary: 'x'.repeat(3000) }) }), budget: { track: () => {} } as never, limits: undefined, signal: stop.signal, review: () => false, labelOf: (id) => id });
     const note = (sup as unknown as { entries: { label: string; text: string; files: string[] }[] }).entries;
     for (const label of ['uno', 'dos', 'tres', 'cuatro']) note.push({ label, text: 'x'.repeat(3000), files: [] });
     const text = sup.memory()!;

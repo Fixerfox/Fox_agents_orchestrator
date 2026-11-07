@@ -20,6 +20,7 @@ El Supervisor es la otra pieza: **vigila toda ejecución, frena lo que se sale d
    - *Segunda:* solo avisar.
    - *Revisión:* el usuario pidió también guardarraíles, y eso hay que frenarlo antes. Pero consultar a un modelo en cada acción sería lento, porque un paso hace decenas.
    - *Tercera (elegida):* **las reglas bloquean, la IA avisa.** Nunca se para un paso entero ni se cambia una entrada. Repetir un trabajo sigue siendo cosa del nodo Revisión.
+   - *Cambio del 06/11:* esto dejó pasar un paso que había hecho 1 de 44 tareas. SPEC-062 lo corrige: un paso que no terminó lo pedido se detiene y pregunta.
 3. **Quién lo cambia.** Es interno: sus reglas y su prompt solo cambian con esta spec, para que todas las ejecuciones se vigilen igual. Lo único que se configura es la revisión con IA: si está activa y con qué modelo.
 4. **Dónde vive.** Reglas y servicio en `core`, sin conocer a Claude: escucha el bus como la UI. Lo activa el orquestador de la app (`createEngineOrchestrator`); un `Orchestrator` sin `supervisor` se comporta como antes, y por eso no cambian las grabaciones de SPEC-056.
 5. **Su gasto no corta la ejecución.** Cuenta en el uso, pero el límite de presupuesto solo lo dispara el trabajo de los agentes.
@@ -33,7 +34,7 @@ El Supervisor es la otra pieza: **vigila toda ejecución, frena lo que se sale d
 ### Reglas
 - **R60.1** [M12] Evento `supervisor.alert` (`nodeId?`, `rule`, `severity: 'info' | 'warning'`, `detail`). Cada aviso se emite una vez por paso y regla, salvo `blocked`.
 - **R60.2** [M12] Las reglas son una función pura de `core` (`applyRules`) que no llama al motor.
-- **R60.3** [M12] El Supervisor solo añade eventos: no cambia el flujo ni las entradas, y un fallo suyo no afecta a la ejecución.
+- **R60.3** [M12] El Supervisor no cambia las entradas, y un fallo suyo no afecta a la ejecución. Solo cambia el flujo con los controles de SPEC-062.
 - **R60.4** [M12] Regla `undeclared-file`: una rama de reparto (SPEC-059) tocó un archivo que no declaró.
 - **R60.5** [M12] Regla `empty-output`: un agente terminó bien con la salida vacía.
 - **R60.6** [M12] Regla `unexpected-branch`: un paso actuó en una rama de git distinta de la anterior sin haberla creado ni haber cambiado a ella (SPEC-058).
@@ -44,9 +45,9 @@ El Supervisor es la otra pieza: **vigila toda ejecución, frena lo que se sale d
 ### Revisión con IA
 - **R60.12** [M12] Con la revisión activa, cada paso de agente que termina se revisa con una consulta de un solo turno, sin herramientas (`Decider.supervise`): recibe lo que se le pidió (entrada y tarea) y lo que hizo (acciones, salida y archivos), como datos y no como instrucciones, y responde si lo hecho corresponde a lo pedido. Si no, da `supervisor.alert` con la regla `ai-review` y el motivo. Con el motor simulado no se llama a ningún modelo.
 - **R60.17** [M12] Si hizo algo ajeno a lo pedido, da la regla `out-of-scope`.
-- **R60.13** [M12] La revisión no bloquea: los pasos siguen sin esperarla. Al terminar la ejecución se esperan las pendientes un máximo de 10 segundos, y las que no lleguen dan `supervisor.skipped`.
+- **R60.13** [M12] Un paso que acaba bien espera a su revisión (SPEC-062). La de un paso que falla no bloquea: al terminar la ejecución se espera un máximo de 10 segundos, y las que no lleguen dan `supervisor.skipped`.
 - **R60.14** [M12] Ajustes tiene «Supervisor»: revisión con IA activa o no (activa por defecto) y modelo (Haiku 5.5 por defecto). Lo que gasta cuenta en el uso de la ejecución, sin disparar su límite.
-- **R60.15** [M12] Si una revisión falla, no afecta a la ejecución: el Supervisor deja de revisar con IA en esa ejecución y lo dice con `supervisor.skipped`.
+- **R60.15** [M12] Si la revisión de un paso que falló no llega, no afecta a la ejecución y lo dice con `supervisor.skipped`. Si falla la de un paso que acabó bien, vale R62.8.
 
 ### Memoria
 - **R60.18** [M12] Cada ejecución tiene un diario con una entrada por paso de agente terminado (`supervisor.note`: paso, qué hizo y decidió, y archivos). No se guarda entre ejecuciones.
@@ -54,7 +55,7 @@ El Supervisor es la otra pieza: **vigila toda ejecución, frena lo que se sale d
 - **R60.20** [M12] Sin revisión con IA, la entrada se arma con el nombre del paso y sus archivos.
 - **R60.21** [M12] Cada agente recibe el diario como «Memoria de la ejecución», marcado como contexto de fondo y como datos: no manda sobre su tarea.
 - **R60.22** [M12] Los agentes no pueden escribir en el diario.
-- **R60.23** [M12] Un paso ve el diario tal como estaba al arrancar: las ramas en paralelo no se ven entre sí, y un paso no espera a que llegue la entrada del anterior.
+- **R60.23** [M12] Un paso ve el diario tal como estaba al arrancar: las ramas en paralelo no se ven entre sí.
 - **R60.24** [M12] El diario tiene un tope de 8.000 caracteres: al pasarse, las entradas más antiguas se quedan solo con el paso y sus archivos.
 - **R60.25** [M12] Lo que recibió cada agente queda en `agent.request`.
 - **R60.26** [M12] La memoria empieza con la rama de git de la ejecución (`Rama de git: <rama>`, y `(creada por <paso>)` si un paso la creó). Sale de los eventos `git.branch`, no de la revisión con IA, así que está aunque la revisión esté apagada o no haya llegado. Vale la última rama avisada; `via: 'ran'` solo cuenta si aún no se conoce ninguna. El tope de R60.24 nunca la recorta.
@@ -71,11 +72,15 @@ El Supervisor es la otra pieza: **vigila toda ejecución, frena lo que se sale d
 - **R60.30** [M12] Lo que gasta el Supervisor sale como `agent.usage` con `source: 'supervisor'`: cuenta en el total de la ejecución, pero no en el gasto del paso ni en `budget-burn`.
 - **R60.31** [M12] `supervisorView(events, running, labelOf)` da el estado (`watching`, `reviewing`, `alert`, `rules`, `done`), los pasos revisados, los avisos, el gasto, el modelo, la rama, la memoria y los pasos a los que apuntar. Sin `supervisor.started` no da nada.
 - **R60.32** [M12] El lienzo de una ejecución enseña la tarjeta del Supervisor, fija arriba en el centro de la pantalla, con su estado, los pasos revisados, los avisos, el gasto, el modelo y la rama. Tiene aspecto propio y no se mueve con el lienzo. No sale al editar un diagrama.
-- **R60.33** [M12] Mientras corre, un haz sale de la tarjeta hacia cada paso en revisión, y una mira lo rodea. Si no se está revisando nada, apunta al último paso con aviso. Con avisos, haz y mira van en amarillo. Un paso dentro de un subdiagrama se señala en su nodo del nivel visible. Con varios pasos en revisión a la vez hay un haz y una mira por cada uno, y la tarjeta los nombra si son dos o los cuenta si son más. Un paso sigue en revisión hasta que acaben todas las suyas. Si otro paso se interpone, el haz lo rodea y entra por el lado.
+- **R60.33** [M12] Mientras corre, un haz sale de la tarjeta hacia cada paso en revisión, y una mira lo rodea. Si no se está revisando nada no señala a ningún paso: un haz fijo no dice nada nuevo, y el aviso sigue en el nodo y en la tarjeta. Con avisos, haz y mira van en amarillo. Un paso dentro de un subdiagrama se señala en su nodo del nivel visible. Con varios pasos en revisión a la vez hay un haz y una mira por cada uno, y la tarjeta los nombra si son dos o los cuenta si son más. Un paso sigue en revisión hasta que acaben todas las suyas. Si otro paso se interpone, el haz lo rodea y entra por el lado.
 - **R60.34** [M12] Si el paso queda fuera de la vista, el haz llega hasta el borde y un botón lleva el lienzo hasta él.
 - **R60.35** [M12] El lienzo de una ejecución enseña también el panel «Memoria de la ejecución», fijo arriba a la derecha y plegable: la rama y las entradas, la última primero, según van llegando.
-- **R60.36** [M12] Pulsar la tarjeta abre el Resumen en el apartado «Supervisor», que además de lo de R60.10 da el balance (pasos revisados, gasto y modelo) y la rama.
+- **R60.36** [M12] Pulsar la tarjeta abre la pestaña «Supervisor» de la ejecución.
 - **R60.37** [M12] Cada paso enseña, junto a lo que recibió, la memoria que le llegó.
+- **R60.38** [M12] Las ejecuciones con Supervisor tienen una pestaña «Supervisor», la última, destacada con su color y con el número de avisos.
+- **R60.39** [M12] La pestaña da el balance, los avisos, las revisiones que no llegaron y la memoria. Cada aviso dice en una frase qué pasó, en qué paso y a qué hora; pulsarlo lo despliega con el detalle, qué significa y «Ver el paso». Si solo hay uno, sale desplegado.
+- **R60.40** [M12] Pulsar «N avisos» en un nodo, o «Con aviso» en la mira, abre la pestaña con los avisos de ese paso desplegados.
+- **R60.41** [M12] El apartado «Supervisor» del Resumen destaca los avisos como tales, y pulsar uno abre la pestaña por ese aviso.
 
 ## Fuera de alcance
 - Parar, repetir o corregir pasos.

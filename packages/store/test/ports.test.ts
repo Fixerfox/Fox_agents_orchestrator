@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { MockAgent, MockDecider, Orchestrator, newAgent, type Diagram } from '@orquestador/core';
-import { MAX_INPUT_FILES, ProjectStore, encodeStepKey, libraryReaderOf, runRepositoryOf, safePreviewPath } from '../src';
+import { MAX_INPUT_FILES, ProjectStore, encodeStepKey, libraryReaderOf, runRepositoryOf, safePreviewPath, readRunLog } from '../src';
 
 const D: Diagram = {
   id: 'd',
@@ -80,5 +80,15 @@ describe('SPEC-056 · el proyecto como puertos', () => {
     expect(safePreviewPath('a/b.txt')).toBe(true);
     expect(safePreviewPath('../a')).toBe(false);
     expect(encodeStepKey('bucle/a b')).toBe('bucle~a%20b');
+  });
+});
+
+describe('leer el log de una ejecución [R2.10]', () => {
+  it('[R2.10] una grabación con eventos cambiados de sitio se lee en orden', async () => {
+    const run = join(dir, 'run');
+    await fs.mkdir(run);
+    const line = (seq: number) => JSON.stringify({ runId: 'r', seq, ts: 't', type: 'node.queued', nodeId: 'a' });
+    await fs.writeFile(join(run, 'events.jsonl'), [1, 3, 2, 4].map(line).join('\n') + '\n');
+    expect((await readRunLog(run)).events.map((e) => e.seq)).toEqual([1, 2, 3, 4]);
   });
 });

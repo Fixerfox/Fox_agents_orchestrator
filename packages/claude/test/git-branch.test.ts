@@ -171,6 +171,41 @@ describe('SPEC-058 · HEAD del repositorio', () => {
     ]);
   });
 
+  it('[R58.2] la rama a la que llega queda la última, aunque ya se hubiera nombrado', async () => {
+    await setHead('feature/008');
+    const t = new BranchTracker(dir);
+    await t.start();
+    t.called('mcp__github__create_branch', { branch: 'feature/009' });
+    await collect(t.settled('mcp__github__create_branch', true));
+    t.called('Bash', { command: 'bash cambiar.sh' });
+    await setHead('feature/009');
+    const seen = (await collect(t.settled('Bash', true))).filter((e) => e.type === 'branch').map((e) => e.branch);
+    expect(seen).toEqual(['feature/008', 'feature/009']);
+  });
+
+  it('[R58.3] un checkout que no mueve HEAD no crea nada, aunque el fallo quede escondido por una tubería', async () => {
+    await setHead('feature/008');
+    const t = new BranchTracker(dir);
+    await t.start();
+    t.called('Bash', { command: 'git checkout -B feature/009 --track origin/feature/009 2>&1 | tail -5' });
+    expect(await collect(t.settled('Bash', true))).toEqual([]);
+    t.called('Bash', { command: 'git checkout -b feature/009 2>&1 | tail -2' });
+    await setHead('feature/009');
+    expect(await collect(t.settled('Bash', true))).toEqual([
+      { type: 'branch', branch: 'feature/008', via: 'ran' },
+      { type: 'branch', branch: 'feature/009', via: 'command', created: true },
+      { type: 'git_action', branch: 'feature/009', action: 'switch' },
+    ]);
+  });
+
+  it('[R58.3] crear con `git branch` no mueve HEAD y sigue contando', async () => {
+    await setHead('feature/008');
+    const t = new BranchTracker(dir);
+    await t.start();
+    t.called('Bash', { command: 'git branch otra' });
+    expect(await collect(t.settled('Bash', true))).toEqual([{ type: 'branch', branch: 'otra', via: 'command', created: true }]);
+  });
+
   it('[R58.2] salir de la rama principal no la cuenta', async () => {
     const t = new BranchTracker(dir);
     await t.start();

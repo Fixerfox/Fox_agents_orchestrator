@@ -102,6 +102,13 @@ export interface RunFileContent {
   before?: { text: string; truncated: boolean };
 }
 
+/** Ejecución que hay que abrir, pedida al pulsar un aviso [R61.12]. */
+export interface OpenRunTarget {
+  runId: Id;
+  /** ¿Sigue en marcha? Decide si se abre en «En directo» o en «Historial» [R61.11]. */
+  live: boolean;
+}
+
 /** Ejecuciones: lanzar y controlar, cola, entrada, resultados, correcciones y copias. */
 export interface RunsApi {
   // --- ejecución (R19.7) ---
@@ -146,6 +153,8 @@ export interface RunsApi {
   restoreBackup(req: { runId: Id; path: string }): Promise<ApiResult<boolean>>;
   /** Eventos en vivo (por lotes). Devuelve la función para darse de baja. */
   onRunEvents(listener: (runId: string, events: RunEvent[]) => void): () => void;
+  /** Peticiones de abrir una ejecución. Devuelve la función para darse de baja [R61.12]. */
+  onOpenRun(listener: (target: OpenRunTarget) => void): () => void;
 }
 
 export function parseRunsRequest(channel: string, payload: unknown, { bad, exact, str }: RequestCheck): unknown {

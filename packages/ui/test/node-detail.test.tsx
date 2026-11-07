@@ -152,6 +152,21 @@ describe('SPEC-015 · pasadas en la ventana grande [R15.14]', () => {
     expect(d.getByText('Correcciones de la revisión')).toBeTruthy();
   });
 
+  it('[R15.17] «Recibió» se pliega y despliega, y sigue plegada aunque lleguen más eventos', async () => {
+    const panel = (events: typeof twice) => <NodePanel events={events} live={deriveLive(events)} nodeId="a" nodePath={[]} label="Diseñador" onAnswer={vi.fn()} />;
+    const { rerender } = render(panel(twice.slice(0, 2)));
+    const title = screen.getByText(/^Recibió/);
+    const fold = title.closest('details')!;
+    expect(fold.open).toBe(true);
+    await userEvent.click(title);
+    expect(fold.open).toBe(false);
+    rerender(panel(twice));
+    expect(screen.getAllByText(/^Recibió/)[0]!.closest('details')).toBe(fold);
+    expect(fold.open).toBe(false);
+    await userEvent.click(title);
+    expect(fold.open).toBe(true);
+  });
+
   it('[R15.14] el panel lateral rotula cada entrada con su pasada', () => {
     render(<NodePanel events={twice} live={deriveLive(twice)} nodeId="a" nodePath={[]} label="Diseñador" onAnswer={vi.fn()} />);
     expect(screen.getByText('Recibió (pasada 1, intento 1)')).toBeTruthy();

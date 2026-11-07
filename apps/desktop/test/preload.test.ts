@@ -27,10 +27,21 @@ describe('preload: API tipada [R19.2]', () => {
     expect(invoke.mock.calls[3]).toEqual([CHANNELS.loadDiagram, 'a']);
   });
 
-  it('[R19.2][R29.4][R30.13] la API expuesta no contiene nada más que los métodos del contrato', () => {
+  it('[R19.2][R29.4][R30.13][R61.12] la API expuesta no contiene nada más que los métodos del contrato', () => {
     const api = buildApi(async () => null);
-    expect(Object.keys(api).sort()).toEqual([...Object.keys(CHANNELS), 'onRunEvents', 'onAssistantEvents', 'onTerminalEvents'].sort());
+    expect(Object.keys(api).sort()).toEqual([...Object.keys(CHANNELS), 'onRunEvents', 'onAssistantEvents', 'onTerminalEvents', 'onOpenRun'].sort());
     expect(Object.values(api).every((v) => typeof v === 'function')).toBe(true);
+  });
+
+  it('[R61.12] abrir una ejecución llega por su canal de una sola dirección', () => {
+    const listener = vi.fn();
+    const subscribe = vi.fn(() => () => {});
+    const api = buildApi(async () => null, undefined, undefined, undefined, subscribe);
+    api.onOpenRun(listener);
+    expect(subscribe).toHaveBeenCalledWith(listener);
+    const src = readFileSync(join(__dirname, '..', 'src', 'preload', 'preload.ts'), 'utf8');
+    expect(src).toContain('ipcRenderer.on(OPEN_RUN_CHANNEL, handler)');
+    expect(src).not.toContain('ipcRenderer.send(OPEN_RUN_CHANNEL');
   });
 
   it('[R19.2] el preload solo expone buildApi: no entrega ipcRenderer ni require', () => {

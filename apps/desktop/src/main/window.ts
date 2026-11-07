@@ -43,7 +43,7 @@ export interface SecureWebPreferences {
   preload: string;
 }
 
-export function windowOptions(preload: string, platform: string = process.platform) {
+export function windowOptions(preload: string, platform: string = process.platform, icon?: string) {
   const webPreferences: SecureWebPreferences = {
     contextIsolation: true,
     sandbox: true,
@@ -59,6 +59,7 @@ export function windowOptions(preload: string, platform: string = process.platfo
     minHeight: 600,
     title: 'Orquestador',
     show: false,
+    ...(icon ? { icon } : {}),
     // Ventana propia: sin barra de título ni menú del sistema; la barra superior de la app hace de barra de título [R19.8].
     titleBarStyle: 'hidden' as const,
     autoHideMenuBar: true,

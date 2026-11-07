@@ -1,5 +1,5 @@
 import { supervisorView } from './supervisor-view';
-import { describeSplitProblem, type DeliverableItemResult, type NodeStatus, type RunEvent } from '@orquestador/core';
+import { describeSplitProblem, pathKey, type DeliverableItemResult, type NodeStatus, type RunEvent } from '@orquestador/core';
 import { branchesOf } from './branches';
 import { t } from './i18n';
 
@@ -44,7 +44,7 @@ export interface RunSummaryView {
   /** Ramas de git en las que se actuó y qué pasos lo hicieron [R58.10]. */
   branches: { name: string; created: boolean; deleted: boolean; prUrl?: string; steps: { label: string; actions: string[] }[] }[];
   /** Lo que vio y anotó el Supervisor, si estaba activo [R60.10]. */
-  supervisor?: { alerts: { label: string; detail: string }[]; notes: { label: string; text: string; files: string[] }[]; skipped?: { count: number; reason: 'timeout' | 'failed' }; /** [R60.36] */ balance?: { reviewed: number; costUsd: number; model?: string }; branch?: string };
+  supervisor?: { final?: { met: boolean; detail: string }; alerts: { label: string; detail: string; rule?: string; key?: string }[]; notes: { label: string; text: string; files: string[] }[]; skipped?: { count: number; reason: 'timeout' | 'failed' }; /** [R60.36] */ balance?: { reviewed: number; costUsd: number; model?: string }; branch?: string };
   /** Repartos rechazados: quién y por qué [R59.14]. */
   splitRejections: { label: string; problems: string[] }[];
   errors: { label: string; message: string }[];
@@ -128,10 +128,13 @@ export function summarizeRun(events: readonly RunEvent[], labelOf: (nodeId: stri
         errors.push({ label: e.nodeId ? labelOf(e.nodeId, e.nodePath ?? []) : '', message: e.message });
         break;
       case 'supervisor.alert':
-        watched().alerts.push({ label: e.nodeId !== undefined ? labelOf(e.nodeId, e.nodePath ?? []) : '', detail: e.detail });
+        watched().alerts.push({ label: e.nodeId !== undefined ? labelOf(e.nodeId, e.nodePath ?? []) : '', detail: e.detail, rule: e.rule, ...(e.nodeId !== undefined ? { key: pathKey(e.nodePath ?? [], e.nodeId) } : {}) });
         break;
       case 'supervisor.note':
         watched().notes.push({ label: labelOf(e.nodeId, e.nodePath ?? []), text: e.text, files: e.files });
+        break;
+      case 'supervisor.verified':
+        watched().final = { met: e.met, detail: e.detail };
         break;
       case 'supervisor.skipped':
         watched().skipped = { count: e.count, reason: e.reason };

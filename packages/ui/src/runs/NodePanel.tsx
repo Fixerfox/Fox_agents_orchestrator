@@ -180,7 +180,7 @@ export function ReviewGateCard({ item, onAnswer, closed = false, files = [], onP
 }
 
 /** Fichero por el que pide permiso para modificar, si la pregunta es de ese tipo [R45.9]. */
-export function permissionTarget(item: { text: string; ask?: 'question' | 'permission' | 'gate' }): string | undefined {
+export function permissionTarget(item: { text: string; ask?: 'question' | 'permission' | 'gate' | 'unfinished' }): string | undefined {
   if (questionGroup({ text: item.text, ...(item.ask ? { kind: item.ask } : {}) }) !== 'permission') return undefined;
   return /^¿Puedo modificar (.+)\?$/.exec(item.text.trim())?.[1];
 }
@@ -283,14 +283,18 @@ export function NodePanel({ events, live, nodeId, nodePath, label, onAnswer, onE
               case 'input':
                 return (
                   <li key={i} className="orq-t orq-t--input">
-                    <strong>{inputTitle(it)}</strong>
-                    <Markdown text={it.text} />
-                    {it.memory && (
-                      <details className="orq-t__memory">
-                        <summary>{t('transcript.memory')}</summary>
-                        <pre>{it.memory}</pre>
-                      </details>
-                    )}
+                    <details open className="orq-t__fold">
+                      <summary>
+                        <strong>{inputTitle(it)}</strong>
+                      </summary>
+                      <Markdown text={it.text} />
+                      {it.memory && (
+                        <details className="orq-t__memory">
+                          <summary>{t('transcript.memory')}</summary>
+                          <pre>{it.memory}</pre>
+                        </details>
+                      )}
+                    </details>
                   </li>
                 );
               case 'text':

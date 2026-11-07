@@ -83,13 +83,15 @@ export type EventBody =
       source?: 'supervisor' | 'judge';
     }
   /** Archivo escrito por el paso; `change` dice si es nuevo o modificado (los adaptadores que no lo saben lo omiten) [R45.2]. */
-  | { type: 'file.produced'; nodeId: Id; path: string; change?: FileChange; /** [R55.3] */ via?: FileVia }
+  | { type: 'file.produced'; nodeId: Id; path: string; change?: FileChange; /** [R55.3] */ via?: FileVia; /** Viene de un paso reutilizado [R41.9]. */ reused?: boolean }
   /** El paso creó una rama de git o actuó en ella [R58.1]. */
   | { type: 'git.branch'; nodeId: Id; branch: string; via: 'head' | 'command' | 'mcp' | 'ran'; created?: boolean }
   /** El paso hizo esto en una rama [R58.11]. */
   | { type: 'git.action'; nodeId: Id; branch: string; action: 'commit' | 'push' | 'pr' | 'merge' | 'delete' | 'switch'; /** PR o merge request [R58.14]. */ url?: string }
   /** El Supervisor detecta algo o frena una acción [R60.1]. */
   | { type: 'supervisor.alert'; nodeId?: Id; rule: string; severity: 'info' | 'warning'; detail: string }
+  /** Si el resultado final cumple lo pedido [R62.9]. */
+  | { type: 'supervisor.verified'; met: boolean; detail: string }
   /** Entrada de la memoria de la ejecución [R60.18]. */
   | { type: 'supervisor.note'; nodeId: Id; text: string; files: string[]; /** Salió de una revisión con IA [R60.29]. */ reviewed?: boolean }
   /** El Supervisor empieza a vigilar [R60.28]. */
@@ -174,6 +176,9 @@ export class EventBus {
   private seq = 0;
   private readonly log: RunEvent[] = [];
   private readonly listeners = new Set<EventListener>();
+  /** Eventos por entregar: el que emite un oyente espera a que acabe el actual [R2.9]. */
+  private readonly outbox: RunEvent[] = [];
+  private delivering = false;
 
   constructor(
     readonly runId: Id,
@@ -191,14 +196,23 @@ export class EventBus {
       ...(nodePath.length > 0 ? { nodePath: [...nodePath] } : {}),
     } as RunEvent;
     this.log.push(event);
-    for (const listener of [...this.listeners]) {
-      try {
-        listener(event);
-      } catch {
-        // Un listener defectuoso nunca debe romper la ejecución.
+    this.outbox.push(event);
+    if (!this.delivering) this.deliver();
+    return event;
+  }
+
+  private deliver(): void {
+    this.delivering = true;
+    for (let next = this.outbox.shift(); next; next = this.outbox.shift()) {
+      for (const listener of [...this.listeners]) {
+        try {
+          listener(next);
+        } catch {
+          // Un listener defectuoso nunca debe romper la ejecución.
+        }
       }
     }
-    return event;
+    this.delivering = false;
   }
 
   /**

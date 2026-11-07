@@ -51,6 +51,11 @@ export function createEngineOrchestrator(ctx: EngineContext, engines: readonly A
       if (!chosen.supervise) throw new AgentError('El motor activo no sabe revisar');
       return chosen.supervise(r, s);
     },
+    verifyRun: (r, s) => {
+      const chosen = pick().decider;
+      if (!chosen.verifyRun) throw new AgentError('El motor activo no sabe comprobar el resultado');
+      return chosen.verifyRun(r, s);
+    },
     transform: (r, s) => {
       const chosen = pick().decider;
       if (!chosen.transform) throw new AgentError('El motor activo no sabe transformar con Claude');

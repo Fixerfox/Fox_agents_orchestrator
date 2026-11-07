@@ -30,11 +30,11 @@ export function RunDetail(
   const [picked, setPicked] = useState<string | undefined>(p.nav.step);
   /** Modal de la ejecución y la pestaña con la que se abre: «Resumen» si ya terminó y «Cronograma» mientras corre [R44.5]. */
   const [modal, setModal] = useState<Btab>();
-  /** El modal se abrió desde la tarjeta del Supervisor [R60.36]. */
-  const [toSupervisor, setToSupervisor] = useState(false);
-  const openSupervisor = useCallback(() => {
-    setToSupervisor(true);
-    setModal('summary');
+  /** Paso desde el que se abrió la pestaña «Supervisor» [R60.36][R60.40]. */
+  const [alertStep, setAlertStep] = useState<string>();
+  const openSupervisor = useCallback((key?: string) => {
+    setAlertStep(key);
+    setModal('supervisor');
   }, []);
   /** Fichero abierto en el visor [R45.10]. */
   const [viewing, setViewing] = useState<string>();
@@ -147,7 +147,7 @@ export function RunDetail(
           )}
         </aside>
       </div>
-      {modal && <RunModalView data={d} api={p.api} runId={p.runId} initialTab={modal} focusSupervisor={toSupervisor} onClose={() => (setModal(undefined), setToSupervisor(false))} onPick={(k) => (setModal(undefined), setPicked(k))} onExport={p.onExport} />}
+      {modal && <RunModalView data={d} api={p.api} runId={p.runId} initialTab={modal} focusAlert={alertStep} onClose={() => setModal(undefined)} onPick={(k) => (setModal(undefined), setPicked(k))} onExport={p.onExport} />}
       {previewing && (
         // Vista previa en grande: archivos del paso, comparar con la anterior, ver cambios y pedir corrección [R54.5].
         <PreviewDialog

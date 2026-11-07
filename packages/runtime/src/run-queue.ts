@@ -1,4 +1,4 @@
-import type { Diagram, Orchestrator, Payload, RunOptions, RunRepository } from '@orquestador/core';
+import type { Diagram, Orchestrator, Payload, RunEvent, RunOptions, RunRepository } from '@orquestador/core';
 import type { LibrarySnapshot, RunSnapshots } from './snapshot';
 import type { Live, LiveRuns, PreparedRun } from './run-types';
 
@@ -19,10 +19,14 @@ interface QueueEntry extends QueuedRun {
 /** Copia lo que hizo un paso que terminó bien [R54.3]. */
 export type StepFilesHandler = (runId: string, key: string, files: string[]) => Promise<unknown>;
 
+/** Oyente de los eventos de todas las ejecuciones, con su diagrama [R61.9]. */
+export type RunWatcher = (event: RunEvent, diagram: Diagram) => void;
+
 /** Lanzamiento de ejecuciones y cola por diagrama [R52.3][R56.16]. */
 export class RunQueue {
   private queue: QueueEntry[] = [];
   private queueSeq = 0;
+  private readonly watchers = new Set<RunWatcher>();
 
   constructor(
     private readonly live: LiveRuns,
@@ -42,6 +46,7 @@ export class RunQueue {
     if (snapshot) this.snapshots?.set(handle.runId, snapshot);
     const live: Live = { handle, finished: false, diagram, previews: [] };
     this.live.add(live);
+    handle.bus.subscribe((e) => this.tell(e, diagram), { fromSeq: 1 });
     // Al terminar bien un paso, se copia lo que hizo para que la ejecución lo enseñe siempre igual [R54.3].
     const touched = new Map<string, Set<string>>();
     handle.bus.subscribe(
@@ -49,6 +54,7 @@ export class RunQueue {
         if (e.type !== 'file.produced' && e.type !== 'node.finished') return;
         const key = [...(e.nodePath ?? []), e.nodeId].join('/');
         if (e.type === 'file.produced') {
+          if (e.reused) return; // ya se copió en su ejecución [R41.9]
           (touched.get(key) ?? touched.set(key, new Set()).get(key)!).add(e.path.replace(/\\/g, '/'));
           return;
         }
@@ -65,6 +71,28 @@ export class RunQueue {
     };
     void logged.then(done, done);
     return live;
+  }
+
+  /** Escucha todas las ejecuciones que arranquen desde ahora; devuelve la función para dejar de hacerlo [R61.9]. */
+  watch(watcher: RunWatcher): () => void {
+    this.watchers.add(watcher);
+    return () => void this.watchers.delete(watcher);
+  }
+
+  /** Un oyente que falla no puede impedir arrancar: el historial se entrega fuera de la protección del bus [R61.9]. */
+  private tell(event: RunEvent, diagram: Diagram): void {
+    for (const watcher of this.watchers) {
+      try {
+        watcher(event, diagram);
+      } catch {
+        /* un aviso perdido no importa a la ejecución */
+      }
+    }
+  }
+
+  /** Cuántas ejecuciones siguen en marcha [R61.9]. */
+  runningCount(): number {
+    return this.live.running().length;
   }
 
   launchPrepared(p: PreparedRun): Live {

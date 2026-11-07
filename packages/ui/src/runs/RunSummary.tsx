@@ -1,23 +1,24 @@
-import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
-import { CheckCircle2, XCircle, Loader2, CircleDashed, RotateCcw, Square, Copy, GitBranch } from 'lucide-react';
+import { type ReactNode, useMemo, useState } from 'react';
+import { CheckCircle2, XCircle, Loader2, CircleDashed, RotateCcw, Square, Copy, GitBranch, ShieldAlert } from 'lucide-react';
 import { ReactFlowProvider } from '@xyflow/react';
-import { type Diagram, type RunEvent, MODELS, pathKey, canResume } from '@orquestador/core';
+import { type Diagram, type RunEvent, pathKey, canResume } from '@orquestador/core';
 import { type LiveView, EditorSession, filesByStep, type ProjectApi, t, formatDuration, type RunSummaryView, type MessageKey, type HistoryRow, supervisorView } from '@orquestador/editor';
 import { Canvas } from '../diagrams';
-import { SupervisorOverlay, reviewedText } from './SupervisorOverlay';
+import { SupervisorOverlay } from './SupervisorOverlay';
+import { SupervisorBalance, SupervisorFinal, SupervisorMemoryList, ruleTitle } from './SupervisorTab';
 import { ResultsPanel } from './ResultsPanel';
 import { Markdown, PrLink } from '../common';
 import { money } from './runFormat';
 
 /** Lienzo de solo lectura con el diagrama de la ejecución y el estado de cada paso [R35.9]. */
-export function RunCanvas({ diagram, live, events, agentNames, onSelect, onOpenFile, previewCard, label, onSupervisor }: { label?: (id: string, path: readonly string[]) => string; onSupervisor?: () => void; diagram: Diagram; live: LiveView; events: readonly RunEvent[]; agentNames: Readonly<Record<string, string>>; onSelect: (key: string) => void; onOpenFile?: (key: string, path: string) => void; previewCard?: (key: string, path: string) => ReactNode }) {
+export function RunCanvas({ diagram, live, events, agentNames, onSelect, onOpenFile, previewCard, label, onSupervisor }: { label?: (id: string, path: readonly string[]) => string; onSupervisor?: (key?: string) => void; diagram: Diagram; live: LiveView; events: readonly RunEvent[]; agentNames: Readonly<Record<string, string>>; onSelect: (key: string) => void; onOpenFile?: (key: string, path: string) => void; previewCard?: (key: string, path: string) => ReactNode }) {
   const session = useMemo(() => {
     const s = new EditorSession(diagram);
     s.setReadOnly(true);
     return s;
   }, [diagram]);
   // Fichas con los archivos de cada paso, debajo de su nodo [R54.1].
-  const extras = useMemo(() => ({ stepFiles: filesByStep(events), ...(onOpenFile ? { onOpenFile } : {}), ...(previewCard ? { previewCard } : {}) }), [events, onOpenFile, previewCard]);
+  const extras = useMemo(() => ({ stepFiles: filesByStep(events), ...(onOpenFile ? { onOpenFile } : {}), ...(previewCard ? { previewCard } : {}), ...(onSupervisor ? { onAlerts: onSupervisor } : {}) }), [events, onOpenFile, previewCard, onSupervisor]);
   const pick = (id: string) => onSelect(pathKey(session.getSnapshot().path, id));
   // La tarjeta y la memoria salen de los eventos: sin Supervisor, no hay nada que pintar [R60.32].
   const watch = useMemo(() => supervisorView(events, live.status === 'running', label ?? ((id) => id)), [events, live.status, label]);
@@ -86,13 +87,8 @@ const stepIcon = (st: string) => (st === 'succeeded' ? <CheckCircle2 size={15} a
  * Pestaña «Resumen»: cómo terminó en una frase, lo que se pidió, el resultado final y qué hizo cada paso, con
  * revisiones, preguntas, archivos y errores [R38.23].
  */
-export function SummaryBody({ summary: s, onPick, wide = false, onOpenDeliverable, focusSupervisor = false }: { summary: RunSummaryView; onPick: (key: string) => void; wide?: boolean; onOpenDeliverable?: (path: string) => void; focusSupervisor?: boolean }) {
+export function SummaryBody({ summary: s, onPick, wide = false, onOpenDeliverable, onAlert }: { summary: RunSummaryView; onPick: (key: string) => void; wide?: boolean; onOpenDeliverable?: (path: string) => void; onAlert?: ((key?: string) => void) | undefined }) {
   const icon = stepIcon;
-  const supervisor = useRef<HTMLElement>(null);
-  // Al llegar desde la tarjeta, directo a su apartado [R60.36].
-  useEffect(() => {
-    if (focusSupervisor) supervisor.current?.scrollIntoView?.({ block: 'start' });
-  }, [focusSupervisor]);
   return (
     <div className={`orq-rsum${wide ? ' is-wide' : ''}`}>
       <div className="orq-rsum__col">
@@ -120,20 +116,22 @@ export function SummaryBody({ summary: s, onPick, wide = false, onOpenDeliverabl
         </section>
       )}
       {s.supervisor && (
-        <section ref={supervisor} className="orq-rsum__sec orq-rsum__sup" aria-label={t('rsum.sup')}>
+        <section className="orq-rsum__sec orq-rsum__sup" aria-label={t('rsum.sup')}>
           <h3>{t('rsum.sup')}</h3>
-          {s.supervisor.balance && (
-            <p className="orq-hint">
-              {`${reviewedText(s.supervisor.balance.reviewed)} · ${money(s.supervisor.balance.costUsd)}`}
-              {s.supervisor.balance.model ? ` · ${MODELS.find((m) => m.id === s.supervisor!.balance!.model)?.name ?? s.supervisor.balance.model}` : ''}
-            </p>
-          )}
+          <SupervisorBalance watch={s.supervisor} />
+          <SupervisorFinal watch={s.supervisor} />
           {s.supervisor.alerts.length > 0 ? (
-            <ul className="orq-rsum__list">
+            <ul className="orq-supalerts">
               {s.supervisor.alerts.map((a, i) => (
                 <li key={i}>
-                  {a.label && <strong>{a.label}: </strong>}
-                  {a.detail}
+                  <button type="button" className="orq-supalert orq-supalert--row" onClick={() => onAlert?.(a.key)}>
+                    <ShieldAlert size={16} aria-hidden="true" />
+                    <span>
+                      <strong>{ruleTitle(a.rule)}</strong>
+                      {a.label && <span className="orq-hint"> · {a.label}</span>}
+                      <span className="orq-supalert__detail">{a.detail}</span>
+                    </span>
+                  </button>
                 </li>
               ))}
             </ul>
@@ -141,21 +139,7 @@ export function SummaryBody({ summary: s, onPick, wide = false, onOpenDeliverabl
             <p className="orq-hint">{t('rsum.sup.ok')}</p>
           )}
           {s.supervisor.skipped && <p className="orq-hint">{s.supervisor.skipped.reason === 'timeout' ? t('rsum.sup.timeout', { count: s.supervisor.skipped.count }) : t('rsum.sup.failed')}</p>}
-          {(s.supervisor.notes.length > 0 || s.supervisor.branch) && (
-            <>
-              <h3>{t('rsum.sup.memory')}</h3>
-              {s.supervisor.branch && <p className="orq-rsum__branch">{s.supervisor.branch}</p>}
-              <ul className="orq-rsum__list">
-                {s.supervisor.notes.map((n, i) => (
-                  <li key={i}>
-                    <strong>{n.label}</strong>
-                    {n.text ? `: ${n.text}` : ''}
-                    {n.files.length > 0 ? ` (${n.files.join(', ')})` : ''}
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
+          <SupervisorMemoryList watch={s.supervisor} />
         </section>
       )}
       {s.splitRejections.length > 0 && (

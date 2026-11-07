@@ -1,6 +1,8 @@
 import { pathKey, type Id, type RunEvent } from '@orquestador/core';
 
-type GitAction = Extract<RunEvent, { type: 'git.action' }>['action'];
+type GitBranchEvent = Extract<RunEvent, { type: 'git.branch' }>;
+type GitActionEvent = Extract<RunEvent, { type: 'git.action' }>;
+type GitAction = GitActionEvent['action'];
 
 /** Una rama de la ejecución y quién actuó en ella [R58.6][R58.13]. */
 export interface RunBranch {
@@ -28,13 +30,15 @@ export const reviewNumber = (url: string): string => /(\d+)$/.exec(url)?.[1] ?? 
 /** Ramas de una ejecución; si los pasos solo corrieron en ella, sin actividad de git, no hay ninguna (decisión 2) [R58.6]. */
 export function branchesOf(events: readonly RunEvent[]): RunBranches {
   const seen = events.filter((e) => e.type === 'git.branch');
+  const moves = events.filter((e): e is GitBranchEvent | GitActionEvent => e.type === 'git.branch' || (e.type === 'git.action' && e.action === 'switch'));
   if (seen.every((e) => e.via === 'ran')) return { byStep: {}, actions: {}, links: {}, list: [] };
   const byStep: Record<string, string[]> = {};
   const list = new Map<string, RunBranch>();
-  for (const e of seen) {
+  for (const e of moves) {
     const nodePath = e.nodePath ?? [];
     const key = pathKey(nodePath, e.nodeId);
     byStep[key] = [...(byStep[key] ?? []).filter((b) => b !== e.branch), e.branch];
+    if (e.type !== 'git.branch') continue;
     const branch = list.get(e.branch) ?? { name: e.branch, created: false, deleted: false, steps: [] };
     if (e.created) branch.created = true;
     if (!branch.steps.some((s) => s.key === key)) branch.steps.push({ key, nodeId: e.nodeId, nodePath: [...nodePath], actions: [] });

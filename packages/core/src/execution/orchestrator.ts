@@ -3,6 +3,7 @@ import { isCoordinator, type Id, type KnowledgeExtra, type Payload } from '../sh
 import type { AgentAdapter, AgentProfile, AgentSnapshot, Decider } from './adapter';
 import { proposeCorrectionWith } from './corrections';
 import { EventBus, type RunEvent } from './events';
+import { trailBody } from './resume';
 import { errorMessage, type DiagramOutcome, type Outcome, type ReviewLevel, type RunServices, type StepContext } from './nodes/handler';
 import { defaultNodeRegistry, type NodeRegistry } from './nodes/registry';
 import { composeRoundInput } from './review';
@@ -33,7 +34,7 @@ export interface OrchestratorDeps {
   now?(): Date;
   newRunId?(): Id;
   /** Activa el Supervisor; `review` dice si revisa con IA, y se pregunta en cada paso [R60.1]. */
-  supervisor?: { review(): boolean; model?(): string; settleMs?: number };
+  supervisor?: { review(): boolean; model?(): string; settleMs?: number; checkMs?: number };
   /** Tipos de nodo; por defecto, los de la aplicación [R56.12]. */
   nodes?: NodeRegistry;
 }
@@ -87,7 +88,7 @@ export class Orchestrator {
     let failReason: string | undefined;
     const watch = this.deps.supervisor;
     const supervisor = watch
-      ? new Supervisor({ emitter, decider: this.deps.decider, budget, limits: options.budget, signal: stop.signal, review: () => watch.review(), ...(watch.model ? { model: () => watch.model!() } : {}), labelOf: (id) => diagram.nodes.find((n) => n.id === id)?.label ?? id, ...(watch.settleMs !== undefined ? { settleMs: watch.settleMs } : {}) })
+      ? new Supervisor({ order: typeof order === 'string' ? { text: order, files: [] } : order, ...(options.correction ? { correction: { text: options.correction.text, ...(options.correction.before ? { before: options.correction.before } : {}) } } : {}), ...(deliverable ? { deliverable: JSON.stringify(deliverable) } : {}), ...(watch.checkMs !== undefined ? { checkMs: watch.checkMs } : {}), emitter, decider: this.deps.decider, budget, limits: options.budget, signal: stop.signal, review: () => watch.review(), ...(watch.model ? { model: () => watch.model!() } : {}), labelOf: (id) => diagram.nodes.find((n) => n.id === id)?.label ?? id, ...(watch.settleMs !== undefined ? { settleMs: watch.settleMs } : {}) })
       : undefined;
     if (supervisor) bus.subscribe((e) => supervisor.observe(e));
     const services: RunServices = {
@@ -139,6 +140,12 @@ export class Orchestrator {
         reason = failReason;
       }
       await supervisor?.settle();
+      // Acabar bien exige haber conseguido lo pedido [R62.10].
+      const unmet = status === 'succeeded' ? await supervisor?.verify() : undefined;
+      if (unmet !== undefined) {
+        status = 'failed';
+        reason = unmet;
+      }
       emitter.emit({ type: 'run.finished', status, ...(reason !== undefined ? { reason } : {}) });
       return {
         runId,
@@ -303,6 +310,13 @@ async function executeDiagram(run: RunServices, nodes: NodeRegistry, diagram: Di
     if (reused && (!isCoordinator(node) || partsOf(node, reused))) {
       emitter.emit({ type: 'node.started', nodeId: node.id, input: nodeInput }, path);
       emitter.emit({ type: 'node.reused', nodeId: node.id, fromRunId: run.cache.reuseFrom! }, path);
+      // Su rastro viaja con él: ramas, archivos, avisos y memoria siguen en la ejecución nueva [R41.7].
+      for (const past of run.cache.trailOf(node.id)) {
+        const body = trailBody(past);
+        if (body.type === 'supervisor.note' || body.type === 'supervisor.alert') run.supervisor?.restore(body, past.nodePath ?? []);
+        else emitter.emit(body, past.nodePath ?? []);
+      }
+      run.supervisor?.reused(node.id, reused);
       return Promise.resolve({ status: 'succeeded', output: reused });
     }
     return nodes.find(node.kind)!.run(stepOf(node), node, nodeInput, path);

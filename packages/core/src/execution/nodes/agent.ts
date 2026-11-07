@@ -6,6 +6,7 @@ import { CONFIRM_APPROVE, CONFIRM_QUESTION, composeConfirmInput, isApproval } fr
 import { deliverableNotice } from '../text/deliverable-notice';
 import { composeSplitFix, declaredFiles, describeSplitProblem, parseSplit, splitRule, type SplitBranch } from '../text/split';
 import { explainTouchedFiles } from '../text/touched-files';
+import { UNFINISHED_OPTIONS, unfinishedDecision, unfinishedQuestion } from '../text/unfinished';
 import { errorMessage, failStep, type NodeHandler, type Outcome, type StepContext } from './handler';
 
 /** Lo que dura todos los intentos de un paso. */
@@ -63,6 +64,27 @@ export const agentHandler: NodeHandler = {
       for (let round = 1; ; round++) {
         const out = await attemptsOf(step, node, current, path, turn);
         if (out.status !== 'succeeded' || !out.output) return out;
+        // Un paso que no terminó lo pedido no pasa de largo: decide la persona [R62.4].
+        // Sin ficha se revisa con lo demás: esto no debe fallar el paso.
+        const profile = step.supervisor && node.agentId ? await step.agentProfile?.(node.agentId, node.extra, step.emitter.runId).catch(() => undefined) : undefined;
+        const missing = await step.supervisor?.check(node.id, path, out.output, profile?.purpose);
+        if (missing !== undefined) {
+          let answer: string;
+          try {
+            answer = await step.limiter.whileWaiting(turn.slot, step.signal, () => step.questions.ask(node.id, path, { text: unfinishedQuestion(missing), options: UNFINISHED_OPTIONS, kind: 'unfinished' }));
+          } catch (err) {
+            if (step.signal.aborted) return { status: 'cancelled' };
+            return failStep(step, node, errorMessage(err), path);
+          }
+          if (step.signal.aborted) return { status: 'cancelled' };
+          const decision = unfinishedDecision(answer, missing);
+          if (decision.action === 'stop') return failStep(step, node, `Parado porque no terminó lo pedido: ${missing}`, path);
+          if (decision.action === 'retry') {
+            turn.answered.push({ question: 'El Supervisor dijo que faltaba algo', answer: decision.request });
+            current = composeConfirmInput({ round, original: input, previous: out.output, request: decision.request });
+            continue;
+          }
+        }
         if (node.confirm) {
           // Confirmar antes de terminar: espera a que el usuario apruebe o pida cambios [R43.5].
           let reply: string;

@@ -47,12 +47,23 @@ export interface OrqNodeData extends Record<string, unknown> {
   prUrl?: string;
   /** Avisos del Supervisor [R60.9]. */
   alerts?: readonly string[];
+  /** Abre los avisos de este paso [R60.40]. */
+  onAlerts?: () => void;
   /** «Ampliar»: la vista previa en grande [R54.2]. */
   onOpenFile?: (path: string) => void;
   /** Vista previa pequeña de un archivo, en la tarjeta junto al nodo [R54.2]. */
   renderPreview?: (path: string) => ReactNode;
 }
 export type OrqFlowNode = Node<OrqNodeData, 'orq'>;
+
+function AlertCount({ n }: { n: number }) {
+  return (
+    <>
+      <ShieldAlert size={12} aria-hidden="true" />
+      {n === 1 ? t('node.alerts.one') : t('node.alerts', { n })}
+    </>
+  );
+}
 
 const KIND_ICON = { entry: Play, output: Square, agent: Bot, router: GitFork, loop: Repeat2, review: ShieldCheck, subdiagram: Boxes, transform: Braces } as const;
 
@@ -147,12 +158,24 @@ export function OrqNode({ data, selected }: NodeProps<OrqFlowNode>) {
         )}
         {data.note && <span className="orq-node__note">{data.note}</span>}
         {data.waits && <span className="orq-node__waits">{data.waits}</span>}
-        {data.alerts && (
-          <span className="orq-node__alerts" title={data.alerts.join('\n')}>
-            <ShieldAlert size={12} aria-hidden="true" />
-            {data.alerts.length === 1 ? t('node.alerts.one') : t('node.alerts', { n: data.alerts.length })}
-          </span>
-        )}
+        {data.alerts &&
+          (data.onAlerts ? (
+            <button
+              type="button"
+              className="orq-node__alerts nodrag nopan"
+              title={data.alerts.join('\n')}
+              onClick={(e) => {
+                e.stopPropagation();
+                data.onAlerts!();
+              }}
+            >
+              <AlertCount n={data.alerts.length} />
+            </button>
+          ) : (
+            <span className="orq-node__alerts" title={data.alerts.join('\n')}>
+              <AlertCount n={data.alerts.length} />
+            </span>
+          ))}
         {data.gitActions && (
           <span className="orq-node__git">
             {data.gitActions.map((a) => {

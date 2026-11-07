@@ -1,3 +1,4 @@
+export { ErrorBoundary } from '../common';
 export { NavRail, type SectionId } from './NavRail';
 export { type StartPath, StartScreen } from './StartScreen';
 export { Toolbar } from './Toolbar';

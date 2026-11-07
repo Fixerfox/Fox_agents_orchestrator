@@ -22,6 +22,25 @@ export interface SupervisorView {
   memory: { label: string; text: string; files: string[] }[];
 }
 
+/** Un aviso del Supervisor, con lo que hace falta para explicarlo [R60.39]. */
+export interface SupervisorAlertItem {
+  /** Paso del aviso; sin él, es de la ejecución entera. */
+  key?: string;
+  label: string;
+  rule: string;
+  detail: string;
+  at: string;
+}
+
+export function supervisorAlerts(events: readonly RunEvent[], labelOf: (id: Id, path: readonly Id[]) => string): SupervisorAlertItem[] {
+  return events.flatMap((e) => {
+    if (e.type !== 'supervisor.alert') return [];
+    const path = e.nodePath ?? [];
+    const step = e.nodeId === undefined ? { label: '' } : { key: pathKey(path, e.nodeId), label: labelOf(e.nodeId, path) };
+    return [{ ...step, rule: e.rule, detail: e.detail, at: e.ts }];
+  });
+}
+
 export function supervisorView(events: readonly RunEvent[], running: boolean, labelOf: (id: Id, path: readonly Id[]) => string): SupervisorView | undefined {
   let found = false;
   let reviews = false;
@@ -30,7 +49,6 @@ export function supervisorView(events: readonly RunEvent[], running: boolean, la
   let alerts = 0;
   let costUsd = 0;
   let lastAlert: string | undefined;
-  let lastKey: string | undefined;
   const pending = new Map<string, { label: string; count: number }>();
   const warned = new Set<string>();
   const branches = newBranchMemory();
@@ -61,10 +79,7 @@ export function supervisorView(events: readonly RunEvent[], running: boolean, la
       case 'supervisor.alert':
         alerts++;
         lastAlert = e.detail;
-        if (e.nodeId !== undefined) {
-          lastKey = pathKey(path, e.nodeId);
-          warned.add(lastKey);
-        }
+        if (e.nodeId !== undefined) warned.add(pathKey(path, e.nodeId));
         break;
       case 'supervisor.skipped':
         if (e.reason === 'failed') reviews = false;
@@ -81,7 +96,6 @@ export function supervisorView(events: readonly RunEvent[], running: boolean, la
   }
   if (!found) return undefined;
   const open = running ? [...pending.keys()] : [];
-  const keys = open.length > 0 || !running || lastKey === undefined ? open : [lastKey];
   const status: SupervisorStatus = !running ? 'done' : open.length > 0 ? 'reviewing' : !reviews ? 'rules' : alerts > 0 ? 'alert' : 'watching';
   const branch = branchMemoryLine(branches).replace(/^Rama de git: /, '');
   return {
@@ -90,7 +104,7 @@ export function supervisorView(events: readonly RunEvent[], running: boolean, la
     alerts,
     costUsd,
     reviewing: open.map((key) => pending.get(key)!.label),
-    targets: keys.map((key) => ({ key, warn: warned.has(key) })),
+    targets: open.map((key) => ({ key, warn: warned.has(key) })),
     memory,
     ...(model ? { model } : {}),
     ...(branch ? { branch } : {}),

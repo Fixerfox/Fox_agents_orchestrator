@@ -57,7 +57,7 @@ describe('SPEC-060 · el Resumen', () => {
   it('[R60.10] tiene su sección con cada aviso, su paso y la memoria', () => {
     render(<SummaryBody summary={summarizeRun([...started, alert, note], labels)} onPick={vi.fn()} />);
     const s = section();
-    expect(s.getByText(/src\/api\/x\.ts: fuera de sus archivos/).textContent).toContain('Pintor');
+    expect(s.getByRole('button', { name: /src\/api\/x\.ts: fuera de sus archivos/ }).textContent).toContain('Pintor');
     expect(s.getByText(/Pintó el cielo/).textContent).toContain('cielo.png');
     expect(s.getByRole('heading', { name: 'Memoria de la ejecución' })).toBeTruthy();
   });
@@ -126,8 +126,8 @@ describe('SPEC-060 · lo que se ve de la ejecución', () => {
     expect(view([start, on('a'), on('a'), off('a'), off('a')]).status).toBe('watching');
   });
 
-  it('[R60.33] sin revisiones en marcha apunta al último aviso, en amarillo', () => {
-    expect(view([start, alert])).toMatchObject({ status: 'alert', lastAlert: 'src/api/x.ts: fuera de sus archivos', targets: [{ key: 'a', warn: true }] });
+  it('[R60.33] sin revisiones en marcha no señala a nadie, y mientras revisa un paso con aviso va en amarillo', () => {
+    expect(view([start, alert])).toMatchObject({ status: 'alert', lastAlert: 'src/api/x.ts: fuera de sus archivos', targets: [] });
     expect(view([start, alert, reviewing]).targets).toEqual([{ key: 'a', warn: true }]);
   });
 
@@ -179,13 +179,10 @@ describe('SPEC-060 · lo que se ve de la ejecución', () => {
     expect(panel.queryByRole('listitem')).toBeNull();
   });
 
-  it('[R60.36] el Resumen da el balance y la rama, y se llega directo', () => {
-    const scroll = vi.fn();
-    Element.prototype.scrollIntoView = scroll;
-    render(<SummaryBody summary={summarizeRun([...started, start, spent, branch, reviewed], labels)} onPick={vi.fn()} focusSupervisor />);
+  it('[R60.39] el Resumen da el balance y la rama', () => {
+    render(<SummaryBody summary={summarizeRun([...started, start, spent, branch, reviewed], labels)} onPick={vi.fn()} />);
     expect(section().getByText(/1 paso revisado/).textContent).toContain('Haiku 5.5');
     expect(section().getByText('feature/login (creada por Pintor)')).toBeTruthy();
-    expect(scroll).toHaveBeenCalled();
   });
 
   it('[R60.37] cada paso guarda la memoria que recibió', () => {

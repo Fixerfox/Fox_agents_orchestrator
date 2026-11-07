@@ -287,5 +287,6 @@ export function memoryRuns(s: MemoryState, options: MemoryApiOptions) {
       listeners.add(listener);
       return () => void listeners.delete(listener);
     },
+    onOpenRun: () => () => {},
   } satisfies Partial<MemoryApi>;
 }

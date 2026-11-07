@@ -71,10 +71,10 @@ function headline(v: SupervisorView): string {
 }
 
 /** Tarjeta fija del Supervisor: no es un nodo y no se mueve con el lienzo [R60.32]. */
-export function SupervisorCard({ view: v, onOpen }: { view: SupervisorView; onOpen?: (() => void) | undefined }) {
+export function SupervisorCard({ view: v, onOpen }: { view: SupervisorView; onOpen?: ((key?: string) => void) | undefined }) {
   const metrics = `${reviewedText(v.reviewed)} · ${alertsText(v.alerts)} · ${money(v.costUsd)}`;
   return (
-    <button type="button" className={`orq-sup is-${v.status}`} aria-label={t('sup.open')} onClick={onOpen}>
+    <button type="button" className={`orq-sup is-${v.status}`} aria-label={t('sup.open')} onClick={() => onOpen?.()}>
       <span className="orq-sup__ring">
         <span className="orq-sup__body">
           <svg className="orq-sup__emblem" width="52" height="60" viewBox="0 0 62 70" aria-hidden="true">
@@ -132,7 +132,7 @@ export function SupervisorMemory({ view: v }: { view: SupervisorView }) {
 }
 
 /** Tarjeta, memoria y haz sobre el lienzo de una ejecución; va dentro de React Flow [R60.32]–[R60.35]. */
-export function SupervisorOverlay({ view, path, onOpen }: { view: SupervisorView; path: readonly string[]; onOpen?: (() => void) | undefined }) {
+export function SupervisorOverlay({ view, path, onOpen }: { view: SupervisorView; path: readonly string[]; onOpen?: ((key?: string) => void) | undefined }) {
   const flow = useReactFlow();
   const [tx, ty, zoom] = useStore((s) => s.transform);
   const width = useStore((s) => s.width);
@@ -151,7 +151,7 @@ export function SupervisorOverlay({ view, path, onOpen }: { view: SupervisorView
     if (!id || !rect) return [];
     seen.add(id);
     const others = steps.filter((n) => n.id !== id).flatMap((n) => screen(n.id) ?? []);
-    return [{ id, warn: target.warn, rect, ...beamTo(rect, { width, height }, others) }];
+    return [{ id, key: target.key, warn: target.warn, rect, ...beamTo(rect, { width, height }, others) }];
   });
   return (
     <>
@@ -175,10 +175,17 @@ export function SupervisorOverlay({ view, path, onOpen }: { view: SupervisorView
               <i />
               <i />
               <i />
-              <span>{t(b.warn ? 'sup.tag.alert' : 'sup.tag.review')}</span>
+              {!b.warn && <span>{t('sup.tag.review')}</span>}
             </div>
           ))}
       </div>
+      {beams
+        .filter((b) => b.warn && !b.offscreen)
+        .map((b) => (
+          <button key={b.id} type="button" className="orq-sup__tag" style={{ left: b.rect.x + b.rect.width + SCOPE, top: b.rect.y - SCOPE - 26 }} onClick={() => onOpen?.(b.key)}>
+            {t('sup.tag.alert')}
+          </button>
+        ))}
       {beams
         .filter((b) => b.offscreen)
         .map((b) => (

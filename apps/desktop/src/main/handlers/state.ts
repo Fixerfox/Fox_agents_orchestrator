@@ -1,4 +1,4 @@
-import { defaultSettings, type AppSettings, type ImportPlan, type Orchestrator, type RunEvent } from '@orquestador/core';
+import { defaultSettings, type AppSettings, type Diagram, type ImportPlan, type Orchestrator, type RunEvent } from '@orquestador/core';
 import type { AssistantEvent, ImportKind } from '@orquestador/editor';
 import type { CreateAppServer, QueryFn } from '@orquestador/claude';
 import { createHash } from 'node:crypto';
@@ -45,6 +45,8 @@ export interface DesktopDeps {
   assistantProtectedDirs?: string[];
   /** Envía un lote de eventos al renderer (R15.7/R20.4). */
   push?(runId: string, events: RunEvent[]): void;
+  /** Recibe los eventos de todas las ejecuciones, para los avisos del sistema [R61.9]. */
+  watchRun?(event: RunEvent, diagram: Diagram): void;
   /** Ventana de agrupación en ms (por defecto 50). */
   batchMs?: number;
 }

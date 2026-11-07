@@ -1,6 +1,6 @@
 import { CORRECTABLE_KINDS, type Diagram, downstreamOf, flowOrder, forwardEdges } from '../diagrams';
 import type { Id, Payload } from '../shared';
-import type { RunEvent } from './events';
+import type { EventBody, RunEvent } from './events';
 
 const KINDS = new Set(['agent', 'transform', 'subdiagram']);
 
@@ -16,6 +16,32 @@ export function resumePlan(diagram: Diagram, events: readonly RunEvent[]): Recor
     if (e.status === 'succeeded' && e.output) out[e.nodeId] = { text: e.output.text, files: [...(e.output.files ?? [])] };
   }
   return out;
+}
+
+/** Lo que entregaron en la anterior los pasos que una corrección repite [R62.16]. */
+export function redoneSteps(diagram: Diagram, events: readonly RunEvent[], reused: Readonly<Record<Id, Payload>>): { step: string; text: string; files: string[] }[] {
+  return Object.entries(resumePlan(diagram, events))
+    .filter(([id]) => !(id in reused))
+    .map(([id, out]) => ({ step: diagram.nodes.find((n) => n.id === id)?.label ?? id, text: out.text.slice(0, 3000), files: out.files }));
+}
+
+const TRAIL = new Set<RunEvent['type']>(['git.branch', 'git.action', 'file.produced', 'supervisor.note', 'supervisor.alert']);
+
+/** Lo que dejaron en la ejecución los pasos que se van a reutilizar, por paso del nivel principal [R41.7]. */
+export function reusedTrail(outputs: Readonly<Record<Id, Payload>>, events: readonly RunEvent[]): Record<Id, RunEvent[]> {
+  const out: Record<Id, RunEvent[]> = {};
+  for (const e of events) {
+    if (!TRAIL.has(e.type) || !('nodeId' in e) || e.nodeId === undefined) continue;
+    const step = e.nodePath?.[0] ?? e.nodeId;
+    if (step in outputs) (out[step] ??= []).push(e);
+  }
+  return out;
+}
+
+/** Un evento del rastro listo para volver a emitirse: lo propio de la ejecución anterior se queda allí [R41.9]. */
+export function trailBody(past: RunEvent): EventBody {
+  const body = Object.fromEntries(Object.entries(past).filter(([key]) => !['runId', 'seq', 'ts', 'nodePath'].includes(key))) as EventBody;
+  return body.type === 'file.produced' ? { ...body, reused: true } : body;
 }
 
 /** Estados desde los que se puede reanudar [R41.2]. */
