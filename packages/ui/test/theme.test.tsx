@@ -210,7 +210,8 @@ describe('tarjetas de nodo [R21.5]', () => {
     await userEvent.click(screen.getByRole('button', { name: '+ Agente' }));
     await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Sonido/ }));
     const node = (await screen.findByLabelText(/^Agente «sonido», 1 problemas/)) as HTMLElement;
-    expect(within(node).getByText('Sonido')).toBeTruthy();
+    // El paso «sonido» es el agente «Sonido»: el nombre sale una vez, sin subtítulo repetido [R63.25].
+    expect(within(node).getAllByText(/^sonido$/i)).toHaveLength(1);
     expect(node.querySelector('.orq-node__problem svg')).toBeTruthy();
   });
 });

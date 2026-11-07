@@ -4,7 +4,7 @@ import { historyRows, type HistoryGroup, type RunAction, t, type HistoryRow } fr
 import type { InboxItem } from './useRunsIndex';
 import { type RunsSection, type RunsScreenProps, type RunsNav } from './runsTypes';
 import { useNow, useDiagrams } from './useRunData';
-import { SECTIONS, diagramLabel } from './runFormat';
+import { SECTIONS, crumbSection, diagramLabel } from './runFormat';
 import { RunDetail } from './RunDetail';
 import { LiveSection } from './LiveSection';
 import { InboxSection } from './InboxSection';
@@ -105,14 +105,15 @@ export function RunsScreen(p: RunsScreenProps) {
 }
 
 function Crumbs({ nav, row, onNav }: { nav: RunsNav; row: HistoryRow | undefined; onNav: RunsScreenProps['onNav'] }) {
-  const sec = SECTIONS.find((s) => s.id === nav.section)!;
+  const section = crumbSection(nav, row);
+  const sec = SECTIONS.find((s) => s.id === section)!;
   return (
     <nav className="orq-runs2__crumbs" aria-label={t('runs.crumbs')}>
       <button type="button" onClick={() => onNav({ section: 'history' })}>
         {t('runs.title')}
       </button>
       <span aria-hidden="true">/</span>
-      <button type="button" aria-current={nav.runId ? undefined : 'page'} onClick={() => onNav({ section: nav.section })}>
+      <button type="button" aria-current={nav.runId ? undefined : 'page'} onClick={() => onNav({ section })}>
         {t(sec.label)}
       </button>
       {nav.runId && (

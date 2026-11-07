@@ -3,6 +3,7 @@ import { isCoordinator, type Id, type KnowledgeExtra, type Payload } from '../sh
 import type { AgentAdapter, AgentProfile, AgentSnapshot, Decider } from './adapter';
 import { proposeCorrectionWith } from './corrections';
 import { EventBus, type RunEvent } from './events';
+import { pathKey } from './replay';
 import { trailBody } from './resume';
 import { errorMessage, type DiagramOutcome, type Outcome, type ReviewLevel, type RunServices, type StepContext } from './nodes/handler';
 import { defaultNodeRegistry, type NodeRegistry } from './nodes/registry';
@@ -37,6 +38,11 @@ export interface OrchestratorDeps {
   supervisor?: { review(): boolean; model?(): string; settleMs?: number; checkMs?: number };
   /** Tipos de nodo; por defecto, los de la aplicación [R56.12]. */
   nodes?: NodeRegistry;
+  /**
+   * Fija al arrancar cada ejecución el motor que usará hasta el final: agentes, decisiones y si el Supervisor revisa
+   * con IA. Sin él se usan `getAdapter` y `decider` tal cual [R63.13].
+   */
+  forRun?(): { getAdapter(agentId: Id): AgentAdapter; decider: Decider; review?(): boolean };
 }
 
 export interface RunResult {
@@ -85,10 +91,16 @@ export class Orchestrator {
     const questions = new QuestionBroker(emitter, stop.signal, options.questionTimeoutMs);
     const budget = new BudgetTracker(options.budget, emitter, stop);
     const deliverable = options.deliverable === null ? undefined : (options.deliverable ?? diagram.deliverable);
+    // El motor queda fijado para toda la ejecución [R63.13].
+    const engine = this.deps.forRun?.() ?? { getAdapter: (agentId: Id) => this.deps.getAdapter(agentId), decider: this.deps.decider };
+    // Etiquetas de cada paso por ruta, también dentro de bucles y subdiagramas [R63.6].
+    const labels = new Map<string, string>();
+    const labelOf = (id: Id, path: readonly Id[] = []) => labels.get(pathKey(path, id)) ?? diagram.nodes.find((n) => n.id === id)?.label ?? id;
+    const outputId = diagram.nodes.find((n) => n.kind === 'output')?.id;
     let failReason: string | undefined;
     const watch = this.deps.supervisor;
     const supervisor = watch
-      ? new Supervisor({ order: typeof order === 'string' ? { text: order, files: [] } : order, ...(options.correction ? { correction: { text: options.correction.text, ...(options.correction.before ? { before: options.correction.before } : {}) } } : {}), ...(deliverable ? { deliverable: JSON.stringify(deliverable) } : {}), ...(watch.checkMs !== undefined ? { checkMs: watch.checkMs } : {}), emitter, decider: this.deps.decider, budget, limits: options.budget, signal: stop.signal, review: () => watch.review(), ...(watch.model ? { model: () => watch.model!() } : {}), labelOf: (id) => diagram.nodes.find((n) => n.id === id)?.label ?? id, ...(watch.settleMs !== undefined ? { settleMs: watch.settleMs } : {}) })
+      ? new Supervisor({ order: typeof order === 'string' ? { text: order, files: [] } : order, ...(options.correction ? { correction: { text: options.correction.text, ...(options.correction.before ? { before: options.correction.before } : {}) } } : {}), ...(deliverable ? { deliverable: JSON.stringify(deliverable) } : {}), ...(watch.checkMs !== undefined ? { checkMs: watch.checkMs } : {}), emitter, decider: engine.decider, budget, limits: options.budget, signal: stop.signal, review: () => watch.review() && (engine.review?.() ?? true), ...(watch.model ? { model: () => watch.model!() } : {}), labelOf, ...(outputId !== undefined ? { outputId } : {}), ...(watch.settleMs !== undefined ? { settleMs: watch.settleMs } : {}) })
       : undefined;
     if (supervisor) bus.subscribe((e) => supervisor.observe(e));
     const services: RunServices = {
@@ -101,8 +113,9 @@ export class Orchestrator {
       questions,
       retry: new RetryPolicy(options.retry, this.deps.sleep),
       cache: new ResumeCache(options),
-      decider: this.deps.decider,
-      getAdapter: (agentId) => this.deps.getAdapter(agentId),
+      decider: engine.decider,
+      getAdapter: (agentId) => engine.getAdapter(agentId),
+      labels,
       ...(this.deps.describeAgent ? { describeAgent: (agentId: Id) => this.deps.describeAgent!(agentId) } : {}),
       ...(this.deps.agentProfile ? { agentProfile: (agentId: Id, extra: KnowledgeExtra | undefined, run: Id) => this.deps.agentProfile!(agentId, extra, run) } : {}),
       ...(this.deps.resolveTemplate ? { resolveTemplate: (id: Id, version: number | 'latest', run?: Id) => this.deps.resolveTemplate!(id, version, run) } : {}),
@@ -199,6 +212,7 @@ async function executeDiagram(run: RunServices, nodes: NodeRegistry, diagram: Di
   }
 
   const nodeById = new Map(diagram.nodes.map((n) => [n.id, n]));
+  for (const n of diagram.nodes) run.labels.set(pathKey(path, n.id), n.label ?? n.id);
   const returns = returnEdges(diagram);
   const incoming = new Map<Id, Edge[]>();
   const outgoing = new Map<Id, Edge[]>();

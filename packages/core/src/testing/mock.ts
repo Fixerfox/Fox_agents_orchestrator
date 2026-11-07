@@ -132,6 +132,10 @@ export interface MockDeciderConfig {
     reason: string;
   };
   condition?: (req: { condition: string; input: Payload }) => boolean;
+  /** Si se da, el router por reglas consulta todas sus condiciones a la vez [R63.16]. */
+  conditions?: NonNullable<Decider['conditions']>;
+  /** Gasto simulado de cada decisión de router o bucle [R63.15]. */
+  decisionUsage?: { inputTokens: number; outputTokens: number; costUsd?: number };
   /** Respuesta del nodo «Transformar» con Claude; por defecto, la conversión simulada [R37.8]. */
   transform?: (req: TransformRequest) => string | Error;
   /** Paso culpable de una corrección; por defecto, el último candidato [R53.17]. */
@@ -151,17 +155,14 @@ export class MockDecider implements Decider {
 
   route: Decider['route'] = async (request) => {
     this.routeCalls.push(request);
-    return (
-      this.config.route?.(request) ?? {
-        edgeIds: request.candidates.map((c) => c.edgeId),
-        reason: 'todas las rutas (simulado)',
-      }
-    );
+    const r = this.config.route?.(request) ?? { edgeIds: request.candidates.map((c) => c.edgeId), reason: 'todas las rutas (simulado)' };
+    return this.config.decisionUsage ? { ...r, usage: this.config.decisionUsage } : r;
   };
 
   judge: Decider['judge'] = async (request) => {
     this.judgeCalls.push(request);
-    return this.config.judge?.(request) ?? { done: true, reason: 'cumplido (simulado)' };
+    const r = this.config.judge?.(request) ?? { done: true, reason: 'cumplido (simulado)' };
+    return this.config.decisionUsage ? { ...r, usage: this.config.decisionUsage } : r;
   };
 
   condition: Decider['condition'] = async (request) => {
@@ -176,6 +177,10 @@ export class MockDecider implements Decider {
 
   get verifyRun(): Decider['verifyRun'] {
     return this.config.verifyRun;
+  }
+
+  get conditions(): Decider['conditions'] {
+    return this.config.conditions;
   }
 
   get supervise(): Decider['supervise'] {

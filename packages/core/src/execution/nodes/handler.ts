@@ -1,6 +1,6 @@
 import type { DeliverableSpec, Diagram, DiagramNode, Edge, ReturnInfo } from '../../diagrams';
 import type { Id, KnowledgeExtra, Payload } from '../../shared';
-import type { AgentAdapter, AgentProfile, AgentSnapshot, Decider } from '../adapter';
+import type { AgentAdapter, AgentProfile, AgentSnapshot, Decider, TransformUsage } from '../adapter';
 import type { BudgetTracker } from '../run/budget-tracker';
 import type { ConcurrencyLimiter } from '../run/concurrency-limiter';
 import type { PauseGate } from '../run/pause-gate';
@@ -47,6 +47,8 @@ export interface RunServices {
   cache: ResumeCache;
   decider: Decider;
   getAdapter(agentId: Id): AgentAdapter;
+  /** Etiqueta de cada paso por ruta, para el Supervisor [R63.6]. */
+  labels: Map<string, string>;
   describeAgent?(agentId: Id): AgentSnapshot | undefined;
   /** Ficha de un agente, con lo enchufado a su paso [R59.18]. */
   agentProfile?(agentId: Id, extra: KnowledgeExtra | undefined, runId: Id): Promise<AgentProfile | undefined>;
@@ -95,3 +97,10 @@ export function failStep(step: Pick<StepContext, 'emitter'>, node: DiagramNode, 
 export const nodeStarted = (step: Pick<StepContext, 'emitter'>, node: DiagramNode, input: Payload, path: Id[]): void => {
   step.emitter.emit({ type: 'node.started', nodeId: node.id, input }, path);
 };
+
+/** Lo que gasta una decisión (router, condiciones, evaluador de bucles) cuenta en el presupuesto y en el uso [R63.15]. */
+export function chargeDecision(step: Pick<StepContext, 'emitter' | 'budget'>, node: DiagramNode, path: Id[], usage: TransformUsage | undefined): void {
+  if (!usage) return;
+  step.emitter.emit({ type: 'agent.usage', nodeId: node.id, inputTokens: usage.inputTokens, outputTokens: usage.outputTokens, ...(usage.costUsd !== undefined ? { costUsd: usage.costUsd } : {}), source: 'decision' }, path);
+  step.budget.add(usage.inputTokens, usage.outputTokens, usage.costUsd);
+}

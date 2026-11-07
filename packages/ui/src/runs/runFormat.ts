@@ -1,5 +1,5 @@
 import { History, MessageCircleQuestion, Radio } from 'lucide-react';
-import type { RunsSection } from './runsTypes';
+import type { RunsNav, RunsSection } from './runsTypes';
 import { type Diagram } from '@orquestador/core';
 import { t, type MessageKey, type HistoryRow } from '@orquestador/editor';
 
@@ -32,3 +32,8 @@ export const SECTIONS: { id: RunsSection; label: MessageKey; icon: typeof Radio 
   { id: 'inbox', label: 'runs.sec.inbox', icon: MessageCircleQuestion },
   { id: 'history', label: 'runs.sec.history', icon: History },
 ];
+
+/** Sección a la que pertenece lo que se ve: una ejecución terminada ya no está «En directo» [R63.26]. */
+export function crumbSection(nav: RunsNav, row: { status: string } | undefined): RunsNav['section'] {
+  return nav.runId && nav.section === 'live' && row && row.status !== 'running' ? 'history' : nav.section;
+}

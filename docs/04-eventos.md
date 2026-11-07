@@ -29,7 +29,7 @@ interface EventBase { runId: Id; seq: number; ts: string; type: string; nodePath
 | `git.branch` | `nodeId, branch, via: 'head' \| 'command' \| 'mcp' \| 'ran', created?` | El paso creó una rama o actuó en ella (SPEC-058) |
 | `git.action` | `nodeId, branch, action: 'commit' \| 'push' \| 'pr' \| 'merge' \| 'delete' \| 'switch', url?` | El paso hizo eso en esa rama; `url` es la de la PR (SPEC-058) |
 | `supervisor.alert` | `nodeId?, rule, severity, detail` | El Supervisor detecta algo o bloquea una acción (SPEC-060) |
-| `agent.usage` (`source?`) | `source: 'supervisor' \| 'judge'` | Gasto de una pieza interna: suma al total, no al paso (SPEC-060, SPEC-034) |
+| `agent.usage` (`source?`) | `source: 'supervisor' \| 'judge' \| 'decision'` | Gasto de una pieza interna: suma al total, no al paso (SPEC-060, SPEC-034). `decision` (router, condiciones, evaluador de bucles) también cuenta en el presupuesto (SPEC-063) |
 | `supervisor.started` | `review, model?` | El Supervisor empieza a vigilar la ejecución (SPEC-060) |
 | `supervisor.reviewing` | `nodeId` | Empieza a revisar un paso con IA (SPEC-060) |
 | `supervisor.note` | `nodeId, text, files, reviewed?` | Entrada de la memoria de la ejecución (SPEC-060) |

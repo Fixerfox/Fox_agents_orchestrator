@@ -1,3 +1,4 @@
+import { execFile } from 'node:child_process';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import type { FileChange } from '@orquestador/core';
@@ -18,11 +19,49 @@ export interface FolderSnapshot {
   truncated: boolean;
 }
 
+/**
+ * Carpetas de caché que, si git las ignora, no se miran: las de Unity, Unreal, Python, Rust, Java y los
+ * empaquetadores. Lo demás que git ignora (`dist/`, `build/`, `_site/`…) sí, porque suele ser lo que genera un
+ * comando [R63.18].
+ */
+export const HEAVY_IGNORED = new Set(['Library', 'Temp', 'Logs', 'obj', 'UserSettings', 'MemoryCaptures', 'Intermediate', 'Saved', 'DerivedDataCache', 'Binaries', 'DerivedData', '.venv', 'venv', '__pycache__', '.mypy_cache', '.pytest_cache', 'target', '.gradle', '.idea', '.vs', '.cache', '.next', '.nuxt', '.turbo', '.parcel-cache', '.angular', '.svelte-kit', 'coverage']);
+
+/** Lo que git sabe de una carpeta: archivos que no ignora y lo ignorado (las carpetas acaban en «/»). */
+export interface GitListing {
+  files: string[];
+  ignored: string[];
+}
+
+const git = (root: string, args: string[]): Promise<string[] | undefined> =>
+  new Promise((resolve) => {
+    execFile('git', args, { cwd: root, maxBuffer: 64 * 1024 * 1024, windowsHide: true }, (err, stdout) => resolve(err ? undefined : stdout.split('\0').filter((f) => f !== '')));
+  });
+
+/** Archivos de `root` según git (rutas relativas con «/»), o `undefined` si no es un repositorio o git falla [R63.18]. */
+export async function gitFiles(root: string): Promise<GitListing | undefined> {
+  const [files, ignored] = await Promise.all([git(root, ['ls-files', '-co', '--exclude-standard', '-z']), git(root, ['ls-files', '-oi', '--exclude-standard', '--directory', '-z'])]);
+  return files && ignored ? { files, ignored } : undefined;
+}
+
 /** Foto de la carpeta: tamaño y fecha de cada archivo, con rutas relativas separadas por «/» [R55.2]. */
-export async function snapshotFolder(root: string, max = MAX_WATCHED): Promise<FolderSnapshot> {
+export async function snapshotFolder(root: string, max = MAX_WATCHED, list: (root: string) => Promise<GitListing | undefined> = gitFiles): Promise<FolderSnapshot> {
   const files = new Map<string, FileStamp>();
   let truncated = false;
-  const visit = async (dir: string, rel: string): Promise<void> => {
+  const listed = await list(root);
+  const skipped = (r: string) => r.split('/').some((part) => SKIP.has(part));
+  const stat = async (rels: string[]) => {
+    for (let i = 0; i < rels.length; i += 256) {
+      await Promise.all(
+        rels.slice(i, i + 256).map((r) =>
+          fs.stat(path.join(root, r)).then(
+            (st) => void (st.isFile() && files.set(r, { size: st.size, mtimeMs: st.mtimeMs })),
+            () => undefined,
+          ),
+        ),
+      );
+    }
+  };
+  const visit = async (dir: string, rel: string, heavy: (name: string) => boolean): Promise<void> => {
     if (truncated) return;
     let entries;
     try {
@@ -33,7 +72,7 @@ export async function snapshotFolder(root: string, max = MAX_WATCHED): Promise<F
     const subdirs: [string, string][] = [];
     const stats: Promise<void>[] = [];
     for (const e of entries) {
-      if (SKIP.has(e.name)) continue;
+      if (SKIP.has(e.name) || heavy(e.name)) continue;
       const r = rel ? `${rel}/${e.name}` : e.name;
       const abs = path.join(dir, e.name);
       if (e.isDirectory()) subdirs.push([abs, r]);
@@ -51,9 +90,23 @@ export async function snapshotFolder(root: string, max = MAX_WATCHED): Promise<F
       }
     }
     await Promise.all(stats);
-    for (const [abs, r] of subdirs) await visit(abs, r);
+    for (const [abs, r] of subdirs) await visit(abs, r, heavy);
   };
-  await visit(root, '');
+  if (listed) {
+    // En un repositorio: lo que git no ignora, y de lo ignorado todo menos las carpetas de caché [R63.18].
+    const tracked = listed.files.filter((r) => !skipped(r));
+    const loose = listed.ignored.filter((r) => !r.endsWith('/') && !skipped(r));
+    const wanted = [...tracked, ...loose].slice(0, max);
+    truncated = tracked.length + loose.length > max;
+    await stat(wanted);
+    for (const dir of listed.ignored.filter((r) => r.endsWith('/'))) {
+      const rel = dir.slice(0, -1);
+      if (skipped(rel) || rel.split('/').some((part) => HEAVY_IGNORED.has(part))) continue;
+      await visit(path.join(root, rel), rel, (name) => HEAVY_IGNORED.has(name));
+    }
+    return { files, truncated };
+  }
+  await visit(root, '', () => false);
   return { files, truncated };
 }
 

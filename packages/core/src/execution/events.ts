@@ -79,8 +79,8 @@ export type EventBody =
       inputTokens: number;
       outputTokens: number;
       costUsd?: number;
-      /** Gasto de una pieza interna, no del paso [R60.30][R34.28]. */
-      source?: 'supervisor' | 'judge';
+      /** Gasto de una pieza interna, no del paso [R60.30][R34.28]; `decision`: router y bucles [R63.15]. */
+      source?: 'supervisor' | 'judge' | 'decision';
     }
   /** Archivo escrito por el paso; `change` dice si es nuevo o modificado (los adaptadores que no lo saben lo omiten) [R45.2]. */
   | { type: 'file.produced'; nodeId: Id; path: string; change?: FileChange; /** [R55.3] */ via?: FileVia; /** Viene de un paso reutilizado [R41.9]. */ reused?: boolean }

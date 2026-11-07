@@ -260,7 +260,7 @@ describe('SPEC-027 · decisiones con Claude', () => {
 
   it('[R27.11] el enrutado tolera texto y vallas alrededor del JSON y descarta aristas inexistentes', async () => {
     const d = decider('Claro:\n```json\n{"edges":["e2","zzz","e2"],"reason":"Solo sonido"}\n```');
-    expect(await d.route({ nodeId: 'r', candidates: cands, input }, sig)).toEqual({ edgeIds: ['e2'], reason: 'Solo sonido' });
+    expect(await d.route({ nodeId: 'r', candidates: cands, input }, sig)).toMatchObject({ edgeIds: ['e2'], reason: 'Solo sonido' });
   });
 
   it('[R27.11] sin ninguna arista válida o sin JSON falla con error claro, no inventa una decisión', async () => {
@@ -269,7 +269,7 @@ describe('SPEC-027 · decisiones con Claude', () => {
   });
 
   it('[R27.11] evaluador y condición exigen booleanos', async () => {
-    expect(await decider('{"done":true,"reason":"ok"}').judge({ prompt: 'p', output: input, iteration: 1 }, sig)).toEqual({ done: true, reason: 'ok' });
+    expect(await decider('{"done":true,"reason":"ok"}').judge({ prompt: 'p', output: input, iteration: 1 }, sig)).toMatchObject({ done: true, reason: 'ok' });
     await expect(decider('{"done":"sí"}').judge({ prompt: 'p', output: input, iteration: 1 }, sig)).rejects.toThrow(/cumple lo pedido/);
     expect(await decider('{"result":false}').condition({ condition: 'c', input }, sig)).toBe(false);
     await expect(decider('{"result":1}').condition({ condition: 'c', input }, sig)).rejects.toThrow(/condición/);

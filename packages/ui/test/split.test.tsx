@@ -53,7 +53,7 @@ describe('SPEC-059 · el Coordinador', () => {
     render(<App initialProject="Juego" api={api} agents={[]} confirm={() => true} />);
     await userEvent.click(await screen.findByRole('button', { name: '+ Coordinador' }));
     const card = await screen.findByLabelText(/^Agente «Coordinador»/);
-    expect(within(card).getByText('Coordinador · reparte entre 0')).toBeTruthy();
+    expect(within(card).getByText('reparte entre 0')).toBeTruthy();
   });
 
   it('[R59.19] en el panel no se cambia de agente y dice lo que hace', () => {
@@ -85,7 +85,7 @@ describe('SPEC-059 · lienzo', () => {
 
   it('[R59.13] la tarjeta dice entre cuántos reparte', () => {
     const sub = (d: Diagram) => buildFlowNodes(d, [], {}, undefined, { o: 'Origen', [COORDINATOR_ID]: 'Coordinador' }).find((n) => n.id === 'o')!.data['sub'];
-    expect(sub(split)).toBe('Coordinador · reparte entre 2');
+    expect(sub(split)).toBe('reparte entre 2');
     expect(sub(fan())).toBe('Origen');
   });
 
