@@ -19,7 +19,7 @@ Elegida por el usuario entre tres prototipos (variante «A2», revisada con la s
 - **R21.2** [M4c] En ambos temas el texto principal y el secundario tienen un contraste mínimo de 4,5:1 sobre sus fondos, y los bordes de los controles 3:1. Un test lo calcula a partir de las variables reales.
 - **R21.3** [M4c] Los botones y los tipos de nodo llevan icono. Un botón con solo icono tiene nombre accesible y tooltip.
 - **R21.4** [M4c] Los nodos de la paleta se pueden arrastrar al lienzo y se crean donde se sueltan; el clic sigue añadiéndolos.
-- **R21.5** [M4c] Cada nodo es una tarjeta con icono de su tipo, nombre, subtítulo (agente o modo) e indicador de estado con icono y texto; los nodos con problemas lo señalan con un icono.
+- **R21.5** [M4c] Cada nodo es una tarjeta con icono de su tipo, nombre, subtítulo (agente o modo; el agente no se repite si se llama como el paso, R63.25) e indicador de estado con icono y texto; los nodos con problemas lo señalan con un icono.
 - **R21.6** [M4c] La ejecución se controla con una barra de transporte: ejecutar, pausar o reanudar y parar son botones inequívocos; el presupuesto de tokens se muestra como un medidor y el contador usa singular y plural correctos.
 - **R21.7** [M4c] Los problemas del diagrama se ven en un contador junto a «Ejecutar» que abre su lista (sin panel inferior; SPEC-032, R32.23); los resultados de una ejecución viven en Ejecuciones › Resultados (R32.20).
 - **R21.8** [M4c] Las pantallas vacías dicen qué hacer: lienzo sin proyecto, sin nodos añadidos, sin resultados, sin registro.
