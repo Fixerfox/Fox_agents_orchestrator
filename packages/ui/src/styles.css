@@ -2123,3 +2123,14 @@ button.orq-story__line:hover { background: var(--raised); }
 @media (prefers-reduced-motion: reduce) { .orq-sup__beam, .orq-sup__sweep, .orq-sup__scope i { animation: none; } .orq-sup__pulse { display: none; } }
 button.orq-node__alerts { padding: 0; border: 0; background: none; cursor: pointer; }
 button.orq-node__alerts:hover { text-decoration: underline; }
+
+/* Ventana «Configurar» de un paso agente [R64.3]. */
+.orq-stepcfg { width: min(1120px, calc(100vw - 48px)); }
+.orq-stepcfg__tabs { padding: 0; }
+.orq-stepcfg__step { border: 0; padding: 0; margin: 0; min-width: 0; }
+.orq-stepcfg__cols { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.orq-stepcfg__col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.orq-stepcfg__col .orq-task textarea { min-height: 280px; }
+.orq-stepcfg__agent { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 12px; }
+.orq-stepcfg__shared { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+@media (max-width: 820px) { .orq-stepcfg__cols { grid-template-columns: 1fr; } }

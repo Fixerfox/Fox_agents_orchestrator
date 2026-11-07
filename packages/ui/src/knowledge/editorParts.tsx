@@ -11,7 +11,7 @@ export const SZ = { size: 16, strokeWidth: 1.5, 'aria-hidden': true } as const;
 export const initial = (name: string) => (name.trim()[0] ?? '?').toUpperCase();
 
 /** Cabecera fija del editor: nombre, estado y acciones; Ctrl+S guarda [R32.14]. */
-export function EditorHead({ badge, name, sub, dirty, saved, isNew, onDiscard, onDelete, busy = false }: { badge: ReactNode; name: string; sub?: ReactNode; dirty: boolean; saved: boolean; isNew: boolean; onDiscard: () => void; onDelete: () => void; busy?: boolean }) {
+export function EditorHead({ badge, name, sub, dirty, saved, isNew, onDiscard, onDelete, busy = false, deletable = true }: { badge: ReactNode; name: string; sub?: ReactNode; dirty: boolean; saved: boolean; isNew: boolean; onDiscard: () => void; onDelete: () => void; busy?: boolean; deletable?: boolean }) {
   return (
     <>
     <header className="orq-editor__head">
@@ -34,7 +34,7 @@ export function EditorHead({ badge, name, sub, dirty, saved, isNew, onDiscard, o
           {t('lib.discard')}
         </button>
       )}
-      {!isNew && (
+      {!isNew && deletable && (
         <button type="button" className="orq-btn orq-btn--ghost orq-btn--small" disabled={busy} onClick={onDelete}>
           <Trash2 {...SZ} />
           {t('form.delete')}

@@ -16,6 +16,7 @@ El hito indica cuándo debe estar cubierto por tests. `npm run spec:check` exige
 ## Índice
 | Spec | Título | Hito | Estado |
 |---|---|---|---|
+| [064](064-configurar-agente-en-el-diagrama.md) | Configurar un agente desde el diagrama: doble clic o «Configurar…» abre una ventana con «Este paso» (los ajustes del lateral, en ancho) y «El agente» (su ficha, que vale en todos los diagramas) | M13 | Implementada |
 | [062](062-control-de-lo-pedido.md) | Control de lo pedido: un paso que no terminó lo suyo se detiene antes de cerrarse y pregunta, y el resultado final se compara con lo que pidió la persona | M12 | Implementada |
 | [061](061-bandeja-y-avisos.md) | Bandeja del sistema y avisos de escritorio: cerrar deja la app en la bandeja, una sola instancia, y avisos cuando un agente necesita respuesta o acaba una ejecución | M12 | Implementada |
 | [060](060-supervisor-de-ejecucion.md) | Supervisor de la ejecución: pieza interna que frena con reglas lo que se sale de los límites, revisa con un modelo barato y configurable si cada paso hizo lo pedido, y escribe la memoria que leen los agentes | M12 | Implementada |

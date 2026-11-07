@@ -27,13 +27,13 @@ async function mount(options: MemoryApiOptions = OPTIONS) {
 const menu = () => within(screen.getByRole('menu'));
 
 describe('SPEC-032 · agentes a mano', () => {
-  it('[R32.34] el botón derecho sobre un agente del lienzo lleva a editarlo, cambiarlo y a sus skills y contextos', async () => {
+  it('[R32.34][R64.2] el botón derecho sobre un agente del lienzo lleva a editarlo, cambiarlo y a sus skills y contextos', async () => {
     await mount();
     await userEvent.click(screen.getByRole('button', { name: 'Añadir «Pixelador» al diagrama' }));
     const node = await screen.findByLabelText(/^Agente «pix»/);
     fireEvent.contextMenu(node);
     const items = menu().getAllByRole('menuitem').map((b) => b.textContent);
-    expect(items.slice(0, 2)).toEqual(['Editar el agente', 'Cambiar el agente…']);
+    expect(items.slice(0, 3)).toEqual(['Configurar…', 'Editar el agente', 'Cambiar el agente…']);
     expect(items).toContain('Paleta');
     expect(items).toContain('Glosario');
     expect(items[items.length - 1]).toBe('Eliminar');

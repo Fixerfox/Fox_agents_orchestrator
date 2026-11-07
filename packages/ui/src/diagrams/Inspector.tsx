@@ -1,15 +1,13 @@
-import { BookOpen, Copy, FileText, Trash2, Workflow } from 'lucide-react';
-import { DEFAULT_MODEL, MAX_TASK_LENGTH, MODELS, correctionCandidates, finalSteps, type Diagram, type DiagramNode, type ProjectPermission, COORDINATOR_ID, coordinatorAgent } from '@orquestador/core';
-import { PermissionPicker, permissionName } from '../common';
-import { AgentAvatar, AskFirstMark } from '../common';
-import { useState, type ReactNode } from 'react';
+import { Copy, Trash2, Workflow } from 'lucide-react';
+import { finalSteps, correctionCandidates, type Diagram, type DiagramNode } from '@orquestador/core';
+import { type ReactNode } from 'react';
 import { t, type ProjectApi, type EditorSession, type EditorSnapshot, type NodePatch } from '@orquestador/editor';
 import type { AgentOption } from './Palette';
 import { ExtraKnowledge, type KnowledgeCatalog } from './ExtraKnowledge';
-import { ClaudeButton, ClaudeDiff, ClaudeMenu, ClaudeStatus, useClaudeAssist, type AssistConfig } from '../common';
 import type { Selection } from './Canvas';
 import { TransformPanel } from './TransformPanel';
 import { DeliverablePanel } from './DeliverablePanel';
+import { AgentStepFields, incomingNames, type StepFiles } from './StepFields';
 import type { RunEvent } from '@orquestador/core';
 
 interface Props {
@@ -27,7 +25,7 @@ interface Props {
   /** Para el ✦ de la tarea [R32.29]. */
   api?: ProjectApi;
   /** Bloque «Archivos» (prototipo «Nodo A»): ajustes de escritura de la carpeta de trabajo [R32.29]. */
-  files?: { folder?: string | undefined; permissions: ProjectPermission; onPermissions: (level: ProjectPermission) => void };
+  files?: StepFiles;
   /** Skills, contextos y MCP del proyecto para añadirlos a un paso o al diagrama [R33.5][R33.6]. */
   catalog?: KnowledgeCatalog;
   onCreateKnowledge?: (kind: 'skills' | 'contexts' | 'mcp') => void;
@@ -38,48 +36,6 @@ interface Props {
   events?: readonly RunEvent[];
   /** «En marcha»: sustituye al aviso de solo lectura cuando no hay nada seleccionado [R38.12]. */
   liveCard?: ReactNode;
-}
-
-/** Campo de tarea con ✦ dentro: borrador local, se confirma al salir o al aceptar la propuesta [R32.3][R32.29]. */
-function TaskField({ api, label, value, onCommit }: { api?: ProjectApi | undefined; label: string; value: string; onCommit: (v: string) => void }) {
-  const [text, setText] = useState(value);
-  const commit = (v: string) => v !== value && onCommit(v);
-  const config: AssistConfig | undefined = api
-    ? { api, kind: 'context', field: 'value', current: { name: t('insp.task.ai.name', { name: label }), value: text }, names: { contexts: {}, skills: {} }, onApply: (f) => typeof f['value'] === 'string' && (setText(f['value']), commit(f['value'])) }
-    : undefined;
-  const ai = useClaudeAssist(config);
-  return (
-    <div className="orq-task">
-      <div className="orq-task__head">
-        <label htmlFor="node-task">{t('inspector.task')}</label>
-        {config && <ClaudeButton ai={ai} fieldEmpty={text.trim() === ''} />}
-      </div>
-      {config && (
-        <ClaudeMenu
-          ai={ai}
-          id="node-task"
-          fieldEmpty={text.trim() === ''}
-          kind="context"
-          labels={text.trim() === '' ? { label: t('insp.task.ai.write'), placeholder: t('insp.task.ai.write.ph') } : { label: t('assist.label.improve'), placeholder: t('assist.placeholder.improve') }}
-        />
-      )}
-      {config && <ClaudeStatus ai={ai} />}
-      {config && ai.result ? (
-        <ClaudeDiff ai={ai} config={config} />
-      ) : (
-        <textarea
-          id="node-task"
-          data-field="task"
-          rows={5}
-          maxLength={MAX_TASK_LENGTH}
-          placeholder={t('inspector.task.placeholder')}
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onBlur={() => commit(text)}
-        />
-      )}
-    </div>
-  );
 }
 
 /** Los campos de texto confirman al salir (un paso de historial por edición, no por pulsación). */
@@ -125,8 +81,6 @@ function NumberField({ label, value, min, onCommit }: { label: string; value: nu
   );
 }
 
-const COORDINATOR = coordinatorAgent();
-
 export function Inspector({ session, snap, selection, agents, onError, onEditAgent, onSelect, onChangeAgent, api, files, catalog, onCreateKnowledge, diagramNames, onOpenDiagram, events, liveCard }: Props) {
   const guard = (fn: () => void) => {
     try {
@@ -141,8 +95,7 @@ export function Inspector({ session, snap, selection, agents, onError, onEditAge
   const node = nodeId !== undefined ? level.nodes.find((n) => n.id === nodeId) : undefined;
   const edge = edgeId !== undefined ? level.edges.find((e) => e.id === edgeId) : undefined;
   const patch = (id: string, p: NodePatch) => guard(() => session.updateNode(id, p));
-  const agentOf = (id: string | undefined): AgentOption | undefined => (id === COORDINATOR_ID ? COORDINATOR : agents.find((a) => a.id === id));
-  const incoming = node ? level.edges.filter((e) => e.to === node.id).map((e) => level.nodes.find((n) => n.id === e.from)).filter((n) => n !== undefined).map((n) => (n.kind === 'entry' ? 'entrada' : (n.label ?? n.id))) : [];
+  const incoming = node ? incomingNames(level, node.id) : [];
 
   return (
     <aside className="orq-inspector" aria-label={t('inspector.title')}>
@@ -187,136 +140,18 @@ export function Inspector({ session, snap, selection, agents, onError, onEditAge
           />
 
           {node.kind === 'agent' && (
-            <>
-              <section className="orq-insp__card" aria-label={t('insp.card.task')}>
-                <TaskField
-                  key={`${node.id}|${node.task ?? ''}`}
-                  api={api}
-                  label={node.label ?? node.id}
-                  value={node.task ?? ''}
-                  onCommit={(v) => patch(node.id, { task: v })}
-                />
-                {incoming.length > 0 && (
-                  <div className="orq-insp__recv" aria-label={t('insp.receives')}>
-                    <span className="orq-hint">{t('insp.receives')}</span>
-                    {incoming.map((x) => (
-                      <span key={x} className="orq-tag">
-                        @{x}
-                      </span>
-                    ))}
-                  </div>
-                )}
-                <p className="orq-hint">{t('inspector.task.hint')}</p>
-              </section>
-              <section className="orq-insp__card">
-                <span className="orq-insp__label">{t('inspector.agent.who')}</span>
-                <div className="orq-agentcard" role="group" aria-label={t('inspector.agent.who')}>
-                  {agentOf(node.agentId)?.icon ? (
-                    <AgentAvatar name={agentOf(node.agentId)!.name} icon={agentOf(node.agentId)!.icon} tone={agentOf(node.agentId)!.tone} size="lg" />
-                  ) : (
-                    <span className="orq-agentcard__av" aria-hidden="true">
-                      {(agentOf(node.agentId)?.name ?? node.agentId ?? '?').slice(0, 1).toUpperCase()}
-                    </span>
-                  )}
-                  <span className="orq-agentcard__text">
-                    <strong>{agentOf(node.agentId)?.name ?? node.agentId}</strong>
-                    <span className="orq-hint">{agentOf(node.agentId)?.description ?? t('inspector.agent.noDesc')}</span>
-                  </span>
-                  <div className="orq-agentcard__facts">
-                    {agentOf(node.agentId)?.model && <span className="orq-tag">{MODELS.find((m) => m.id === agentOf(node.agentId)?.model)?.name ?? agentOf(node.agentId)?.model}</span>}
-                    {agentOf(node.agentId)?.askFirst && (
-                      <span className="orq-tag orq-agentf__ask">
-                        <AskFirstMark size={12} /> {t('askfirst.mark')}
-                      </span>
-                    )}
-                  </div>
-                  <div className="orq-agentcard__acts">
-                    {node.agentId !== COORDINATOR_ID && (
-                      <button type="button" className="orq-btn orq-btn--small" aria-label={t('insp.agent.change')} onClick={() => onChangeAgent?.(node.id)}>
-                        {t('inspector.agent.change')}
-                      </button>
-                    )}
-                    {onEditAgent && node.agentId && agents.some((a) => a.id === node.agentId) && (
-                      <button type="button" className="orq-btn orq-btn--small orq-btn--ghost" aria-label={t('insp.agent.edit')} onClick={() => onEditAgent(node.agentId!)}>
-                        {t('insp.agent.editShort')}
-                      </button>
-                    )}
-                  </div>
-                </div>
-                {/* Modelo solo para este paso; vacío = el de la ficha del agente [R40.5]. */}
-                <label className="orq-insp__model">
-                  {t('insp.model')}
-                  <select value={node.model ?? ''} onChange={(e) => patch(node.id, { model: e.target.value })}>
-                    <option value="">
-                      {t('insp.model.agent', { model: MODELS.find((m) => m.id === (agentOf(node.agentId)?.model ?? DEFAULT_MODEL))?.name ?? agentOf(node.agentId)?.model ?? '' })}
-                    </option>
-                    {MODELS.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <p className="orq-hint">{t('insp.model.hint')}</p>
-                {/* Confirmar antes de terminar, solo en este paso [R43.3]. */}
-                <label className="orq-insp__check">
-                  <input type="checkbox" checked={node.confirm === true} onChange={(e) => patch(node.id, { confirm: e.target.checked })} />
-                  {t('insp.confirm')}
-                </label>
-                <p className="orq-hint">{t('insp.confirm.hint')}</p>
-              </section>
-              <section className="orq-insp__card">
-                <div className="orq-insp__sec" role="group" aria-label={t('insp.knowledge')}>
-                  <span className="orq-insp__label">{t('insp.knowledge')}</span>
-                  {(agentOf(node.agentId)?.skills?.length ?? 0) + (agentOf(node.agentId)?.contexts?.length ?? 0) === 0 ? (
-                    <p className="orq-hint">{t('insp.knowledge.none')}</p>
-                  ) : (
-                    <div className="orq-insp__chips">
-                      {agentOf(node.agentId)?.skills?.map((k) => (
-                        <span key={`s-${k}`} className="orq-tag">
-                          <BookOpen size={12} strokeWidth={1.5} aria-hidden="true" />
-                          {k} <span className="orq-hint">· {t('insp.fromAgent')}</span>
-                        </span>
-                      ))}
-                      {agentOf(node.agentId)?.contexts?.map((c) => (
-                        <span key={`c-${c}`} className="orq-tag">
-                          <FileText size={12} strokeWidth={1.5} aria-hidden="true" />
-                          {c} <span className="orq-hint">· {t('insp.fromAgent')}</span>
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                  <p className="orq-hint">{t('insp.knowledge.hint')}</p>
-                </div>
-                {catalog && (
-                  <ExtraKnowledge
-                    label={t('extra.node')}
-                    hint={t('extra.node.hint')}
-                    value={node.extra}
-                    inherited={snap.diagram.extra}
-                    catalog={catalog}
-                    step
-                    disabled={snap.readOnly}
-                    onChange={(extra) => patch(node.id, { extra })}
-                    {...(onCreateKnowledge ? { onCreate: onCreateKnowledge } : {})}
-                  />
-                )}
-              </section>
-              {files && (
-                <section className="orq-insp__card">
-                  <div className="orq-insp__sec" role="group" aria-label={t('insp.files')}>
-                    <span className="orq-insp__label">{t('insp.files')}</span>
-                    <label className="orq-switch">
-                      <span>{files.folder ? t('insp.files.create', { name: files.folder }) : t('insp.files.createProject')}</span>
-                      <input type="checkbox" role="switch" checked disabled />
-                    </label>
-                    <PermissionPicker legend={t('perm.title')} value={files.permissions} onChange={(level) => level && level !== 'readonly' && files.onPermissions(level)} />
-                    {agentOf(node.agentId)?.permissions && <p className="orq-hint">{t('insp.files.agentOwn', { level: permissionName(agentOf(node.agentId)!.permissions!) })}</p>}
-                    <p className="orq-hint">{t('insp.files.hint')}</p>
-                  </div>
-                </section>
-              )}
-            </>
+            <AgentStepFields
+              node={node}
+              snap={snap}
+              agents={agents}
+              patch={(p) => patch(node.id, p)}
+              api={api}
+              files={files}
+              catalog={catalog}
+              onCreateKnowledge={onCreateKnowledge}
+              onEditAgent={onEditAgent}
+              onChangeAgent={onChangeAgent}
+            />
           )}
 
           {node.kind === 'router' && (

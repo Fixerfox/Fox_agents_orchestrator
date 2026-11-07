@@ -1,6 +1,6 @@
-import type { ComponentProps, ReactNode } from 'react';
+import { useState, type ComponentProps, type ReactNode } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
-import { SlidersHorizontal, X } from 'lucide-react';
+import { Maximize2, SlidersHorizontal, X } from 'lucide-react';
 import type { RunEvent } from '@orquestador/core';
 import { eventsOfDiagram, t, type EditorSession, type EditorSnapshot, type ProjectApi } from '@orquestador/editor';
 import { SideResizeHandle, type OpenLibrary } from '../common';
@@ -9,6 +9,7 @@ import { Canvas } from './Canvas';
 import { DiagramMenu, EditButtons, SaveStatus } from './DiagramMenu';
 import { Inspector } from './Inspector';
 import { Palette } from './Palette';
+import { StepConfigDialog, type AgentEditorSlot, type StepConfigTab } from './StepConfigDialog';
 import type { Designer } from './useDesigner';
 import type { DesignerSelection } from './useDesignerSelection';
 import type { DiagramDocument } from './useDiagramDocument';
@@ -39,12 +40,18 @@ interface Props {
   fail: (message: string) => void;
   guard: (fn: () => void) => void;
   openLibrary: OpenLibrary;
+  /** Ficha del agente para la pestaña «El agente» de «Configurar» [R64.4]. */
+  agentEditor?: AgentEditorSlot;
 }
+
+type ConfigTarget = { nodeId: string; tab: StepConfigTab };
 
 /** Diseñador: paleta, cabecera con el diagrama abierto, lienzo y lateral derecho [R32.38][R33.6]. */
 export function DesignerScreen(p: Props) {
   const { session, snap, doc, sel, designer } = p;
   const { agents, catalog } = p.lib;
+  /** Ventana «Configurar» abierta [R64.1]. */
+  const [config, setConfig] = useState<ConfigTarget>();
   return (
     <div className="orq-body">
       <Palette
@@ -120,6 +127,7 @@ export function DesignerScreen(p: Props) {
             onAddKnowledge={(nodeId, port) => designer.setPortPick({ nodeId, port })}
             onDropKnowledge={designer.addExtra}
             onOpenDiagram={(id) => void doc.openDiagram(id)}
+            onConfigure={(nodeId) => setConfig({ nodeId, tab: 'step' })}
             onEdit={designer.focusField}
             onAddAt={(kind, at, opts) => (kind === 'agent' ? designer.setPicker({ at }) : designer.onAdd(kind === 'review' && opts?.human ? { kind, human: true } : { kind }, at))}
             onInsert={designer.onInsert}
@@ -130,20 +138,46 @@ export function DesignerScreen(p: Props) {
       {p.sideVisible && (
         <div className="orq-side" style={{ width: p.sideWidth }}>
           <SideResizeHandle width={p.sideWidth} onChange={p.onSideWidth} />
-          {p.assistant ?? <DesignerSide {...p} />}
+          {p.assistant ?? <DesignerSide {...p} onConfigure={(nodeId, tab) => setConfig({ nodeId, tab })} />}
         </div>
+      )}
+      {config && (
+        <StepConfigDialog
+          key={config.nodeId}
+          api={p.api}
+          session={session}
+          snap={snap}
+          nodeId={config.nodeId}
+          initialTab={config.tab}
+          agents={agents}
+          agentEditor={p.agentEditor}
+          catalog={catalog}
+          files={p.files}
+          onClose={() => setConfig(undefined)}
+          onError={p.fail}
+          onChangeAgent={(nodeId) => designer.setPicker({ replace: nodeId })}
+          onAgentSaved={() => void p.lib.reloadAgents()}
+          openLibrary={p.openLibrary}
+        />
       )}
     </div>
   );
 }
 
 /** Lateral derecho sin asistente: el paso seleccionado o los ajustes del diagrama [R33.6]. */
-function DesignerSide({ api, session, snap, doc, sel, lib, designer, events, files, fail, openLibrary, onCloseDiagramPanel }: Props) {
+function DesignerSide({ api, session, snap, doc, sel, lib, designer, events, files, fail, openLibrary, onCloseDiagramPanel, onConfigure }: Props & { onConfigure: (nodeId: string, tab: StepConfigTab) => void }) {
+  const agentStep = sel.selectedNode?.kind === 'agent' ? sel.selectedNode : undefined;
+  const editable = (id: string) => lib.agents.find((a) => a.id === id)?.editable === true;
   return (
     <>
       {sel.selectedNode && (
         <div className="orq-side__head">
           <span className="orq-side__title">{t('insp.tab.step')}</span>
+          {agentStep && (
+            <button type="button" className="orq-ib" aria-label={t('stepcfg.open')} title={t('stepcfg.open')} onClick={() => onConfigure(agentStep.id, 'step')}>
+              <Maximize2 size={16} aria-hidden="true" />
+            </button>
+          )}
           <button type="button" className="orq-ib" aria-label={t('insp.close')} title={t('insp.close')} onClick={() => sel.select('')}>
             <X size={16} aria-hidden="true" />
           </button>
@@ -163,7 +197,7 @@ function DesignerSide({ api, session, snap, doc, sel, lib, designer, events, fil
         selection={sel.selection}
         agents={lib.agents}
         onError={fail}
-        onEditAgent={(id) => openLibrary('agents', { tab: 'agents', id })}
+        onEditAgent={(id) => (agentStep && editable(id) ? onConfigure(agentStep.id, 'agent') : openLibrary('agents', { tab: 'agents', id }))}
         events={eventsOfDiagram(events, snap.diagram.id)}
         onSelect={sel.select}
         onChangeAgent={(nodeId) => designer.setPicker({ replace: nodeId })}

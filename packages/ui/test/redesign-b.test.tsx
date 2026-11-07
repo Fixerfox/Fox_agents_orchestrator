@@ -183,7 +183,7 @@ describe('SPEC-032 · M7b carpeta del proyecto', () => {
 });
 
 describe('SPEC-032 · M7b panel del nodo, inicio y ajustes', () => {
-  it('[R32.22][R52.8] el panel del nodo es «Paso», sin «Última ejecución», con conocimiento del agente, enlace a editarlo y Duplicar', async () => {
+  it('[R32.22][R52.8][R64.4] el panel del nodo es «Paso», sin «Última ejecución», con conocimiento del agente, enlace a editarlo y Duplicar', async () => {
     await mount({ agents: [agent('pix', 'Pixelador', { skillIds: ['k'], contextIds: ['c'] })], skills: [{ ...newSkill('k', 'pixel-art'), description: 'x' }], contexts: [{ ...newContext('c', 'Paleta'), value: 'r' }] });
     await userEvent.click(await screen.findByRole('button', { name: 'Añadir «Pixelador» al diagrama' }));
     await screen.findByLabelText(/^Agente «pix»/);
@@ -195,6 +195,8 @@ describe('SPEC-032 · M7b panel del nodo, inicio y ajustes', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Duplicar' }));
     expect(await screen.findAllByLabelText(/^Agente «pix/)).toHaveLength(2);
     await userEvent.click(screen.getByRole('button', { name: 'Editar el agente' }));
+    // abre «Configurar» en «El agente»; desde ahí se llega a Agentes
+    await userEvent.click(within(screen.getByRole('dialog', { name: /^Configurar «/ })).getByRole('button', { name: 'Abrir en Agentes' }));
     const s = content();
     expect(screen.getByRole('region', { name: 'Agentes' })).toBeTruthy();
     expect((s.getByLabelText('Nombre') as HTMLInputElement).value).toBe('Pixelador');
