@@ -30,6 +30,8 @@ export interface ToolOutcome {
 }
 
 export const isDestructive = (name: string) => ASSISTANT_TOOLS.find((x) => x.name === name)?.destructive === true;
+/** Pide «Permitir» aunque el proyecto no pida confirmar acciones [R65.9]. */
+export const alwaysConfirms = (name: string) => ASSISTANT_TOOLS.find((x) => x.name === name)?.alwaysConfirm === true;
 /** Espera a que el usuario escriba algo en la tarjeta (un secreto) [R30.12]. */
 export const isInteractive = (name: string) => ASSISTANT_TOOLS.find((x) => x.name === name)?.interactive === true;
 /** Solo consulta: varias seguidas se juntan en una línea [R38.3]. */
@@ -134,7 +136,7 @@ export async function runAssistantTool(host: AssistantHost, name: string, args: 
         return {
           ok: true,
           summary: t('as.tool.read', { what: t('as.what.runs') }),
-          result: runs.map((r) => ({ runId: r.runId, canResume: canResume(r.status, r.resumedBy), ...(r.resumedFrom ? { resumedFrom: r.resumedFrom } : {}), ...(r.resumedBy ? { resumedBy: r.resumedBy } : {}), diagram: r.diagramName ?? r.diagramId, status: r.status, startedAt: r.startedAt, finishedAt: r.finishedAt, order: r.order ? r.order.slice(0, 300) : undefined, reason: r.reason, tokens: r.usage.inputTokens + r.usage.outputTokens, costUsd: r.usage.costUsd })),
+          result: runs.map((r) => ({ runId: r.runId, canResume: canResume(r.status, r.resumedBy), ...(r.resumedFrom ? { resumedFrom: r.resumedFrom } : {}), ...(r.resumedBy ? { resumedBy: r.resumedBy } : {}), diagram: r.diagramName ?? r.diagramId, status: r.status, ...(r.accepted ? { accepted: r.accepted } : {}), startedAt: r.startedAt, finishedAt: r.finishedAt, order: r.order ? r.order.slice(0, 300) : undefined, reason: r.reason, tokens: r.usage.inputTokens + r.usage.outputTokens, costUsd: r.usage.costUsd })),
         };
       }
       case 'get_run': {
@@ -152,6 +154,10 @@ export async function runAssistantTool(host: AssistantHost, name: string, args: 
           summary: t('as.tool.readRun', { name: run.diagramName ?? diagram?.name ?? run.diagramId }),
           result: { runId: run.runId, canResume: canResume(run.status, run.resumedBy), diagram: run.diagramName ?? diagram?.name ?? run.diagramId, ...summary, outputFiles: out.ok ? out.value.map((f) => f.path) : [] },
         };
+      }
+      case 'accept_run': {
+        const done = must(await api.acceptRun({ runId: str(args['runId']), by: 'assistant', reason: str(args['reason']) }));
+        return done ? { ok: true, summary: t('as.tool.accepted'), result: { accepted: true } } : { ok: false, summary: t('as.tool.notAccepted'), result: t('as.tool.notAccepted') };
       }
       case 'resume_run': {
         const r = must(await api.resumeRun(str(args['runId'])));

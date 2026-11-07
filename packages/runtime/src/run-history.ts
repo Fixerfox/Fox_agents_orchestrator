@@ -1,6 +1,9 @@
-import type { DeliverableSpec, Diagram, LibraryReader, Payload, RunEvent, RunMeta, RunRepository } from '@orquestador/core';
+import type { DeliverableSpec, Diagram, LibraryReader, Payload, RunAcceptance, RunEvent, RunMeta, RunRepository } from '@orquestador/core';
 import { RunError } from './errors';
 import type { LiveRuns } from './run-types';
+
+/** Largo máximo del motivo de «Dar por bueno» [R65.6]. */
+export const MAX_ACCEPT_REASON = 2000;
 
 /** Lo que queda de una ejecución que ya no está en marcha [R53.11]. */
 export interface PastRun {
@@ -44,6 +47,15 @@ export class RunHistory {
     // El entregable con el que arrancó, aunque se hubiera cambiado solo para ella [R46.11].
     const started = events.find((e): e is Extract<RunEvent, { type: 'run.started' }> => e.type === 'run.started');
     return { meta, diagram, events, order: entry?.input ?? meta.order ?? '', ...(started?.deliverable ? { deliverable: started.deliverable } : {}) };
+  }
+
+  /** Da por buena una ejecución fallida; exige un motivo y que no esté en marcha [R65.6]. */
+  async accept(runId: string, acceptance: RunAcceptance): Promise<boolean> {
+    if (this.live.isRunning(runId)) throw new RunError('bad-request', 'Está en marcha: espera a que termine.');
+    const reason = acceptance.reason.trim();
+    if (reason === '' || reason.length > MAX_ACCEPT_REASON) throw new RunError('bad-request', `Escribe por qué la das por buena (hasta ${MAX_ACCEPT_REASON} caracteres).`);
+    if (!(await this.list()).some((m) => m.runId === runId)) throw new RunError('not-found', 'No existe esa ejecución');
+    return this.runs.acceptRun(runId, { by: acceptance.by, reason });
   }
 
   /** Cierra como cancelada una ejecución interrumpida [R41.3]. */

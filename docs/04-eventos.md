@@ -9,6 +9,7 @@ interface EventBase { runId: Id; seq: number; ts: string; type: string; nodePath
 |---|---|---|
 | `run.started` | `diagramId, resumedFrom?, deliverable?` | Inicio de la ejecución; `deliverable` es el entregable efectivo (SPEC-046) |
 | `run.finished` | `status` | Fin (éxito, fallo o cancelación) |
+| `run.accepted` | `by, reason, previousReason?` | La persona (o el asistente, con su permiso) dio por buena una ejecución fallida; se añade después de `run.finished` (SPEC-065) |
 | `run.paused` / `run.resumed` | `nodeId?` | Pausa/reanudación global o de un nodo |
 | `run.budget_reached` | `limit, used` | Se alcanza el límite de presupuesto y se detiene la ejecución |
 | `run.cancelled` | `reason?` | Cancelación solicitada |
@@ -34,7 +35,7 @@ interface EventBase { runId: Id; seq: number; ts: string; type: string; nodePath
 | `supervisor.reviewing` | `nodeId` | Empieza a revisar un paso con IA (SPEC-060) |
 | `supervisor.note` | `nodeId, text, files, reviewed?` | Entrada de la memoria de la ejecución (SPEC-060) |
 | `supervisor.skipped` | `count, reason: 'timeout' \| 'failed'` | Revisiones que no se pudieron hacer (SPEC-060) |
-| `supervisor.verified` | `met, detail` | Comprobó si el resultado final cumple lo pedido (SPEC-062) |
+| `supervisor.verified` | `met, detail, forPerson?` | Comprobó si el resultado final cumple lo pedido (SPEC-062); `forPerson`: lo que queda para una persona (SPEC-065) |
 | `node.retrying` | `nodeId, attempt, max, delayMs, message` | Reintento automático tras error temporal |
 | `workspace.merged` | `nodeId, files` | Cambios de un agente fusionados en el proyecto |
 | `workspace.conflict` | `nodeIds, files` | Conflicto entre agentes paralelos; requiere atención |
@@ -54,7 +55,7 @@ interface EventBase { runId: Id; seq: number; ts: string; type: string; nodePath
 
 ## Garantías
 - `seq` es estrictamente creciente por `runId`.
-- `run.started` es siempre el primero y `run.finished` el último.
+- `run.started` es siempre el primero y `run.finished` el último. La única excepción es `run.accepted`, que se añade al registro de una ejecución ya cerrada (SPEC-065).
 - Todo `node.started` termina con un `node.finished`.
 
 ## Ruta tomada

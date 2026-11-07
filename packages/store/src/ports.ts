@@ -3,7 +3,7 @@ import type { LibraryReader, RunRepository } from '@orquestador/core';
 import type { ProjectStore } from './project';
 import { MAX_INPUT_FILES } from './project-files';
 import { findPreview, snapshotStep } from './previews';
-import { dismissInterruptedRun, listRuns, markCorrectedBy, markResumedBy, readRunDiagram, readRunLog, startLoggedRun } from './run-log';
+import { acceptRun, dismissInterruptedRun, listRuns, markCorrectedBy, markResumedBy, readRunDiagram, readRunLog, startLoggedRun } from './run-log';
 
 /** El proyecto como `RunRepository` [R56.5]. */
 export function runRepositoryOf(store: ProjectStore): RunRepository {
@@ -17,6 +17,7 @@ export function runRepositoryOf(store: ProjectStore): RunRepository {
     markResumedBy: (runId, by) => markResumedBy(dir(runId), by),
     markCorrectedBy: (runId, by) => markCorrectedBy(dir(runId), by),
     dismissInterrupted: (runId) => dismissInterruptedRun(dir(runId)),
+    acceptRun: (runId, acceptance) => acceptRun(dir(runId), acceptance),
     snapshotStep: ({ runId, ...args }) => snapshotStep({ runDir: dir(runId), ...args }),
     findPreview: (runId, key, rel) => findPreview(dir(runId), key, rel),
     outputFolder: (runId) => path.join(dir(runId), 'output'),

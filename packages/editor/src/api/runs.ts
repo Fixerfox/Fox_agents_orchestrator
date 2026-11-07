@@ -67,6 +67,8 @@ export interface RunSummary {
   /** Ejecución que esta corrige, y las que la corrigieron [R53.14]. */
   correctedFrom?: string;
   correctedBy?: string[];
+  /** Dada por buena tras fallar [R65.7]. */
+  accepted?: { by: 'user' | 'assistant'; reason: string; at: string; previousReason?: string };
 }
 /** Vista previa de un archivo que hizo un paso [R54.4]. */
 export interface FilePreview {
@@ -121,6 +123,8 @@ export interface RunsApi {
   resumeRun(runId: string): Promise<ApiResult<{ runId: string }>>;
   /** Cierra como cancelada una ejecución interrumpida [R41.3]. */
   dismissRun(runId: string): Promise<ApiResult<boolean>>;
+  /** «Dar por bueno» una ejecución fallida que no está en marcha [R65.6]. */
+  acceptRun(req: { runId: string; by: 'user' | 'assistant'; reason: string }): Promise<ApiResult<boolean>>;
   /** Pasos que se pueden corregir de una ejecución que no está en marcha y cuál propone el asistente [R53.12]. */
   proposeCorrection(req: { runId: string; text: string; prefer?: string }): Promise<ApiResult<CorrectionProposal>>;
   /** Vista previa de un archivo que hizo el paso `key` (`ruta/id`) en una ejecución [R54.4]. */
@@ -198,6 +202,14 @@ export function parseRunsRequest(channel: string, payload: unknown, { bad, exact
     case CHANNELS.unqueue:
       if (!safeId(payload)) throw bad('runId no válido');
       return payload;
+    case CHANNELS.acceptRun: {
+      if (!isObject(payload)) throw bad('se esperaba un objeto');
+      exact(payload, ['runId', 'by', 'reason']);
+      if (!safeId(payload.runId)) throw bad('runId no válido');
+      if (payload.by !== 'user' && payload.by !== 'assistant') throw bad('by no válido');
+      str(payload.reason, 'reason', 2000, 1);
+      return payload;
+    }
     case CHANNELS.proposeCorrection: {
       if (!isObject(payload)) throw bad('se esperaba un objeto');
       exact(payload, ['runId', 'text', 'prefer']);

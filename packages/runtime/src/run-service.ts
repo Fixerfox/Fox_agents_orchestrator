@@ -1,4 +1,4 @@
-import type { Diagram, Orchestrator, PendingQuestion, RunEvent, RunMeta, RunOptions } from '@orquestador/core';
+import type { Diagram, Orchestrator, PendingQuestion, RunAcceptance, RunEvent, RunMeta, RunOptions } from '@orquestador/core';
 import { RunControl } from './run-control';
 import { RunCorrections } from './run-corrections';
 import { RunFiles, type FilePreview, type OutputFile } from './run-files';
@@ -82,6 +82,10 @@ export class RunService {
   }
   dismiss(runId: string): Promise<boolean> {
     return this.history.dismiss(runId);
+  }
+  /** «Dar por bueno» una ejecución fallida [R65.6]. */
+  accept(runId: string, acceptance: RunAcceptance): Promise<boolean> {
+    return this.history.accept(runId, acceptance);
   }
 
   pause(runId: string): void {

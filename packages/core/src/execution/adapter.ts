@@ -95,6 +95,8 @@ export interface RunVerdict {
   met: boolean;
   /** Qué falta, si no se cumple. */
   missing: string;
+  /** Lo que solo puede hacer o comprobar una persona; no es una falta de los agentes [R65.1]. */
+  forPerson?: string;
   usage?: { inputTokens: number; outputTokens: number; costUsd?: number };
 }
 

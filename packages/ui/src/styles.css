@@ -2138,3 +2138,11 @@ button.orq-node__alerts:hover { text-decoration: underline; }
 .orq-stepcfg__agent { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 12px; }
 .orq-stepcfg__shared { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 @media (max-width: 820px) { .orq-stepcfg__cols { grid-template-columns: 1fr; } }
+
+/* «Dar por bueno» y aviso de atención [R65.4][R65.8]. */
+.orq-accept { width: min(520px, calc(100vw - 48px)); display: flex; flex-direction: column; gap: 12px; }
+.orq-accept textarea { width: 100%; resize: vertical; }
+.orq-accept__actions { display: flex; justify-content: flex-end; gap: 8px; }
+.orq-done.is-attention { border-color: color-mix(in srgb, var(--accent) 60%, var(--line)); }
+.orq-done.is-attention .orq-done__icon { color: var(--accent-text); }
+.orq-supfinal.is-warn { color: var(--accent-text); }

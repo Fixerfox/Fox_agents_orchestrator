@@ -1,4 +1,5 @@
 {
+  "acceptRun": "run:accept",
   "addContextFiles": "context:add-files",
   "addSkillFiles": "skill:add-files",
   "agentUsage": "agent:usage",

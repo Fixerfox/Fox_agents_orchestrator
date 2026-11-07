@@ -15,6 +15,7 @@ import { SECTIONS, crumbSection, statusLabel } from './runFormat';
 import { type Btab } from './RunTabs';
 import { QuestionCard } from './QuestionCard';
 import { RunModalView } from './RunModal';
+import { AcceptDialog } from './AcceptDialog';
 
 /** Vista de una ejecución: cabecera, avisos, lienzo, mensajes del paso y pestañas inferiores [R35.8–R35.10]. */
 export function RunDetail(
@@ -26,7 +27,10 @@ export function RunDetail(
     answer: (i: InboxItem, text: string) => void;
   },
 ) {
-  const d = useRunData(p.api, p.runId, p.main, p.row, p.index.loaded, p.now);
+  /** Sube tras «Dar por bueno» para volver a leer la ejecución [R65.8]. */
+  const [version, setVersion] = useState(0);
+  const [accepting, setAccepting] = useState(false);
+  const d = useRunData(p.api, p.runId, p.main, p.row, p.index.loaded, p.now, version);
   const [picked, setPicked] = useState<string | undefined>(p.nav.step);
   /** Modal de la ejecución y la pestaña con la que se abre: «Resumen» si ya terminó y «Cronograma» mientras corre [R44.5]. */
   const [modal, setModal] = useState<Btab>();
@@ -93,6 +97,26 @@ export function RunDetail(
           ))}
         </div>
       )}
+      {d.accepted && (
+        // Aceptada: quién, por qué y por qué había fallado [R65.8].
+        <p className="orq-run__note" role="note">
+          <strong>{t(d.accepted.by === 'assistant' ? 'accept.by.assistant' : 'accept.by.user')}</strong>
+          {`: ${d.accepted.reason}`}
+          {d.accepted.previousReason && <span className="orq-hint"> · {t('accept.failedWith', { reason: d.accepted.previousReason })}</span>}
+        </p>
+      )}
+      {accepting && (
+        <AcceptDialog
+          api={p.api}
+          runId={p.runId}
+          onClose={() => setAccepting(false)}
+          onAccepted={() => {
+            setAccepting(false);
+            setVersion((v) => v + 1);
+            p.index.refresh();
+          }}
+        />
+      )}
       {status === 'failed' && (
         <div className="orq-run__banner orq-run__banner--error" role="alert">
           <strong>{t('runs.failedAt')}</strong>
@@ -132,7 +156,10 @@ export function RunDetail(
               <p className="orq-runs2__empty">{diagram === null ? t('runs.noDiagram') : t('runs.loading')}</p>
             )}
             {/* En lugar del panel de pestañas, un aviso con la frase y el botón al modal [R44.5]. */}
-            <RunDoneBanner events={d.events} labelOf={label} running={running} interrupted={status === 'interrupted'} onSummary={() => setModal(running ? 'gantt' : 'summary')} onCorrect={fixable.length > 0 ? () => setFix({}) : undefined} />
+            <RunDoneBanner events={d.events} labelOf={label} running={running} interrupted={status === 'interrupted'} onSummary={() => setModal(running ? 'gantt' : 'summary')} onCorrect={fixable.length > 0 ? () => setFix({}) : undefined}
+              onAccept={status === 'failed' ? () => setAccepting(true) : undefined}
+              onTalk={p.onAskAssistant && status !== 'running' ? () => p.onAskAssistant!(t('talk.prompt', { runId: p.runId, diagram: d.title, status: statusLabel(status, false) })) : undefined}
+            />
           </div>
         </div>
         <aside className="orq-run__side" aria-label={step ? label(step.nodeId, step.nodePath) : t('runs.step.none')}>

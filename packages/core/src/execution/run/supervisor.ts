@@ -67,6 +67,8 @@ export interface SupervisorDeps {
   /** Si es una corrección: qué se pidió y lo que ya se había entregado [R62.15][R62.16]. */
   correction?: { text: string; before?: { step: string; text: string; files: string[] }[] };
   checkMs?: number;
+  /** Lo que solo puede comprobar una persona: avisar o fallar [R65.3]. */
+  humanChecks?(): 'warn' | 'fail';
 }
 
 function pushAction(trail: StepTrail, text: string): void {
@@ -283,10 +285,18 @@ export class Supervisor {
         // Sale en los eventos como el resto del Supervisor, para que el total cuadre [R63.5].
         if (this.d.outputId !== undefined) this.d.emitter.emit({ type: 'agent.usage', nodeId: this.d.outputId, inputTokens: v.usage.inputTokens, outputTokens: v.usage.outputTokens, ...(v.usage.costUsd !== undefined ? { costUsd: v.usage.costUsd } : {}), source: 'supervisor' });
       }
-      this.d.emitter.emit({ type: 'supervisor.verified', met: v.met, detail: v.missing });
-      if (v.met) return undefined;
-      this.alert(undefined, [], 'requirements-unmet', v.missing);
-      return `${REQUIREMENTS_UNMET}: ${v.missing}`;
+      const forPerson = v.forPerson?.trim() ?? '';
+      const strict = forPerson !== '' && this.d.humanChecks?.() === 'fail';
+      // Con «Hacer fallar», lo que queda para una persona cuenta como falta [R65.3].
+      const met = v.met && !strict;
+      const missing = strict ? [v.missing.trim(), forPerson].filter(Boolean).join(' ') : v.missing;
+      this.d.emitter.emit({ type: 'supervisor.verified', met, detail: missing, ...(forPerson ? { forPerson } : {}) });
+      if (met) {
+        if (forPerson) this.alert(undefined, [], 'needs-person', forPerson);
+        return undefined;
+      }
+      this.alert(undefined, [], 'requirements-unmet', missing);
+      return `${REQUIREMENTS_UNMET}: ${missing}`;
     } catch {
       if (!signal.aborted) this.alert(undefined, [], 'unchecked', 'No se pudo comprobar si el resultado cumple lo pedido.');
       return undefined;

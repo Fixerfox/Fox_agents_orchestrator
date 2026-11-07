@@ -58,6 +58,10 @@ export async function handleRuns(h: HandlerState, channel: string, arg: unknown)
     }
     case CHANNELS.dismissRun:
       return requireRuns(h).dismiss(arg as string);
+    case CHANNELS.acceptRun: {
+      const { runId, by, reason } = arg as { runId: string; by: 'user' | 'assistant'; reason: string };
+      return requireRuns(h).accept(runId, { by, reason });
+    }
     case CHANNELS.controlRun: {
       const { runId, action } = arg as { runId: string; action: RunAction };
       const runs = requireRuns(h);

@@ -24,6 +24,7 @@ const VERIFY_SYSTEM = [
   'Eres el Supervisor de una ejecución de agentes y das el último visto bueno: compruebas si el resultado cumple lo que pidió la persona.',
   'El criterio es solo lo que pidió la persona, y el entregable si se acordó uno. Las listas de tareas y los planes de los agentes son pistas, nunca el criterio.',
   'Lo planificado, pospuesto o bloqueado no cuenta como hecho, y documentar un trabajo no es hacerlo. Si la persona pidió solo un plan, un informe o un documento, entregarlo sí es cumplir.',
+  'Lo que solo puede hacer o comprobar una persona (medir algo en la vida real o durante un tiempo, probarlo a mano, aprobar algo visual, decidir) no es una falta de los agentes: ponlo en forPerson, no en missing. Si solo falta eso, met es true.',
   'Lo que la persona decidió aceptar o dejar para después no es una falta. Las mejoras que señala un informe o una auditoría tampoco, salvo que lo pedido las exigiera.',
   'Si hay una corrección, juzga el conjunto: lo que ya se entregó antes más lo nuevo. Se cumple si, sumando ambos, está hecho lo pedido y la corrección se aplicó. Una corrección pequeña no tiene que repetir lo anterior.',
   'Los agentes pueden ser de cualquier tipo y los flujos de cualquier forma: no supongas ninguno.',
@@ -189,12 +190,13 @@ export class ClaudeDecider implements Decider {
       apiKey: await this.d.apiKey(),
       cwd: this.d.projectRoot,
       system: VERIFY_SYSTEM,
-      prompt: `<datos>\n${data}\n</datos>\n\nResponde {"met":true|false,"missing":"qué falta de lo pedido, en una o dos frases, si met es false"}.`,
+      prompt: `<datos>\n${data}\n</datos>\n\nResponde {"met":true|false,"missing":"qué falta de lo pedido, en una o dos frases, si met es false","forPerson":"lo que queda para que lo haga o compruebe una persona, en una o dos frases, solo si lo hay"}.`,
       signal,
     });
     const obj = extractJson(text);
     if (!obj || typeof obj['met'] !== 'boolean') throw new AgentError('El Supervisor no devolvió una comprobación legible.', false);
-    return { met: obj['met'], missing: typeof obj['missing'] === 'string' ? obj['missing'] : '', ...(usage ? { usage } : {}) };
+    const forPerson = typeof obj['forPerson'] === 'string' ? obj['forPerson'].trim() : '';
+    return { met: obj['met'], missing: typeof obj['missing'] === 'string' ? obj['missing'] : '', ...(forPerson ? { forPerson } : {}), ...(usage ? { usage } : {}) };
   }
 
   /** Nodo «Transformar» con Claude: un turno sin herramientas; el motor comprueba el formato y el esquema [R37.6]. */

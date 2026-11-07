@@ -10,6 +10,7 @@ import {
   type RunEvent,
   type RunHandle,
   type RunOptions,
+  type RunAcceptance,
   type RunMeta,
   type RunResult,
 } from '@orquestador/core';
@@ -236,6 +237,32 @@ export async function markCorrectedBy(runDir: string, newRunId: string): Promise
   atomicWriteSync(path.join(runDir, 'meta.json'), `${JSON.stringify({ ...meta, correctedBy: list }, null, 2)}\n`);
 }
 
+/** Añade un evento al final del registro de una ejecución cerrada. */
+async function appendEvent(runDir: string, runId: string, body: Record<string, unknown>, ts: string): Promise<void> {
+  const { events } = await readRunLog(runDir);
+  const seq = events.reduce((m, e) => Math.max(m, e.seq), 0) + 1;
+  const event = { runId, seq, ts, ...body } as RunEvent;
+  const file = path.join(runDir, 'events.jsonl');
+  // Si el último registro quedó a medias (cierre inesperado), el nuevo va en su propia línea.
+  const text = await fs.readFile(file, 'utf8');
+  await fs.appendFile(file, `${text === '' || text.endsWith('\n') ? '' : '\n'}${JSON.stringify(event)}\n`);
+}
+
+/**
+ * Da por buena una ejecución fallida: añade `run.accepted` a su registro (sin tocar lo anterior) y la marca terminada
+ * bien en `meta.json`, guardando el motivo del fallo [R65.5]. Una que no falló no se toca.
+ */
+export async function acceptRun(runDir: string, acceptance: RunAcceptance, now: Date = new Date()): Promise<boolean> {
+  const meta = await readRunMeta(runDir);
+  if (meta.status !== 'failed') return false;
+  const ts = now.toISOString();
+  const previous = meta.reason !== undefined ? { previousReason: meta.reason } : {};
+  await appendEvent(runDir, meta.runId, { type: 'run.accepted', by: acceptance.by, reason: acceptance.reason, ...previous }, ts);
+  const accepted = { by: acceptance.by, reason: acceptance.reason, at: ts, ...previous };
+  atomicWriteSync(path.join(runDir, 'meta.json'), `${JSON.stringify({ ...meta, status: 'succeeded', reason: acceptance.reason, accepted, eventCount: meta.eventCount + 1 }, null, 2)}\n`);
+  return true;
+}
+
 export const DISMISS_REASON = 'Se interrumpió y la cancelaste';
 
 /**
@@ -245,14 +272,8 @@ export const DISMISS_REASON = 'Se interrumpió y la cancelaste';
 export async function dismissInterruptedRun(runDir: string, now: Date = new Date()): Promise<boolean> {
   const meta = await readRunMeta(runDir);
   if (meta.status !== 'running') return false;
-  const { events } = await readRunLog(runDir);
-  const seq = events.reduce((m, e) => Math.max(m, e.seq), 0) + 1;
   const ts = now.toISOString();
-  const event = { runId: meta.runId, seq, ts, type: 'run.finished', status: 'cancelled', reason: DISMISS_REASON } as RunEvent;
-  const file = path.join(runDir, 'events.jsonl');
-  // Si el último registro quedó a medias (cierre inesperado), el nuevo va en su propia línea.
-  const text = await fs.readFile(file, 'utf8');
-  await fs.appendFile(file, `${text === '' || text.endsWith('\n') ? '' : '\n'}${JSON.stringify(event)}\n`);
+  await appendEvent(runDir, meta.runId, { type: 'run.finished', status: 'cancelled', reason: DISMISS_REASON }, ts);
   atomicWriteSync(path.join(runDir, 'meta.json'), `${JSON.stringify({ ...meta, status: 'cancelled', finishedAt: ts, reason: DISMISS_REASON, eventCount: meta.eventCount + 1 }, null, 2)}\n`);
   return true;
 }

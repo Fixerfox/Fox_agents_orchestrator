@@ -17,6 +17,7 @@ const RULES: Readonly<Record<string, { title: MessageKey; why: MessageKey }>> = 
   'ai-review': { title: 'sup.rule.ai-review', why: 'sup.rule.ai-review.why' },
   unchecked: { title: 'sup.rule.unchecked', why: 'sup.rule.unchecked.why' },
   'requirements-unmet': { title: 'sup.rule.requirements-unmet', why: 'sup.rule.requirements-unmet.why' },
+  'needs-person': { title: 'sup.rule.needs-person', why: 'sup.rule.needs-person.why' },
 };
 
 /** Lo que pasó, en una frase que se entiende sin conocer la regla [R60.39]. */
@@ -34,7 +35,13 @@ export function SupervisorBalance({ watch }: { watch: Watch }) {
 /** Si el resultado cumple lo pedido [R62.13]. */
 export function SupervisorFinal({ watch }: { watch: Watch }) {
   if (!watch.final) return null;
-  return <p className={`orq-supfinal${watch.final.met ? '' : ' is-bad'}`}>{t(watch.final.met ? 'sup.final.ok' : 'sup.final.bad')}</p>;
+  return (
+    <>
+      <p className={`orq-supfinal${watch.final.met ? '' : ' is-bad'}`}>{t(watch.final.met ? 'sup.final.ok' : 'sup.final.bad')}</p>
+      {/* Lo que queda para una persona [R65.4]. */}
+      {watch.final.forPerson && <p className="orq-supfinal is-warn">{t('sup.final.person', { detail: watch.final.forPerson })}</p>}
+    </>
+  );
 }
 
 export function SupervisorMemoryList({ watch }: { watch: Watch }) {
