@@ -222,6 +222,7 @@ describe('inspector [R14.12]', () => {
     const id = s.addNode({ kind: 'agent', agentId: 'sprites', position: P });
     const onChangeAgent = vi.fn();
     render(<Inspector session={s} snap={s.getSnapshot()} selection={{ nodes: [id], edges: [] }} agents={AGENTS} onError={vi.fn()} onChangeAgent={onChangeAgent} />);
+    await userEvent.click(screen.getByRole('tab', { name: 'Agente' }));
     await userEvent.click(screen.getByRole('button', { name: 'Cambiar el agente' }));
     expect(onChangeAgent).toHaveBeenCalledWith(id);
   });

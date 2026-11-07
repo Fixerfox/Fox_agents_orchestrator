@@ -1,7 +1,7 @@
-import { BookOpen, FileText } from 'lucide-react';
-import { useId, useState } from 'react';
+import { BookOpen, Bot, FileText, ListChecks, ShieldCheck, UserCheck, type LucideIcon } from 'lucide-react';
+import { useId, useState, type ReactNode } from 'react';
 import { DEFAULT_MODEL, MAX_TASK_LENGTH, MODELS, COORDINATOR_ID, coordinatorAgent, type DiagramNode, type ProjectPermission } from '@orquestador/core';
-import { t, type EditorSnapshot, type NodePatch, type ProjectApi } from '@orquestador/editor';
+import { extraCount, stepOverrides, t, type EditorSnapshot, type NodePatch, type ProjectApi } from '@orquestador/editor';
 import { AgentAvatar, AskFirstMark, ClaudeButton, ClaudeDiff, ClaudeMenu, ClaudeStatus, PermissionPicker, permissionName, useClaudeAssist, type AssistConfig } from '../common';
 import { ExtraKnowledge, type KnowledgeCatalog } from './ExtraKnowledge';
 import type { AgentOption } from './Palette';
@@ -85,18 +85,52 @@ interface Props {
   onEditAgent?: ((agentId: string) => void) | undefined;
   /** «Cambiar»: abre la galería de agentes para este paso [R32.29]. */
   onChangeAgent?: ((nodeId: string) => void) | undefined;
-  /** `wide`: la ventana «Configurar» en dos columnas, con la tarea más alta [R64.3]. */
-  layout?: 'side' | 'wide';
+  /** La ventana «Configurar» tiene la tarea más alta [R64.3]. */
+  wide?: boolean;
 }
 
-/** Ajustes de un paso agente: los mismos en el lateral y en la ventana «Configurar» [R32.29][R64.3]. */
-export function AgentStepFields({ node, snap, agents, patch, api, files, catalog, onCreateKnowledge, onEditAgent, onChangeAgent, layout = 'side' }: Props) {
+export type StepSectionId = 'task' | 'who' | 'knowledge' | 'files' | 'supervision';
+
+/** Una sección de los ajustes de un paso: la misma en el lateral y en la ventana [R66.1][R66.6]. */
+export interface StepSection {
+  id: StepSectionId;
+  title: string;
+  icon: LucideIcon;
+  summary: string;
+  /** El paso sobrescribe aquí a su agente [R66.2]. */
+  changed: boolean;
+  content: ReactNode;
+}
+
+const modelName = (id: string | undefined) => MODELS.find((m) => m.id === id)?.name ?? id ?? '';
+
+/** Primera línea de la tarea, corta, para el resumen [R66.1]. */
+function taskLine(task: string | undefined): string {
+  const line = (task ?? '').trim().split('\n')[0]!.trim();
+  return line.length > 60 ? `${line.slice(0, 59)}…` : line;
+}
+
+/** Marca ámbar «cambiado en este paso» [R66.2]. */
+export function ChangedMark() {
+  return (
+    <span className="orq-changed">
+      <span className="orq-changed__dot" aria-hidden="true" />
+      <span className="orq-sr">{t('stepcfg.changed')}</span>
+    </span>
+  );
+}
+
+/** Las secciones de un paso agente: resúmenes, marcas y campos [R66.1][R66.2][R66.6]. */
+export function stepSections({ node, snap, agents, patch, api, files, catalog, onCreateKnowledge, onEditAgent, onChangeAgent, wide = false }: Props): StepSection[] {
   const agent = agentOfNode(agents, node.agentId);
   const incoming = incomingNames(snap.level, node.id);
-  const wide = layout === 'wide';
+  const overrides = stepOverrides(node);
+  const fromAgent = (agent?.skills?.length ?? 0) + (agent?.contexts?.length ?? 0);
+  const line = taskLine(node.task);
+  const taskSummary = [line || t('stepcfg.sum.task.empty'), ...(incoming.length > 0 ? [t('stepcfg.sum.receives', { n: incoming.length })] : [])].join(' · ');
   const task = (
     <section className="orq-insp__card" aria-label={t('insp.card.task')}>
-      <TaskField key={`${node.id}|${node.task ?? ''}`} api={api} label={node.label ?? node.id} value={node.task ?? ''} rows={wide ? 16 : 5} onCommit={(v) => patch({ task: v })} />
+      <TaskField key={`${node.id}|${node.task ?? ''}`} api={api} label={node.label ?? node.id} value={node.task ?? ''} rows={wide ? 10 : 5} onCommit={(v) => patch({ task: v })} />
       {incoming.length > 0 && (
         <div className="orq-insp__recv" aria-label={t('insp.receives')}>
           <span className="orq-hint">{t('insp.receives')}</span>
@@ -111,8 +145,7 @@ export function AgentStepFields({ node, snap, agents, patch, api, files, catalog
     </section>
   );
   const who = (
-    <section className="orq-insp__card">
-      <span className="orq-insp__label">{t('inspector.agent.who')}</span>
+    <div className="orq-insp__card">
       <div className="orq-agentcard" role="group" aria-label={t('inspector.agent.who')}>
         {agent?.icon ? (
           <AgentAvatar name={agent.name} icon={agent.icon} tone={agent.tone} size="lg" />
@@ -126,7 +159,7 @@ export function AgentStepFields({ node, snap, agents, patch, api, files, catalog
           <span className="orq-hint">{agent?.description ?? t('inspector.agent.noDesc')}</span>
         </span>
         <div className="orq-agentcard__facts">
-          {agent?.model && <span className="orq-tag">{MODELS.find((m) => m.id === agent.model)?.name ?? agent.model}</span>}
+          {agent?.model && <span className="orq-tag">{modelName(agent.model)}</span>}
           {agent?.askFirst && (
             <span className="orq-tag orq-agentf__ask">
               <AskFirstMark size={12} /> {t('askfirst.mark')}
@@ -150,7 +183,7 @@ export function AgentStepFields({ node, snap, agents, patch, api, files, catalog
       <label className="orq-insp__model">
         {t('insp.model')}
         <select value={node.model ?? ''} onChange={(e) => patch({ model: e.target.value })}>
-          <option value="">{t('insp.model.agent', { model: MODELS.find((m) => m.id === (agent?.model ?? DEFAULT_MODEL))?.name ?? agent?.model ?? '' })}</option>
+          <option value="">{t('insp.model.agent', { model: modelName(agent?.model ?? DEFAULT_MODEL) })}</option>
           {MODELS.map((m) => (
             <option key={m.id} value={m.id}>
               {m.name}
@@ -159,33 +192,26 @@ export function AgentStepFields({ node, snap, agents, patch, api, files, catalog
         </select>
       </label>
       <p className="orq-hint">{t('insp.model.hint')}</p>
-      {/* Confirmar antes de terminar, solo en este paso [R43.3]. */}
-      {/* En fila, como los demás interruptores: `.orq-inspector label` lo apilaba [R63.28]. */}
-      <label className="orq-switch">
-        <span>{t('insp.confirm')}</span>
-        <input type="checkbox" checked={node.confirm === true} onChange={(e) => patch({ confirm: e.target.checked })} />
-      </label>
-      <p className="orq-hint">{t('insp.confirm.hint')}</p>
-    </section>
+    </div>
   );
   const knowledge = (
-    <section className="orq-insp__card">
+    <div className="orq-insp__card">
       <div className="orq-insp__sec" role="group" aria-label={t('insp.knowledge')}>
-        <span className="orq-insp__label">{t('insp.knowledge')}</span>
-        {(agent?.skills?.length ?? 0) + (agent?.contexts?.length ?? 0) === 0 ? (
+        <span className="orq-insp__label">{t('insp.fromAgent')}</span>
+        {fromAgent === 0 ? (
           <p className="orq-hint">{t('insp.knowledge.none')}</p>
         ) : (
           <div className="orq-insp__chips">
             {agent?.skills?.map((k) => (
               <span key={`s-${k}`} className="orq-tag">
                 <BookOpen size={12} strokeWidth={1.5} aria-hidden="true" />
-                {k} <span className="orq-hint">· {t('insp.fromAgent')}</span>
+                {k}
               </span>
             ))}
             {agent?.contexts?.map((c) => (
               <span key={`c-${c}`} className="orq-tag">
                 <FileText size={12} strokeWidth={1.5} aria-hidden="true" />
-                {c} <span className="orq-hint">· {t('insp.fromAgent')}</span>
+                {c}
               </span>
             ))}
           </div>
@@ -205,38 +231,97 @@ export function AgentStepFields({ node, snap, agents, patch, api, files, catalog
           {...(onCreateKnowledge ? { onCreate: onCreateKnowledge } : {})}
         />
       )}
-    </section>
+    </div>
   );
-  const filesCard = files && (
-    <section className="orq-insp__card">
-      <div className="orq-insp__sec" role="group" aria-label={t('insp.files')}>
-        <span className="orq-insp__label">{t('insp.files')}</span>
-        <label className="orq-switch">
-          <span>{files.folder ? t('insp.files.create', { name: files.folder }) : t('insp.files.createProject')}</span>
-          <input type="checkbox" role="switch" checked disabled />
-        </label>
-        <PermissionPicker legend={t('perm.title')} value={files.permissions} onChange={(level) => level && level !== 'readonly' && files.onPermissions(level)} />
-        {agent?.permissions && <p className="orq-hint">{t('insp.files.agentOwn', { level: permissionName(agent.permissions) })}</p>}
-        <p className="orq-hint">{t('insp.files.hint')}</p>
-      </div>
-    </section>
+  const supervision = (
+    <div className="orq-insp__card">
+      {/* Confirmar antes de terminar, solo en este paso [R43.3]; en fila como los demás interruptores [R63.28]. */}
+      <label className="orq-switch">
+        <span>{t('insp.confirm')}</span>
+        <input type="checkbox" className="orq-toggle" checked={node.confirm === true} onChange={(e) => patch({ confirm: e.target.checked })} />
+      </label>
+      <p className="orq-hint">{t('insp.confirm.hint')}</p>
+    </div>
   );
-  if (!wide)
-    return (
-      <>
-        {task}
-        {who}
-        {knowledge}
-        {filesCard}
-      </>
-    );
+  const sections: StepSection[] = [
+    { id: 'task', title: t('stepcfg.sec.task'), icon: ListChecks, summary: taskSummary, changed: false, content: task },
+    { id: 'who', title: t('stepcfg.sec.who'), icon: Bot, summary: `${agent?.name ?? node.agentId ?? ''} · ${modelName(node.model ?? agent?.model ?? DEFAULT_MODEL)}`, changed: overrides.includes('model'), content: who },
+    { id: 'knowledge', title: t('stepcfg.sec.knowledge'), icon: BookOpen, summary: t('stepcfg.sum.knowledge', { agent: fromAgent, step: extraCount(node.extra) }), changed: overrides.includes('extra'), content: knowledge },
+  ];
+  if (files)
+    sections.push({
+      id: 'files',
+      title: t('stepcfg.sec.files'),
+      icon: ShieldCheck,
+      summary: t('stepcfg.sum.files', { level: permissionName(files.permissions) }),
+      changed: false,
+      content: (
+        <div className="orq-insp__card">
+          <div className="orq-insp__sec" role="group" aria-label={t('insp.files')}>
+            <label className="orq-switch">
+              <span>{files.folder ? t('insp.files.create', { name: files.folder }) : t('insp.files.createProject')}</span>
+              <input type="checkbox" role="switch" checked disabled />
+            </label>
+            <PermissionPicker legend={t('perm.title')} value={files.permissions} onChange={(level) => level && level !== 'readonly' && files.onPermissions(level)} />
+            {agent?.permissions && <p className="orq-hint">{t('insp.files.agentOwn', { level: permissionName(agent.permissions) })}</p>}
+            <p className="orq-hint is-warn">{t('stepcfg.files.project')}</p>
+          </div>
+        </div>
+      ),
+    });
+  sections.push({ id: 'supervision', title: t('stepcfg.sec.supervision'), icon: UserCheck, summary: t(node.confirm ? 'stepcfg.sum.confirm.on' : 'stepcfg.sum.confirm.off'), changed: overrides.includes('confirm'), content: supervision });
+  return sections;
+}
+
+/** Pestañas del lateral (prototipo D): «Permisos» junta supervisión y archivos [R66.6]. */
+export type StepTabId = 'task' | 'who' | 'knowledge' | 'perms';
+const TAB_OF: Record<StepSectionId, StepTabId> = { task: 'task', who: 'who', knowledge: 'knowledge', files: 'perms', supervision: 'perms' };
+const TAB_KEY: Record<StepTabId, 'stepcfg.tab.task' | 'stepcfg.tab.who' | 'stepcfg.tab.knowledge' | 'stepcfg.tab.perms'> = { task: 'stepcfg.tab.task', who: 'stepcfg.tab.who', knowledge: 'stepcfg.tab.knowledge', perms: 'stepcfg.tab.perms' };
+const TAB_ORDER: StepTabId[] = ['task', 'who', 'knowledge', 'perms'];
+
+/** Ajustes de un paso agente en el lateral: pestañas arriba y una sección cada vez [R32.29][R66.6].
+ * `tab`/`onTab` los guarda el Diseñador para recordar la pestaña al cambiar de paso. */
+export function AgentStepFields({ tab: shared, onTab, ...props }: Props & { tab?: StepTabId | undefined; onTab?: ((tab: StepTabId) => void) | undefined }) {
+  const [own, setOwn] = useState<StepTabId>('task');
+  const tab = shared ?? own;
+  const id = useId();
+  const pick = (k: StepTabId) => {
+    setOwn(k);
+    onTab?.(k);
+  };
+  const sections = stepSections(props);
   return (
-    <div className="orq-stepcfg__cols">
-      <div className="orq-stepcfg__col">{task}</div>
-      <div className="orq-stepcfg__col">
-        {who}
-        {knowledge}
-        {filesCard}
+    <div className="orq-steptabs">
+      <div className="orq-steptabs__list" role="tablist" aria-label={t('stepcfg.nav')}>
+        {TAB_ORDER.map((k) => {
+          const mine = sections.filter((s) => TAB_OF[s.id] === k);
+          return (
+            <button
+              key={k}
+              type="button"
+              role="tab"
+              id={`${id}-${k}`}
+              aria-selected={tab === k}
+              aria-controls={`${id}-panel`}
+              title={mine.map((s) => s.summary).join(' · ')}
+              className="orq-steptabs__tab"
+              onClick={() => pick(k)}
+            >
+              {t(TAB_KEY[k])}
+              {mine.some((s) => s.changed) && <ChangedMark />}
+            </button>
+          );
+        })}
+      </div>
+      <div className="orq-steptabs__panel" role="tabpanel" id={`${id}-panel`} aria-labelledby={`${id}-${tab}`}>
+        {sections
+          .filter((s) => TAB_OF[s.id] === tab)
+          .map((s) => (
+            <div key={s.id} className="orq-steptabs__sec">
+              {tab === 'perms' && <span className="orq-insp__label">{s.title}</span>}
+              {s.content}
+            </div>
+          ))}
       </div>
     </div>
   );

@@ -10,6 +10,7 @@ import { NodeDialog } from '../src/runs/NodeDialog';
 import { NodePanel } from '../src/runs/NodePanel';
 import { ResultsPanel } from '../src/runs/ResultsPanel';
 import { QuestionCard } from '../src/runs/QuestionCard';
+import { stepTab } from './nav';
 import { createMemoryApi } from '../src/memoryApi';
 
 const AGENTS = [{ id: 'sprites', name: 'Sprites', description: 'Dibuja', model: 'claude-sonnet-5-5' }];
@@ -110,6 +111,7 @@ describe('SPEC-043 · confirmar antes de terminar (interfaz)', () => {
     await userEvent.click(screen.getByRole('button', { name: '+ Agente' }));
     await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Sprites/ }));
     const card = await screen.findByLabelText(/^Agente «sprites»/);
+    await stepTab('Permisos');
     const box = screen.getByRole('checkbox', { name: 'Confirmar antes de terminar' }) as HTMLInputElement;
     expect(box.checked).toBe(false);
     await userEvent.click(box);

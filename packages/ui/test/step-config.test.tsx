@@ -10,6 +10,7 @@ import { DraftStore } from '../src/common';
 import { StepConfigDialog } from '../src/diagrams/StepConfigDialog';
 import { AgentQuickEditor } from '../src/knowledge';
 import { createMemoryApi } from '../src/memoryApi';
+import { stepTab } from './nav';
 
 const agent = (id: string, name: string, patch: Partial<AgentDefinition> = {}): AgentDefinition => ({ ...newAgent(id, name), ...patch });
 const AGENTS = [agent('pix', 'Pixelador', { description: 'Pinta', instructions: 'Usa píxel art' }), agent('rev', 'Revisor', { description: 'Revisa' })];
@@ -24,16 +25,18 @@ async function mount() {
   return { api, node };
 }
 const dialog = () => within(screen.getByRole('dialog', { name: /^Configurar «/ }));
+const section = (name: RegExp) => within(dialog().getByRole('navigation', { name: 'Secciones del paso' })).getByRole('button', { name });
 const taskOf = (api: ReturnType<typeof createMemoryApi>) => [...api.saved.values()].flatMap((d) => d.nodes).find((n) => n.agentId === 'pix')?.task;
 
 describe('SPEC-064 · configurar un agente desde el diagrama', () => {
-  it('[R64.1] el doble clic sobre un agente abre «Configurar» con «Este paso» y «El agente»', async () => {
+  it('[R64.1] el doble clic sobre un agente abre «Configurar» con el índice del paso y «Editar el agente»', async () => {
     const { node } = await mount();
     fireEvent.doubleClick(node);
     const d = dialog();
     expect(screen.getByRole('dialog', { name: 'Configurar «pix»' })).toBeTruthy();
-    expect(d.getByRole('tab', { name: 'Este paso', selected: true })).toBeTruthy();
-    expect(d.getByRole('tab', { name: 'El agente' })).toBeTruthy();
+    expect(d.getByRole('navigation', { name: 'Secciones del paso' })).toBeTruthy();
+    expect(d.getByRole('button', { name: 'Editar el agente' })).toBeTruthy();
+    await userEvent.click(section(/^Quién lo hace/));
     expect(d.getByRole('group', { name: 'Quién lo hace' })).toBeTruthy();
   });
 
@@ -66,7 +69,7 @@ describe('SPEC-064 · configurar un agente desde el diagrama', () => {
     await userEvent.type(title, 'Sprites{Enter}');
     expect(await screen.findByRole('dialog', { name: 'Configurar «Sprites»' })).toBeTruthy();
     await userEvent.type(d.getByLabelText('Qué tiene que hacer'), 'Pinta el héroe');
-    await userEvent.tab();
+    await userEvent.click(section(/^Quién lo hace/));
     await userEvent.selectOptions(d.getByLabelText('Modelo'), 'claude-opus-5-5');
     await userEvent.click(d.getByRole('button', { name: 'Cerrar' }));
     // el lateral ve lo mismo
@@ -74,6 +77,7 @@ describe('SPEC-064 · configurar un agente desde el diagrama', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Guardar' }));
     await waitFor(() => expect(taskOf(api)).toBe('Pinta el héroe'));
     await userEvent.click(screen.getByRole('button', { name: 'Deshacer' }));
+    await stepTab('Agente');
     expect(((screen.getByLabelText('Modelo') as HTMLSelectElement).value)).toBe('');
   });
 
@@ -81,7 +85,7 @@ describe('SPEC-064 · configurar un agente desde el diagrama', () => {
     const { api, node } = await mount();
     fireEvent.contextMenu(node);
     await userEvent.click(within(screen.getByRole('menu')).getByRole('menuitem', { name: 'Configurar…' }));
-    await userEvent.click(dialog().getByRole('tab', { name: 'El agente' }));
+    await userEvent.click(dialog().getByRole('button', { name: 'Editar el agente' }));
     const d = dialog();
     expect(d.getByText('Los cambios valen para todos los diagramas que usan a «Pixelador».')).toBeTruthy();
     expect(d.queryByRole('button', { name: 'Eliminar' })).toBeNull();
@@ -92,26 +96,28 @@ describe('SPEC-064 · configurar un agente desde el diagrama', () => {
     await waitFor(() => expect(api.agents.get('pix')).toMatchObject({ description: 'Pinta sprites', instructions: 'Usa píxel art' }));
     expect(screen.getByRole('dialog', { name: /^Configurar «/ })).toBeTruthy();
     // la paleta y los pasos se actualizan
-    await waitFor(() => expect(within(screen.getByRole('group', { name: 'Quién lo hace' })).getByText('Pinta sprites')).toBeTruthy());
+    await userEvent.click(dialog().getByRole('button', { name: 'Volver al paso' }));
+    await userEvent.click(section(/^Quién lo hace/));
+    await waitFor(() => expect(within(dialog().getByRole('group', { name: 'Quién lo hace' })).getByText('Pinta sprites')).toBeTruthy());
   });
 
-  it('[R64.4] «Editar» del lateral abre la ventana en «El agente» y «Abrir en Agentes» lleva a la biblioteca', async () => {
+  it('[R64.4] «Editar» del lateral abre la ventana en la ficha del agente y «Abrir en Agentes» lleva a la biblioteca', async () => {
     await mount();
-    const side = within(screen.getByRole('complementary', { name: 'Propiedades' }));
+    const side = await stepTab('Agente');
     await userEvent.click(side.getByRole('button', { name: 'Editar el agente' }));
-    expect(dialog().getByRole('tab', { name: 'El agente', selected: true })).toBeTruthy();
+    expect(dialog().getByRole('button', { name: 'Volver al paso' })).toBeTruthy();
     await userEvent.click(dialog().getByRole('button', { name: 'Abrir en Agentes' }));
     expect(screen.queryByRole('dialog', { name: /^Configurar «/ })).toBeNull();
     const lib = within(await screen.findByRole('region', { name: 'Agentes' }));
     await waitFor(() => expect((lib.getByLabelText('Nombre') as HTMLInputElement).value).toBe('Pixelador'));
   });
 
-  it('[R64.4] el Coordinador se configura, pero sin la pestaña «El agente»', async () => {
+  it('[R64.4] el Coordinador se configura, pero sin «Editar el agente»', async () => {
     await mount();
     await userEvent.click(screen.getByRole('button', { name: '+ Coordinador' }));
     fireEvent.doubleClick((await screen.findByLabelText(/^Agente «Coordinador»/)).closest('.react-flow__node')!);
     expect(screen.getByRole('dialog', { name: 'Configurar «Coordinador»' })).toBeTruthy();
-    expect(dialog().queryByRole('tab')).toBeNull();
+    expect(dialog().queryByRole('button', { name: 'Editar el agente' })).toBeNull();
     expect(dialog().getByLabelText('Qué tiene que hacer')).toBeTruthy();
   });
 
@@ -123,13 +129,13 @@ describe('SPEC-064 · configurar un agente desde el diagrama', () => {
     expect(screen.queryByRole('dialog', { name: /^Configurar «/ })).toBeNull();
     expect((screen.getByLabelText('Qué tiene que hacer') as HTMLTextAreaElement).value).toBe('Sin salir del campo');
     fireEvent.doubleClick(node);
-    await userEvent.click(dialog().getByRole('tab', { name: 'El agente' }));
+    await userEvent.click(dialog().getByRole('button', { name: 'Editar el agente' }));
     const desc = await dialog().findByLabelText('Para qué sirve');
     await userEvent.type(desc, ' y anima');
     fireEvent.pointerDown(document.querySelector('.orq-modal')!);
     expect(screen.queryByRole('dialog', { name: /^Configurar «/ })).toBeNull();
     fireEvent.doubleClick(node);
-    await userEvent.click(dialog().getByRole('tab', { name: 'El agente' }));
+    await userEvent.click(dialog().getByRole('button', { name: 'Editar el agente' }));
     expect(((await dialog().findByLabelText('Para qué sirve')) as HTMLTextAreaElement).value).toBe('Pinta y anima');
     expect(dialog().getByText('Sin guardar')).toBeTruthy();
   });
@@ -144,6 +150,7 @@ describe('SPEC-064 · configurar un agente desde el diagrama', () => {
     const props = { api, session, snap: session.getSnapshot(), nodeId: id, agents, agentEditor: (p: Parameters<NonNullable<Parameters<typeof StepConfigDialog>[0]['agentEditor']>>[0]) => <AgentQuickEditor api={api} drafts={drafts} assistantReady={false} {...p} />, onClose: () => undefined, onError: () => undefined, onChangeAgent: () => undefined, onAgentSaved: () => undefined, openLibrary: () => undefined };
     const { unmount } = render(<StepConfigDialog {...props} />);
     expect((dialog().getByLabelText('Qué tiene que hacer') as HTMLTextAreaElement).matches(':disabled')).toBe(true);
+    await userEvent.click(section(/^Quién lo hace/));
     expect((dialog().getByLabelText('Modelo') as HTMLSelectElement).matches(':disabled')).toBe(true);
     unmount();
     render(<StepConfigDialog {...props} initialTab="agent" />);

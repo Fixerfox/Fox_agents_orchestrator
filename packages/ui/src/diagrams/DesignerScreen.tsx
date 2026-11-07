@@ -10,6 +10,7 @@ import { DiagramMenu, EditButtons, SaveStatus } from './DiagramMenu';
 import { Inspector } from './Inspector';
 import { Palette } from './Palette';
 import { StepConfigDialog, type AgentEditorSlot, type StepConfigTab } from './StepConfigDialog';
+import type { StepTabId } from './StepFields';
 import type { Designer } from './useDesigner';
 import type { DesignerSelection } from './useDesignerSelection';
 import type { DiagramDocument } from './useDiagramDocument';
@@ -166,6 +167,7 @@ export function DesignerScreen(p: Props) {
 
 /** Lateral derecho sin asistente: el paso seleccionado o los ajustes del diagrama [R33.6]. */
 function DesignerSide({ api, session, snap, doc, sel, lib, designer, events, files, fail, openLibrary, onCloseDiagramPanel, onConfigure }: Props & { onConfigure: (nodeId: string, tab: StepConfigTab) => void }) {
+  const [stepTab, setStepTab] = useState<StepTabId>('task');
   const agentStep = sel.selectedNode?.kind === 'agent' ? sel.selectedNode : undefined;
   const editable = (id: string) => lib.agents.find((a) => a.id === id)?.editable === true;
   return (
@@ -206,6 +208,8 @@ function DesignerSide({ api, session, snap, doc, sel, lib, designer, events, fil
         onOpenDiagram={(id) => void doc.openDiagram(id)}
         onCreateKnowledge={(k) => openLibrary('knowledge', { tab: k, id: 'new' })}
         api={api}
+        stepTab={stepTab}
+        onStepTab={setStepTab}
         {...(files ? { files } : {})}
       />
     </>

@@ -10,6 +10,7 @@ import { t } from '@orquestador/editor';
 import { App } from '../src/App';
 import { DraftStore } from '../src/common';
 import { McpForm } from '../src/knowledge/McpForm';
+import { stepTab } from './nav';
 import { createMemoryApi } from '../src/memoryApi';
 import { FIT_VIEW, offscreen, subtitle } from '../src/diagrams/canvasView';
 import { crumbSection } from '../src/runs/runFormat';
@@ -91,6 +92,8 @@ describe('SPEC-063 · interfaz', () => {
     render(<App initialProject="Juego" api={createMemoryApi()} agents={AGENTS} confirm={() => true} />);
     await userEvent.click(screen.getByRole('button', { name: '+ Agente' }));
     await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Sprites/ }));
+    await screen.findByLabelText(/^Agente «/);
+    await stepTab('Permisos');
     const box = await screen.findByRole('checkbox', { name: 'Confirmar antes de terminar' });
     const label = box.closest('label')!;
     expect(label.classList.contains('orq-switch')).toBe(true);

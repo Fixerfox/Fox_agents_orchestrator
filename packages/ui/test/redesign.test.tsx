@@ -5,7 +5,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event';
 import { App } from '../src/App';
 import { InsertPicker } from '../src/diagrams/InsertPicker';
-import { settingsSaved } from './nav';
+import { settingsSaved, stepTab } from './nav';
 import { createMemoryApi } from '../src/memoryApi';
 
 const AGENTS = [
@@ -28,13 +28,15 @@ describe('SPEC-032 · editor rediseñado', () => {
     mount();
     await addSprites();
     const task = screen.getByLabelText('Qué tiene que hacer') as HTMLTextAreaElement;
-    const card = within(screen.getByRole('group', { name: 'Quién lo hace' }));
-    expect(card.getByText('Sprites', { selector: 'strong' })).toBeTruthy();
-    expect(card.getByText('Dibuja en píxel art')).toBeTruthy();
     await userEvent.type(task, 'Dibuja cada enemigo');
     fireEvent.blur(task);
     // un solo paso de historial por edición: deshacer devuelve el campo vacío
     await waitFor(() => expect((screen.getByLabelText('Qué tiene que hacer') as HTMLTextAreaElement).value).toBe('Dibuja cada enemigo'));
+    // la tarjeta del agente está en la pestaña «Agente» del lateral [R66.6]
+    await stepTab('Agente');
+    const card = within(screen.getByRole('group', { name: 'Quién lo hace' }));
+    expect(card.getByText('Sprites', { selector: 'strong' })).toBeTruthy();
+    expect(card.getByText('Dibuja en píxel art')).toBeTruthy();
     // «Cambiar» abre la galería de agentes y sustituye el del nodo [R32.29]
     await userEvent.click(card.getByRole('button', { name: 'Cambiar el agente' }));
     const gal = within(screen.getByRole('dialog', { name: 'Elige un agente' }));

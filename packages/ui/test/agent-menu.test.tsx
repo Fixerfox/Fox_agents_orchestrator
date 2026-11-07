@@ -7,7 +7,7 @@ import { newAgent, newContext, newSkill, type AgentDefinition } from '@orquestad
 import { createDiagram } from '@orquestador/editor';
 import { App } from '../src/App';
 import { createMemoryApi, type MemoryApiOptions } from '../src/memoryApi';
-import { goLib } from './nav';
+import { goLib, stepTab } from './nav';
 
 const agent = (id: string, name: string, patch: Partial<AgentDefinition> = {}): AgentDefinition => ({ ...newAgent(id, name), ...patch });
 const OPTIONS: MemoryApiOptions = {
@@ -50,6 +50,7 @@ describe('SPEC-032 · agentes a mano', () => {
     await userEvent.click(menu().getByRole('menuitem', { name: 'Cambiar el agente…' }));
     await userEvent.click(within(screen.getByRole('dialog', { name: 'Elige un agente' })).getByRole('button', { name: /Revisor/ }));
     expect(await screen.findByLabelText(/^Agente «pix»/)).toBeTruthy();
+    await stepTab('Agente');
     expect(within(screen.getByRole('group', { name: 'Quién lo hace' })).getByText('Revisor', { selector: 'strong' })).toBeTruthy();
   });
 

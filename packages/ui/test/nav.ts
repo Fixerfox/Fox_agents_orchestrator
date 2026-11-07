@@ -31,3 +31,10 @@ export async function settingsSaved() {
   await new Promise((r) => setTimeout(r, 400));
   await waitFor(() => expect(screen.getByText('Ajustes guardados')).toBeTruthy());
 }
+
+/** Abre una pestaña del paso agente en el lateral («Tarea», «Agente», «Conocimiento» o «Permisos») [R66.6]. */
+export async function stepTab(name: 'Tarea' | 'Agente' | 'Conocimiento' | 'Permisos') {
+  const side = within(screen.getByRole('complementary', { name: 'Propiedades' }));
+  await userEvent.click(side.getByRole('tab', { name: new RegExp(`^${name}`) }));
+  return side;
+}
