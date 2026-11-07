@@ -49,8 +49,13 @@ describe('SPEC-060 · reglas', () => {
 
   it('[R60.7] agotar los reintentos o repetir el reparto hasta el máximo', () => {
     const retry = (attempt: number) => ({ type: 'node.retrying', nodeId: 'a', attempt, max: 3, delayMs: 1, message: 'x' });
+    const end = (status: string) => ({ type: 'node.finished', nodeId: 'a', status });
     expect(rulesOf([retry(1)])).toEqual([]);
-    expect(rulesOf([retry(2)])).toEqual(['retry-loop']);
+    // Solo cuando también falla el último intento [R63.4].
+    expect(rulesOf([retry(2)])).toEqual([]);
+    expect(rulesOf([retry(1), end('failed')])).toEqual([]);
+    expect(rulesOf([retry(1), retry(2), end('succeeded')])).toEqual([]);
+    expect(rulesOf([retry(1), retry(2), end('failed')])).toEqual(['retry-loop']);
     const rejected = { type: 'split.rejected', nodeId: 'c', attempt: 1, problems: [] };
     expect(rulesOf([rejected, rejected])).toEqual([]);
     expect(rulesOf([rejected, rejected, rejected])).toEqual(['retry-loop']);

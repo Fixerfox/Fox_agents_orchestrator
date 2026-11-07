@@ -46,8 +46,18 @@ export interface Live {
 export class LiveRuns {
   private readonly runs = new Map<string, Live>();
 
+  /** Terminadas que se guardan en memoria; las demás se leen del disco [R63.19]. */
+  static readonly KEEP_FINISHED = 10;
+
   add(live: Live): void {
     this.runs.set(live.handle.runId, live);
+    this.prune();
+  }
+
+  /** Suelta las terminadas más antiguas por encima del tope, con su historial de eventos [R63.19]. */
+  prune(): void {
+    const finished = [...this.runs.values()].filter((l) => l.finished);
+    for (const old of finished.slice(0, Math.max(0, finished.length - LiveRuns.KEEP_FINISHED))) this.runs.delete(old.handle.runId);
   }
   find(runId: string): Live | undefined {
     return this.runs.get(runId);
