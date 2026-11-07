@@ -2,7 +2,7 @@ import { projectPermission, type ProjectPermission } from '@orquestador/core';
 import { AssistantPanel } from '../assistant';
 import { downloadText } from '../common';
 import { DesignerScreen, DiagramsScreen } from '../diagrams';
-import { LibraryScreen } from '../knowledge';
+import { AgentQuickEditor, LibraryScreen } from '../knowledge';
 import { JobsScreen, RunsScreen } from '../runs';
 import { ProjectScreen, SettingsDialog } from '../settings';
 import type { AppModel } from './useApp';
@@ -38,6 +38,7 @@ function Designer({ app }: { app: AppModel }) {
       fail={app.fail}
       guard={app.guard}
       openLibrary={app.openLibrary}
+      agentEditor={(p) => <AgentQuickEditor api={app.api} drafts={app.drafts} assistantReady={conf.engine === 'claude'} {...p} />}
     />
   );
 }

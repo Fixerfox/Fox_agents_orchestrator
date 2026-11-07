@@ -10,7 +10,7 @@ import {
   useReactFlow,
   type NodeChange,
 } from '@xyflow/react';
-import { Braces, Copy, GitFork, LogIn, Pencil, Repeat2, ShieldCheck, Trash2, Bot, Workflow } from 'lucide-react';
+import { Braces, Copy, GitFork, LogIn, Pencil, Repeat2, Settings2, ShieldCheck, Trash2, Bot, Workflow } from 'lucide-react';
 import { finalSteps, returnEdges, type Diagram, type KnowledgeExtra, type ReviewPort, type RunEvent, isCoordinator, splitBranchIds } from '@orquestador/core';
 import { deliverableLabel, edgeTraversals, isForcedOnStep, isRequired, knowledgeKey, setRequired, type EditorSession, type LiveView } from '@orquestador/editor';
 import { EdgeInspector } from './EdgeInspector';
@@ -45,6 +45,8 @@ interface Props {
   onInsertTransform?: (edgeId: string) => void;
   /** Doble clic en un nodo que no es un bucle: abre su ventana de ejecución [R15.12]. */
   onOpenNode?: (id: string) => void;
+  /** Doble clic o «Configurar…» sobre un agente: abre la ventana «Configurar» [R64.1][R64.2]. */
+  onConfigure?: (id: string) => void;
   /** Pide al inspector que enfoque el campo de nombre o de condición [R21.12]. */
   onEdit?: (what: 'label' | 'condition') => void;
   /** Selecciona un nodo desde fuera (p. ej. «En este diagrama») [R21.15]. */
@@ -301,7 +303,7 @@ export function buildFlowEdges(level: Diagram, path: readonly string[], live?: L
 const isSplitEdge = (level: Diagram, e: Diagram['edges'][number]) => isCoordinator(level.nodes.find((n) => n.id === e.from) ?? {}) && splitBranchIds(level, e.from).includes(e.to);
 
 /** Lienzo de React Flow. La sesión es la fuente de verdad; el arrastre se confirma al soltar [R14.4]. */
-export function Canvas({ session, onSelection, onReject, live, overlay, events, onAddAt, onOpenNode, onEdit, selectRequest, agentNames, onInsert, extras, agentMenu, readOnly = false, onAddSubdiagram, onOpenDiagram, onAddKnowledge, onDropKnowledge, onInsertTransform }: Props) {
+export function Canvas({ session, onSelection, onReject, live, overlay, events, onAddAt, onOpenNode, onConfigure, onEdit, selectRequest, agentNames, onInsert, extras, agentMenu, readOnly = false, onAddSubdiagram, onOpenDiagram, onAddKnowledge, onDropKnowledge, onInsertTransform }: Props) {
   const flow = useReactFlow();
   const [menu, setMenu] = useState<MenuTarget>();
   const closeMenu = useCallback(() => setMenu(undefined), []);
@@ -443,11 +445,13 @@ export function Canvas({ session, onSelection, onReject, live, overlay, events, 
       const id = node.id;
       const am = node.kind === 'agent' && node.agentId && !isCoordinator(node) ? agentMenu?.(node.agentId, id) : undefined;
       const sub = node.kind === 'subdiagram' && node.subdiagram && onOpenDiagram ? [{ id: 'sub-open', label: t('sub.open'), icon: <Workflow size={16} />, onSelect: () => onOpenDiagram(node.subdiagram!.templateId) }] : [];
+      const configure: MenuItem[] = node.kind === 'agent' && onConfigure ? [{ id: 'configure', label: t('menu.node.configure'), icon: <Settings2 size={16} />, onSelect: () => onConfigure(id) }] : [];
       if (readOnly && sub.length > 0) return sub;
-      // En ejecución solo se puede consultar: abrir el agente y su conocimiento [R32.37].
-      if (readOnly) return [...(am?.top.filter((x) => x.id === 'agent-edit') ?? []), ...(am?.knowledge.filter((x) => x.id !== 'skill-assign') ?? [])];
+      // En ejecución solo se puede consultar: abrir el agente y su conocimiento [R32.37][R64.2].
+      if (readOnly) return [...configure, ...(am?.top.filter((x) => x.id === 'agent-edit') ?? []), ...(am?.knowledge.filter((x) => x.id !== 'skill-assign') ?? [])];
       return [
         ...sub,
+        ...configure,
         ...(am?.top ?? []),
         { id: 'rename', label: t('menu.node.rename'), icon: <Pencil size={16} />, onSelect: () => { select([id], []); onEdit?.('label'); } },
         { id: 'duplicate', label: t('menu.node.duplicate'), icon: <Copy size={16} />, disabled: fixed, onSelect: () => guard(() => { const nid = session.duplicateNode(id); select([nid], []); }) },
@@ -533,6 +537,7 @@ export function Canvas({ session, onSelection, onReject, live, overlay, events, 
         }}
         onNodeDoubleClick={(_e, n) => {
           if (n.data.kind === 'loop') session.enter(n.id);
+          else if (n.data.kind === 'agent' && onConfigure) onConfigure(n.id);
           else onOpenNode?.(n.id);
         }}
         onSelectionChange={onSelectionChange}

@@ -18,13 +18,13 @@ const addAgent = async (name: RegExp) => {
 };
 
 describe('menú contextual y conexiones [R21.12][R21.13]', () => {
-  it('[R21.12][R32.34] el botón derecho en un nodo ofrece renombrar, duplicar y eliminar, y duplica', async () => {
+  it('[R21.12][R32.34][R64.2] el botón derecho en un nodo ofrece renombrar, duplicar y eliminar, y duplica', async () => {
     mount();
     await addAgent(/Sprites/);
     const node = await screen.findByLabelText(/^Agente «sprites»/);
     fireEvent.contextMenu(node.closest('.react-flow__node')!);
     const menu = await screen.findByRole('menu');
-    expect(within(menu).getAllByRole('menuitem').map((i) => i.textContent)).toEqual(['Editar el agente', 'Cambiar el agente…', 'Renombrar', 'Duplicar', 'Skill o contexto solo aquí…', 'MCP solo aquí…', 'Alta de MCP con Claude…', 'Eliminar']);
+    expect(within(menu).getAllByRole('menuitem').map((i) => i.textContent)).toEqual(['Configurar…', 'Editar el agente', 'Cambiar el agente…', 'Renombrar', 'Duplicar', 'Skill o contexto solo aquí…', 'MCP solo aquí…', 'Alta de MCP con Claude…', 'Eliminar']);
     // «Sprites» es un agente de ejemplo, no del proyecto: no se puede editar
     expect((within(menu).getByRole('menuitem', { name: 'Editar el agente' }) as HTMLButtonElement).disabled).toBe(true);
     await userEvent.click(within(menu).getByRole('menuitem', { name: 'Duplicar' }));
