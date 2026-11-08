@@ -104,8 +104,8 @@ export function memoryCounts(memory: SupervisorView['memory']): string {
  * La memoria bajo la tarjeta, con su ancho y su forma: plegada, una línea con lo que hay por bloque; desplegada, la
  * rama y las dos últimas entradas. Sin nada anotado no se muestra [R69.4].
  */
-export function SupervisorMemory({ view: v, onAll }: { view: SupervisorView; onAll?: (() => void) | undefined }) {
-  const [open, setOpen] = useState(false);
+export function SupervisorMemory({ view: v, onAll, initialOpen = false }: { view: SupervisorView; onAll?: (() => void) | undefined; initialOpen?: boolean }) {
+  const [open, setOpen] = useState(initialOpen);
   if (v.memory.length === 0 && !v.branch) return null;
   const counts = memoryCounts(v.memory);
   return (
