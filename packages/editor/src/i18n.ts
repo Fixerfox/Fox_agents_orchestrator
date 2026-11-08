@@ -2313,6 +2313,7 @@ export const es = {
   'settings.onBudget.stop': 'Parar ya',
   'settings.onBudget.finish': 'Dejar terminar lo que está en marcha',
   'step.limits.cost': 'Presupuesto de cada intento ($)',
+  'agent.maxCost': 'Presupuesto de cada intento ($)',
 } as const;
 
 export type MessageKey = keyof typeof es;

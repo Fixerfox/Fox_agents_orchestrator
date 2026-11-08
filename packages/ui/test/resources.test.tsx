@@ -11,6 +11,10 @@ import { HistorySection, type HistoryFilterState } from '../src/runs/HistorySect
 import { SettingsDialog } from '../src/settings/SettingsDialog';
 import { createMemoryApi } from '../src/memoryApi';
 import { useState } from 'react';
+import { newAgent } from '@orquestador/core';
+import { createDiagram } from '@orquestador/editor';
+import { App } from '../src/App';
+import { goLib } from './nav';
 
 let seq = 0;
 const at = (s: number) => new Date(Date.parse('2026-11-08T10:00:00.000Z') + s * 1000).toISOString();
@@ -107,5 +111,23 @@ describe('SPEC-077 · Ajustes', () => {
     });
     await userEvent.click(index.getByRole('button', { name: /^Supervisor/ }));
     expect((page.getByLabelText(/Avisar si un paso gasta más de/) as HTMLInputElement).value).toBe('1');
+  });
+});
+
+describe('SPEC-077 · ficha del agente', () => {
+  it('[R77.9] el presupuesto de cada intento se pone en «Avanzado» de la ficha y se guarda en sus límites', async () => {
+    const api = createMemoryApi([createDiagram('principal', 'Principal')], { agents: [{ ...newAgent('a', 'Alfa'), limits: { idleMinutes: 5 } }] });
+    render(<App api={api} confirm={() => true} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Crear proyecto' }));
+    const s = await goLib('agents');
+    await userEvent.click(s.getByRole('button', { name: 'Alfa' }));
+    await userEvent.click(s.getByRole('button', { name: /^Modelo y aspecto/ }));
+    const adv = s.getByText('Avanzado').closest('details')!;
+    await userEvent.type(within(adv).getByLabelText('Presupuesto de cada intento ($)'), '2');
+    await userEvent.click(s.getByRole('button', { name: 'Guardar' }));
+    await waitFor(() => expect(api.agents.get('a')?.limits).toEqual({ idleMinutes: 5, maxCostUsd: 2 }));
+    await userEvent.clear(within(adv).getByLabelText('Presupuesto de cada intento ($)'));
+    await userEvent.click(s.getByRole('button', { name: 'Guardar' }));
+    await waitFor(() => expect(api.agents.get('a')?.limits).toEqual({ idleMinutes: 5 }));
   });
 });

@@ -66,3 +66,13 @@ describe('SPEC-077 · historial y métricas', () => {
     expect(() => parseRequest(CHANNELS.saveSettings, { ...s, maxAgentsTotal: '12' })).toThrow();
   });
 });
+
+describe('SPEC-077 · ficha del agente en el contrato', () => {
+  it('[R77.9] guardar un agente admite sus límites (con el presupuesto) y sus comprobaciones', async () => {
+    const { newAgent } = await import('@orquestador/core');
+    const a = { ...newAgent('a', 'Alfa'), limits: { maxCostUsd: 2, idleMinutes: 5 }, checks: [{ id: 't', label: 'Tests', kind: 'command', run: 'npm test' }] };
+    expect(parseRequest(CHANNELS.saveAgent, a)).toMatchObject({ limits: { maxCostUsd: 2 } });
+    expect(() => parseRequest(CHANNELS.saveAgent, { ...a, limits: 'mucho' })).toThrow();
+    expect(() => parseRequest(CHANNELS.saveAgent, { ...a, checks: {} })).toThrow();
+  });
+});

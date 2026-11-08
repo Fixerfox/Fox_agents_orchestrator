@@ -17,6 +17,7 @@ const FIELD_PLACE: Record<string, { step: number; section: AgentSection }> = {
   permissions: { step: 3, section: 'can' },
   model: { step: 3, section: 'model' },
   maxTurns: { step: 3, section: 'model' },
+  'limits.maxCostUsd': { step: 3, section: 'model' },
 };
 
 export function AgentForm({ api, drafts, draftKey, original, agents, contexts, skills, mcp, justSaved, onSaved, onDeleted, onCreateOther, busy = false, seed, assistantReady = false, deletable = true }: {
