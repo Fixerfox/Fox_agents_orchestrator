@@ -16,6 +16,14 @@ El hito indica cuándo debe estar cubierto por tests. `npm run spec:check` exige
 ## Índice
 | Spec | Título | Hito | Estado |
 |---|---|---|---|
+| [077](077-gobierno-de-recursos.md) | Gobierno de recursos: límite global de agentes, enfriamiento compartido ante límites de uso, presupuesto con aviso y freno, pausa en la siguiente herramienta, tokens agrupados y métricas | M15h | Borrador |
+| [076](076-memoria-del-proyecto.md) | Memoria del proyecto: convenciones, preferencias, lecciones y avisos falsos que propone la app y aprueba la persona, con índice en el prompt y herramienta de lectura; memoria propia de Claude Code apagada | M15g | Borrador |
+| [075](075-supervisor-con-evidencia.md) | Supervisor con evidencia: comprobaciones deterministas, diff para la revisión, veredicto con gravedad, verificador con skill y calibración de avisos | M15f | Borrador |
+| [074](074-ejecucion-duradera.md) | Ejecución duradera: reanudar reproduciendo los eventos por clave de paso (también bucles, decisiones y respuestas) y validar todo el árbol antes de empezar | M15e | Borrador |
+| [073](073-ramas-aisladas-y-fusion.md) | Ramas en paralelo aisladas (worktree o copia desde el estado real de la carpeta), git de solo lectura dentro y fusión por líneas con conflictos que decide la persona | M15d | Borrador |
+| [072](072-memoria-de-ejecucion-estructurada.md) | Memoria de la ejecución estructurada: bloques con procedencia y tope, relevancia por grafo, decisiones de la persona para todos y notas de los agentes | M15c | Borrador |
+| [071](071-reintentos-con-contexto.md) | Reintentos con contexto: errores por tipo, jitter y `retry-after`, lo que el siguiente intento sabe del anterior, volver al punto de partida y decisiones reintentables | M15b | Borrador |
+| [070](070-tiempos-limite-y-pasos-parados.md) | Tiempos límite y pasos parados: latido por inactividad, tiempo máximo por intento, bucle de herramientas y política para preguntas sin respuesta | M15a | Borrador |
 | [069](069-conversacion-memoria-supervisor.md) | Mejoras visuales (4): conversación como chat con las herramientas agrupadas, memoria en tarjetas (también en la pestaña «Memoria») y Supervisor dentro del diagrama | M14 | Implementada |
 | [068](068-panel-del-paso-y-scroll.md) | Mejoras visuales (3): panel del paso en ejecución con estado, pestañas Resumen · Conversación · Ficheros y plegado a una franja; barras de scroll finas en toda la app | M14 | Implementada |
 | [067](067-ajustes-por-secciones.md) | Mejoras visuales (2): Ajustes con índice «General / Este proyecto», una sección cada vez, estado de Claude arriba, opciones en tarjetas y reglas junto a los permisos | M14 | Implementada |
