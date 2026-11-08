@@ -1,8 +1,8 @@
-import { useState, type ReactNode } from 'react';
-import { Maximize2 } from 'lucide-react';
+import { useEffect, useState, type ReactNode } from 'react';
+import { AlertTriangle, Check, ChevronsRight, Loader2, Maximize2, MessageCircleQuestion, X as XIcon } from 'lucide-react';
 import { MODELS, isApproval, type RunEvent } from '@orquestador/core';
 import { pathKey } from '@orquestador/core';
-import { filesSinceReview, questionGroup, stepFiles, t, transcriptItems, type LiveView, type MessageKey, type TranscriptItem } from '@orquestador/editor';
+import { filesSinceReview, questionGroup, stepFiles, stepOverview, t, transcriptItems, type LiveView, type MessageKey, type TranscriptItem } from '@orquestador/editor';
 import { Markdown } from '../common';
 import { StepFilesBlock } from './RunFiles';
 
@@ -25,6 +25,8 @@ interface Props {
   onPreview?: (key: string, path: string) => void;
   /** Miniatura de un archivo de un paso [R54.6]. */
   renderThumb?: (key: string, path: string) => ReactNode;
+  /** Pliega el panel a una franja [R68.3]. */
+  onFold?: () => void;
 }
 
 /** Miniaturas que se ven en la tarjeta de una revisión humana [R54.6]. */
@@ -238,38 +240,80 @@ export function filesState(status: string | undefined, closed: boolean): 'done' 
   return 'unfinished';
 }
 
-export function NodePanel({ events, live, nodeId, nodePath, label, onAnswer, onExpand, closed = false, labelOf, onOpenFile, onPreview, renderThumb }: Props) {
-  const [tab, setTab] = useState<'messages' | 'files'>('messages');
+export function NodePanel({ events, live, nodeId, nodePath, label, onAnswer, onExpand, closed = false, labelOf, onOpenFile, onPreview, renderThumb, onFold }: Props) {
   const items = transcriptItems(events, nodeId, nodePath);
   const key = [...nodePath, nodeId].join('/');
   const status = live.nodeStatus[key];
   const files = stepFiles(events, pathKey(nodePath, nodeId));
   const state = filesState(status, closed);
+  const view = stepOverview(events, nodeId, nodePath);
+  const pending = !closed && items.some((it) => it.kind === 'question' && it.answer === undefined);
+  // Con salida y sin preguntas pendientes, primero el resumen; si no, la conversación [R68.2].
+  const [tab, setTab] = useState<'summary' | 'messages' | 'files'>(() => (view.output !== undefined && !pending ? 'summary' : 'messages'));
+  // Si el paso te pregunta algo, la conversación pasa delante para no perder la pregunta [R68.2].
+  useEffect(() => {
+    if (pending) setTab('messages');
+  }, [pending]);
+  const shown = tab === 'files' && files.length === 0 ? 'messages' : tab;
   // Terminado bien: el bloque va tras la salida; si no, al final con su aviso [R45.9].
   const lastOutput = state === 'done' ? items.map((it) => it.kind).lastIndexOf('output') : -1;
   const block = <StepFilesBlock files={files} state={state} onOpen={onOpenFile} />;
+  const tone = stepTone(status);
+  const metrics = stepMetrics(view);
   return (
     <section className="orq-nodepanel" aria-label={t('transcript.title', { name: label })}>
       <div className="orq-nodepanel__head">
-        <h3>{t('transcript.title', { name: label })}</h3>
+        <h3>{label}</h3>
         {onExpand && items.length > 0 && (
           <button type="button" className="orq-icon-btn" aria-label={t('detail.expand')} title={t('detail.expand')} onClick={onExpand}>
             <Maximize2 size={16} strokeWidth={1.5} aria-hidden="true" />
           </button>
         )}
+        {onFold && (
+          <button type="button" className="orq-icon-btn" aria-label={t('step.fold')} title={t('step.fold')} onClick={onFold}>
+            <ChevronsRight size={16} strokeWidth={1.5} aria-hidden="true" />
+          </button>
+        )}
       </div>
-      {status && <p className="orq-hint">{t(`node.status.${status}` as MessageKey)}</p>}
-      {files.length > 0 && (
-        <div className="orq-run__tabs orq-nodepanel__tabs" role="tablist" aria-label={t('files.tabs')}>
-          <button type="button" role="tab" aria-selected={tab === 'messages'} onClick={() => setTab('messages')}>
-            {t('files.tab.messages')}
-          </button>
-          <button type="button" role="tab" aria-selected={tab === 'files'} onClick={() => setTab('files')}>
-            {t('files.tab.files', { count: files.length })}
-          </button>
+      {/* Tarjeta de estado: color según cómo va y, si los hay, duración, tokens y coste [R68.1]. */}
+      {status && (
+        <div className={`orq-stepstate is-${tone}`}>
+          <p className="orq-stepstate__title">
+            <StepIcon tone={tone} />
+            {t(`node.status.${status}` as MessageKey)}
+          </p>
+          {metrics.length > 0 && (
+            <p className="orq-stepstate__metrics">
+              {metrics.map((m) => (
+                <span key={m}>{m}</span>
+              ))}
+            </p>
+          )}
         </div>
       )}
-      {tab === 'files' && files.length > 0 ? (
+      <div className="orq-run__tabs orq-nodepanel__tabs" role="tablist" aria-label={t('files.tabs')}>
+        <button type="button" role="tab" aria-selected={shown === 'summary'} onClick={() => setTab('summary')}>
+          {t('step.tab.summary')}
+        </button>
+        <button type="button" role="tab" aria-selected={shown === 'messages'} onClick={() => setTab('messages')}>
+          {t('step.tab.conversation', { count: items.length })}
+        </button>
+        {files.length > 0 && (
+          <button type="button" role="tab" aria-selected={shown === 'files'} onClick={() => setTab('files')}>
+            {t('files.tab.files', { count: files.length })}
+          </button>
+        )}
+      </div>
+      {shown === 'summary' ? (
+        <div className="orq-nodepanel__summary">
+          {view.output !== undefined ? <Markdown text={view.output} /> : <p className="orq-hint">{t('step.summary.none')}</p>}
+          {items.length > 0 && (
+            <button type="button" className="orq-link orq-nodepanel__more" onClick={() => setTab('messages')}>
+              {t('step.summary.all')} →
+            </button>
+          )}
+        </div>
+      ) : shown === 'files' ? (
         <div className="orq-nodepanel__files">
           {block}
           <p className="orq-hint">{t('files.only')}</p>
@@ -352,5 +396,55 @@ export function NodePanel({ events, live, nodeId, nodePath, label, onAnswer, onE
         </ol>
       )}
     </section>
+  );
+}
+
+type StepTone = 'ok' | 'fail' | 'busy' | 'ask' | 'idle';
+
+/** Color de la tarjeta de estado de un paso [R68.1]. */
+export function stepTone(status: string | undefined): StepTone {
+  if (status === 'succeeded') return 'ok';
+  if (status === 'failed' || status === 'interrupted') return 'fail';
+  if (status === 'waiting_input') return 'ask';
+  if (status === 'running' || status === 'queued') return 'busy';
+  return 'idle';
+}
+
+function StepIcon({ tone, size = 15 }: { tone: StepTone; size?: number }) {
+  const p = { size, strokeWidth: 2.2, 'aria-hidden': true } as const;
+  if (tone === 'ok') return <Check {...p} />;
+  if (tone === 'fail') return <XIcon {...p} />;
+  if (tone === 'ask') return <MessageCircleQuestion {...p} />;
+  if (tone === 'busy') return <Loader2 {...p} className="orq-spin" />;
+  return <AlertTriangle {...p} />;
+}
+
+/** Duración, tokens y coste en el formato del panel [R68.1]. */
+function stepMetrics(v: ReturnType<typeof stepOverview>): string[] {
+  const out: string[] = [];
+  if (v.durationMs !== undefined) {
+    const total = Math.round(v.durationMs / 1000);
+    out.push(total < 60 ? t('step.duration.s', { s: total }) : t('step.duration.m', { m: Math.floor(total / 60), s: total % 60 }));
+  }
+  if (v.hasUsage) {
+    out.push(t('step.tokens', { n: v.tokens.toLocaleString('es-ES') }));
+    out.push(t('step.cost', { cost: v.costUsd.toFixed(3).replace('.', ',') }));
+  }
+  return out;
+}
+
+/** El panel plegado: una franja con el estado, el nombre y el coste; al pulsarla se despliega [R68.3]. */
+export function FoldedStep({ events, live, nodeId, nodePath, label, onUnfold }: { events: readonly RunEvent[]; live: LiveView; nodeId: string; nodePath: string[]; label: string; onUnfold: () => void }) {
+  const status = live.nodeStatus[[...nodePath, nodeId].join('/')];
+  const tone = stepTone(status);
+  const v = stepOverview(events, nodeId, nodePath);
+  return (
+    <button type="button" className={`orq-stepfold is-${tone}`} aria-label={t('step.unfold')} title={t('step.unfold')} onClick={onUnfold}>
+      <span className="orq-stepfold__icon">
+        <StepIcon tone={tone} size={14} />
+      </span>
+      <span className="orq-stepfold__label">{label}</span>
+      {v.hasUsage && <span className="orq-stepfold__cost">{t('step.cost', { cost: v.costUsd.toFixed(3).replace('.', ',') })}</span>}
+    </button>
   );
 }

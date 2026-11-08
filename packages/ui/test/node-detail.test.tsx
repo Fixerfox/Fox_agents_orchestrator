@@ -7,6 +7,7 @@ import type { RunEvent } from '@orquestador/core';
 import { deriveLive } from '@orquestador/editor';
 import { NodeDialog } from '../src/runs/NodeDialog';
 import { NodePanel } from '../src/runs/NodePanel';
+import { showConversation } from './nav';
 import { ResizeHandle } from '../src/common/ResizeHandle';
 
 const ev = (seq: number, body: object): RunEvent => ({ runId: 'r', seq, ts: 't', ...body }) as RunEvent;
@@ -82,8 +83,9 @@ describe('SPEC-015 · ventana grande de un nodo', () => {
     expect(screen.queryByRole('button', { name: 'Ver en grande' })).toBeNull();
   });
 
-  it('[R15.13] en el panel lateral las salidas largas también van plegadas', () => {
+  it('[R15.13] en el panel lateral las salidas largas también van plegadas', async () => {
     render(<NodePanel events={events} live={deriveLive(events)} nodeId="a" nodePath={[]} label="D" onAnswer={() => {}} />);
+    await showConversation();
     expect(screen.getByText('Ver salida (40 líneas)').closest('details')?.hasAttribute('open')).toBe(false);
   });
 });
@@ -167,8 +169,9 @@ describe('SPEC-015 · pasadas en la ventana grande [R15.14]', () => {
     expect(fold.open).toBe(true);
   });
 
-  it('[R15.14] el panel lateral rotula cada entrada con su pasada', () => {
+  it('[R15.14] el panel lateral rotula cada entrada con su pasada', async () => {
     render(<NodePanel events={twice} live={deriveLive(twice)} nodeId="a" nodePath={[]} label="Diseñador" onAnswer={vi.fn()} />);
+    await showConversation();
     expect(screen.getByText('Recibió (pasada 1, intento 1)')).toBeTruthy();
     expect(screen.getByText('Recibió (pasada 2, intento 1)')).toBeTruthy();
     // Sin nombre para la revisión, se usa su id.

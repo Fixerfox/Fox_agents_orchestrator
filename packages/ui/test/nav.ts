@@ -45,3 +45,8 @@ export async function settingsSection(name: string) {
   await userEvent.click(within(page.getByRole('navigation', { name: 'Ajustes' })).getByRole('button', { name: new RegExp(`^${name}`) }));
   return page;
 }
+
+/** El panel de un paso con salida se abre en «Resumen»: pasa a «Conversación» para ver la transcripción [R68.2]. */
+export async function showConversation(scope: { getByRole: typeof screen.getByRole } = screen) {
+  await userEvent.click(scope.getByRole('tab', { name: /^Conversación/ }));
+}

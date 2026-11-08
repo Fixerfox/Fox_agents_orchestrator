@@ -9,6 +9,7 @@ import { App } from '../src/App';
 import { RunsScreen } from '../src/runs/RunsScreen';
 import { type RunsNav } from '../src/runs/runsTypes';
 import { createMemoryApi } from '../src/memoryApi';
+import { showConversation } from './nav';
 import type { RunsIndex } from '../src/runs/useRunsIndex';
 
 const T0 = Date.parse('2026-11-05T08:30:00.000Z');
@@ -458,6 +459,7 @@ describe('SPEC-035 con la revisión de SPEC-034 [R35.3][R35.9][R35.16]', () => {
     expect([...row.querySelectorAll('.orq-gantt__mark')].map((m) => m.getAttribute('title'))).toContain('Vuelta: Pasada 2 · devuelto por Revisión');
     await userEvent.click(row);
     const panel = within(screen.getByRole('region', { name: 'Ejecución de «creador»' }));
+    await showConversation(panel);
     expect(panel.getByRole('separator', { name: 'Pasada 2' }).textContent).toContain('Pasada 2 · devuelto por Revisión');
     expect(panel.getByText('Recibió (pasada 1, intento 1)')).toBeTruthy();
     expect(panel.getByText('Recibió (pasada 2, intento 1)')).toBeTruthy();

@@ -344,3 +344,51 @@ export function transcriptItems(events: readonly RunEvent[], nodeId: Id, nodePat
   }
   return items;
 }
+
+/** Lo esencial de un paso para la tarjeta de estado del panel [R68.4]. */
+export interface StepOverview {
+  status?: NodeStatus;
+  /** De que empieza a que termina; sin valor si no ha terminado. */
+  durationMs?: number;
+  /** Entrada más salida, en todas sus pasadas. */
+  tokens: number;
+  costUsd: number;
+  /** Si hubo algún uso que contar. */
+  hasUsage: boolean;
+  /** La última salida del paso, si la hay. */
+  output?: string;
+}
+
+/** Estado, duración, tokens, coste y última salida de un paso, desde sus eventos [R68.4]. */
+export function stepOverview(events: readonly RunEvent[], nodeId: Id, nodePath: readonly Id[] = []): StepOverview {
+  const key = pathKey(nodePath, nodeId);
+  const items = transcriptItems(events, nodeId, nodePath);
+  let tokens = 0;
+  let costUsd = 0;
+  let hasUsage = false;
+  let output: string | undefined;
+  let status: NodeStatus | undefined;
+  for (const it of items) {
+    if (it.kind === 'usage') {
+      hasUsage = true;
+      tokens += it.inputTokens + it.outputTokens;
+      costUsd += it.costUsd;
+    }
+    if (it.kind === 'output') {
+      status = it.status;
+      if (it.text !== undefined) output = it.text;
+    }
+  }
+  let started: number | undefined;
+  let finished: number | undefined;
+  for (const e of events) {
+    if (!('nodeId' in e) || e.nodeId !== nodeId || pathKey(e.nodePath, nodeId) !== key) continue;
+    if (e.type === 'node.started' && started === undefined) started = Date.parse(e.ts);
+    if (e.type === 'node.finished') finished = Date.parse(e.ts);
+  }
+  const out: StepOverview = { tokens, costUsd, hasUsage };
+  if (status) out.status = status;
+  if (output !== undefined) out.output = output;
+  if (started !== undefined && finished !== undefined && finished >= started) out.durationMs = finished - started;
+  return out;
+}

@@ -16,6 +16,7 @@ El hito indica cuándo debe estar cubierto por tests. `npm run spec:check` exige
 ## Índice
 | Spec | Título | Hito | Estado |
 |---|---|---|---|
+| [068](068-panel-del-paso-y-scroll.md) | Mejoras visuales (3): panel del paso en ejecución con estado, pestañas Resumen · Conversación · Ficheros y plegado a una franja; barras de scroll finas en toda la app | M14 | Implementada |
 | [067](067-ajustes-por-secciones.md) | Mejoras visuales (2): Ajustes con índice «General / Este proyecto», una sección cada vez, estado de Claude arriba, opciones en tarjetas y reglas junto a los permisos | M14 | Implementada |
 | [066](066-mejoras-visuales.md) | Mejoras visuales (1): la ventana «Configurar» pasa a un índice con una sección cada vez, marcas de lo cambiado en el paso, «Editar el agente» dentro y pie con «Restablecer paso»; el lateral de cada nodo estrena cabecera con su tipo y secciones plegables | M14 | Implementada |
 | [065](065-dar-por-bueno.md) | Lo que solo puede comprobar una persona termina como aviso, «Dar por bueno» una ejecución fallida (también el asistente, siempre con permiso) y «Hablar con el asistente» desde el aviso del final | M13 | Implementada |

@@ -364,8 +364,9 @@ export function Canvas({ session, onSelection, onReject, live, overlay, events, 
     if (!selectRequest) return;
     const id = selectRequest.id;
     setNodes((cur) => cur.map((n) => ({ ...n, selected: n.id === id })));
-    onSelection({ nodes: [id], edges: [] });
-    reveal(id);
+    // `''` quita la selección: cerrar el lateral de un paso no debe dejar una selección vacía que abra los ajustes del diagrama [R68.6].
+    onSelection({ nodes: id ? [id] : [], edges: [] });
+    if (id) reveal(id);
   }, [selectRequest]);
 
   const inspectedId = inspect && inspect.level === levelKey && hasRun ? inspect.edgeId : undefined;
