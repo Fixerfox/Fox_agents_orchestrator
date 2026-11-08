@@ -225,6 +225,16 @@ export function withSelfProtection<P extends (tool: string, input: Record<string
  * Rama en paralelo [R73.8][R73.9]: nunca se escribe en la carpeta original (también con «Sin preguntar nunca») ni se
  * cambia git. Lo demás, como siempre.
  */
+/**
+ * Si el comando nombra la carpeta: en Windows también escrita con `/` y sin distinguir mayúsculas,
+ * porque Bash acepta `C:/…` igual que `C:\…` [R73.8].
+ */
+export function namesFolder(command: string, folder: string, platform: NodeJS.Platform = process.platform): boolean {
+  if (platform !== 'win32') return command.includes(folder);
+  const text = command.toLowerCase().replaceAll('\\', '/');
+  return text.includes(folder.toLowerCase().replaceAll('\\', '/'));
+}
+
 export function withIsolation(original: string | undefined, note: WritePolicyDeps['note'], inner: (tool: string, input: Record<string, unknown>) => Promise<PermissionResult>, root: string): (tool: string, input: Record<string, unknown>) => Promise<PermissionResult> {
   if (original === undefined) return inner;
   return async (tool, input) => {
@@ -240,7 +250,7 @@ export function withIsolation(original: string | undefined, note: WritePolicyDep
         return deny(ISOLATED_GIT_DENY);
       }
       // Un comando que nombra la carpeta original y no solo lee también rompería el aislamiento.
-      if (command.includes(original) && !(await classifyCommand(command, original, original, { readOnly: true })).safe) {
+      if (namesFolder(command, original) && !(await classifyCommand(command, original, original, { readOnly: true })).safe) {
         note?.({ kind: 'denied', path: command, reason: 'carpeta original de una rama en paralelo' });
         return deny(ISOLATED_DENY);
       }

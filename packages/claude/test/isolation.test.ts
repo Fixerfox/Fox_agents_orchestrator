@@ -1,9 +1,9 @@
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, sep } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { defaultSettings, newAgent, type AgentQuestion, type AgentStreamEvent, type AppSettings } from '@orquestador/core';
-import { ClaudeAdapter, DENY, ISOLATED_DENY, ISOLATED_GIT_DENY, promptText, writesGit, type ClaudeEnvironment, type ClaudeQueryOptions, type QueryFn, type SdkMessage } from '../src';
+import { ClaudeAdapter, DENY, ISOLATED_DENY, ISOLATED_GIT_DENY, namesFolder, promptText, writesGit, type ClaudeEnvironment, type ClaudeQueryOptions, type QueryFn, type SdkMessage } from '../src';
 
 let dir: string;
 let work: string;
@@ -57,13 +57,21 @@ describe('SPEC-073 · el agente en una rama aislada', () => {
       expect(await o.canUseTool!('Write', { file_path: join(work, 'x.ts'), content: 'x' }, { toolUseID: 't1' })).toEqual({ behavior: 'deny', message: ISOLATED_DENY });
       expect(await o.canUseTool!('Bash', { command: 'ls' }, { toolUseID: 't2' })).toMatchObject({ behavior: 'allow' });
       expect(await o.canUseTool!('Bash', { command: `cp nuevo.ts ${join(work, 'x.ts')}` }, { toolUseID: 't3' })).toEqual({ behavior: 'deny', message: ISOLATED_DENY });
-      expect(await o.canUseTool!('Bash', { command: `ls ${work}` }, { toolUseID: 't4' })).toMatchObject({ behavior: 'allow' });
+      expect(await o.canUseTool!('Bash', { command: `cp nuevo.ts ${join(work, 'x.ts').split(sep).join('/')}` }, { toolUseID: 't5' })).toEqual({ behavior: 'deny', message: ISOLATED_DENY });
+      expect(await o.canUseTool!('Bash', { command: `ls ${work.split(sep).join('/')}` }, { toolUseID: 't4' })).toMatchObject({ behavior: 'allow' });
     }, { permissions: 'full' });
     expect(seen.files[0]).toEqual(expect.objectContaining({ kind: 'denied', path: join(work, 'x.ts') }));
     // Lo denegado llega al Supervisor como `blocked` tras el siguiente resultado de herramienta (aquí, no hay).
     expect(out.filter((e) => e.type === 'branch')).toEqual([]);
   });
 
+  it('[R73.8] en Windows, la carpeta original cuenta también escrita con «/» o con otras mayúsculas', () => {
+    expect(namesFolder('cp a C:/Juego/x.ts', 'C:\\Juego', 'win32')).toBe(true);
+    expect(namesFolder('cp a c:\\juego\\x.ts', 'C:\\Juego', 'win32')).toBe(true);
+    expect(namesFolder('cp a C:/Otro/x.ts', 'C:\\Juego', 'win32')).toBe(false);
+    expect(namesFolder('cp a /home/Juego/x', '/home/juego', 'linux')).toBe(false);
+    expect(namesFolder('cp a /home/juego/x', '/home/juego', 'linux')).toBe(true);
+  });
   it('[R73.9] git que escribe se deniega con el motivo; el que lee, no', async () => {
     await runIn(async (o) => {
       expect(await o.canUseTool!('Bash', { command: 'git commit -m "x"' }, { toolUseID: 't1' })).toEqual({ behavior: 'deny', message: ISOLATED_GIT_DENY });

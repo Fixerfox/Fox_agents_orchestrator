@@ -1,6 +1,6 @@
 import { promises as fs } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { CONFLICT_PREVIEW_KEY, MockAgent, MockDecider, Orchestrator, defaultSettings, type AgentAdapter, type BranchSpaces, type Diagram } from '@orquestador/core';
 import { ProjectStore } from '@orquestador/store';
@@ -74,7 +74,7 @@ describe('SPEC-073 · ramas aisladas en la app', () => {
       getAdapter: (id) => adapters[id]!,
       decider: new MockDecider(),
       spaces: (runId) => {
-        const m = new BranchSpaceManager({ workRoot: dir, runDir: store.paths.runDir(runId), spacesRoot: join(dir, '..', `${dir.split('/').pop()}-spaces`) });
+        const m = new BranchSpaceManager({ workRoot: dir, runDir: store.paths.runDir(runId), spacesRoot: join(dir, '..', `${basename(dir)}-spaces`) });
         managers.push(m);
         return m;
       },
@@ -95,7 +95,7 @@ describe('SPEC-073 · ramas aisladas en la app', () => {
     expect(await fs.readFile(join(dir, 'web.md'), 'utf8')).toBe('la web');
     expect(await fs.readFile(join(dir, 'api.ts'), 'utf8')).toBe('la api');
     expect(await svc.previewFile(runId, 'web', 'web.md')).toMatchObject({ text: 'la web', source: 'run' });
-    await fs.rm(join(dir, '..', `${dir.split('/').pop()}-spaces`), { recursive: true, force: true });
+    await fs.rm(join(dir, '..', `${basename(dir)}-spaces`), { recursive: true, force: true });
   });
 
   it('[R73.16] las dos versiones de un conflicto se pueden previsualizar', async () => {
