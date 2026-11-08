@@ -4,6 +4,7 @@ import type { AgentErrorKind, AgentSnapshot, AnsweredQuestion, FileChange, FileV
 import type { DeliverableItemResult, DeliverableLinks } from './deliverable';
 import type { NodeStatus, RunStatus } from './run-types';
 import type { SplitProblem } from './text/split';
+import type { MemoryStats } from './memory/memory-render';
 
 export type EventBody =
   | { type: 'run.started'; diagramId: Id; /** Ejecución que esta reanuda [R41.1]. */ resumedFrom?: string; /** Ejecución que esta corrige [R53.8]. */ correctedFrom?: string; /** Entregable efectivo [R46.3]. */ deliverable?: DeliverableSpec }
@@ -32,6 +33,8 @@ export type EventBody =
       split?: string;
       /** Memoria que recibe este paso [R60.25]. */
       memory?: string;
+      /** Tokens estimados de cada bloque de la memoria y cuáles se recortaron [R72.19]. */
+      memoryStats?: MemoryStats;
       /** Archivos a los que se limita [R60.16]. */
       scope?: string[];
       /** Aviso del entregable que recibe este paso [R46.4]. */
@@ -107,7 +110,11 @@ export type EventBody =
   /** Si el resultado final cumple lo pedido [R62.9]. */
   | { type: 'supervisor.verified'; met: boolean; detail: string; /** Lo que queda para una persona [R65.3]. */ forPerson?: string }
   /** Entrada de la memoria de la ejecución [R60.18]. */
-  | { type: 'supervisor.note'; nodeId: Id; text: string; files: string[]; /** Salió de una revisión con IA [R60.29]. */ reviewed?: boolean }
+  | { type: 'supervisor.note'; nodeId: Id; text: string; files: string[]; /** Salió de una revisión con IA [R60.29]. */ reviewed?: boolean; /** Lo que el paso decidió por su cuenta [R72.10]. */ decided?: string[] }
+  /** Nota que un paso deja a los siguientes, sacada de su salida [R72.11]. */
+  | { type: 'memory.note'; nodeId: Id; text: string }
+  /** La persona dice si un aviso era un problema o no [R75.21]. */
+  | { type: 'supervisor.feedback'; alertSeq: number; verdict: 'false-alarm' | 'confirmed'; note?: string; nodeId?: Id }
   /** El Supervisor empieza a vigilar [R60.28]. */
   | { type: 'supervisor.started'; review: boolean; model?: string }
   /** Empieza a revisar un paso con IA [R60.29]. */

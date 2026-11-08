@@ -9,6 +9,7 @@ import type { ResumeCache } from '../run/resume-cache';
 import type { RetryPolicy } from '../run/retry-policy';
 import type { RunEmitter } from '../run/run-emitter';
 import type { Supervisor } from '../run/supervisor';
+import type { RunMemoryService } from '../run/memory-service';
 import type { Timers } from '../run/timers';
 
 /** Cómo acaba un paso. */
@@ -43,6 +44,8 @@ export interface RunServices {
   budget: BudgetTracker;
   /** Vigila la ejecución, si la app lo activa [R60.1]. */
   supervisor?: Supervisor;
+  /** La memoria de la ejecución, con el Supervisor o si se pide [R72.3]. */
+  memory?: RunMemoryService;
   questions: QuestionBroker;
   retry: RetryPolicy;
   cache: ResumeCache;

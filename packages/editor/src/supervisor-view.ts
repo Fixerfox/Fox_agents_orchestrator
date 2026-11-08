@@ -1,4 +1,5 @@
 import { branchMemoryLine, newBranchMemory, pathKey, rememberBranch, type Id, type RunEvent } from '@orquestador/core';
+import { memoryCards, type MemoryCard } from './memory-cards';
 
 export type SupervisorStatus = 'watching' | 'reviewing' | 'alert' | 'rules' | 'done';
 
@@ -19,7 +20,8 @@ export interface SupervisorView {
   reviewing: string[];
   lastAlert?: string;
   targets: SupervisorTarget[];
-  memory: { label: string; text: string; files: string[] }[];
+  /** La memoria de la ejecución, por bloques [R72.22]. */
+  memory: MemoryCard[];
 }
 
 /** Un aviso del Supervisor, con lo que hace falta para explicarlo [R60.39]. */
@@ -52,7 +54,6 @@ export function supervisorView(events: readonly RunEvent[], running: boolean, la
   const pending = new Map<string, { label: string; count: number }>();
   const warned = new Set<string>();
   const branches = newBranchMemory();
-  const memory: SupervisorView['memory'] = [];
   for (const e of events) {
     const path = e.nodePath ?? [];
     switch (e.type) {
@@ -73,7 +74,6 @@ export function supervisorView(events: readonly RunEvent[], running: boolean, la
         if (open && open.count > 1) open.count--;
         else pending.delete(key);
         if (e.reviewed) reviewed++;
-        memory.push({ label: labelOf(e.nodeId, path), text: e.text, files: e.files });
         break;
       }
       case 'supervisor.alert':
@@ -105,7 +105,7 @@ export function supervisorView(events: readonly RunEvent[], running: boolean, la
     costUsd,
     reviewing: open.map((key) => pending.get(key)!.label),
     targets: open.map((key) => ({ key, warn: warned.has(key) })),
-    memory,
+    memory: memoryCards(events, labelOf),
     ...(model ? { model } : {}),
     ...(branch ? { branch } : {}),
     ...(lastAlert ? { lastAlert } : {}),

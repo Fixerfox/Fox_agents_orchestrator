@@ -88,6 +88,8 @@ export function createEngineOrchestrator(ctx: EngineContext, engines: readonly A
       return { getAdapter: () => chosen.adapter, decider: deciderOf(() => chosen), review: () => chosen.decider.supervise !== undefined };
     },
     supervisor,
+    // El tope de la memoria de la ejecución, de Ajustes [R72.15].
+    memory: { tokens: () => ctx.settings().memoryTokens },
     agentProfile: (id, extra, runId) => profileOf(ctx.library, id, extra, runId),
     ...(ctx.restoreFiles ? { restoreFiles: (runId: Id, files: { path: string; change?: 'created' | 'modified' }[]) => ctx.restoreFiles!(runId, files) } : {}),
     // Los límites de la ficha del agente [R70.7].

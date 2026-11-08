@@ -2,6 +2,8 @@ import { closeSync, mkdirSync, openSync, writeSync } from 'node:fs';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import {
+  diagramLabelOf,
+  memoryFiles,
   redactString,
   type Diagram,
   type EventBus,
@@ -33,6 +35,9 @@ export class RunLogWriter {
   /** Se cumple cuando la ejecución ha terminado y los archivos están cerrados. */
   readonly done: Promise<void> = new Promise((r) => (this.resolveDone = r));
   private readonly meta: RunMeta;
+  /** Para sacar la memoria de la ejecución de sus eventos [R72.20]. */
+  private bus: EventBus | undefined;
+  private labelOf: (nodeId: string, path: readonly string[]) => string = (id) => id;
 
   private constructor(
     private readonly runDir: string,
@@ -61,6 +66,8 @@ export class RunLogWriter {
     init: { diagramId: string; order?: string; diagram?: Diagram },
   ): RunLogWriter {
     const writer = new RunLogWriter(runDir, { runId: bus.runId, ...init });
+    writer.bus = bus;
+    writer.labelOf = diagramLabelOf(init.diagram);
     // fromSeq 1: también recoge lo emitido antes de engancharse.
     const off = bus.subscribe((e) => writer.onEvent(e), { fromSeq: 1 });
     if (writer.finalized) off();
@@ -89,11 +96,26 @@ export class RunLogWriter {
       this.writeMeta();
     }
     if (e.type === 'deliverable.done') this.writeDeliverable(e);
+    // La memoria se guarda al terminar cada paso y al terminar la ejecución [R72.20].
+    if (e.type === 'node.finished' || e.type === 'run.finished') this.writeMemory();
     if (e.type === 'run.finished') {
       this.meta.status = e.status;
       this.meta.finishedAt = e.ts;
       if (e.reason !== undefined) this.meta.reason = e.reason;
       this.close();
+    }
+  }
+
+  /** `memory.json` y `memory.md`, con escritura atómica; un fallo no rompe el registro [R72.20]. */
+  private writeMemory(): void {
+    if (!this.bus) return;
+    try {
+      const files = memoryFiles(this.bus.history(), this.labelOf);
+      if (files.memory.steps.length === 0 && files.memory.decisions.length === 0 && !files.memory.branch) return;
+      atomicWriteSync(path.join(this.runDir, 'memory.json'), files.json);
+      atomicWriteSync(path.join(this.runDir, 'memory.md'), files.markdown);
+    } catch {
+      // La memoria siempre se puede sacar otra vez de events.jsonl.
     }
   }
 

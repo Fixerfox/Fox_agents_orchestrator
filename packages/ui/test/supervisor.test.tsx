@@ -163,8 +163,9 @@ describe('SPEC-060 · lo que se ve de la ejecución', () => {
   });
 
   it('[R69.4] la tarjeta enseña la rama y las dos últimas entradas de la memoria, se pliega y «Ver las N entradas» pide la pestaña', () => {
-    const second = ev({ type: 'supervisor.note', nodeId: 'a', text: 'Luego el mar', files: [] });
-    const third = ev({ type: 'supervisor.note', nodeId: 'a', text: 'Y las nubes', files: ['cielo.png', 'mar.png', 'nubes.png'] });
+    // Un paso sale una sola vez en la memoria [R72.17]: cada nota es de un paso distinto.
+    const second = ev({ type: 'supervisor.note', nodeId: 'b', text: 'Luego el mar', files: [] });
+    const third = ev({ type: 'supervisor.note', nodeId: 'c', text: 'Y las nubes', files: ['cielo.png', 'mar.png', 'nubes.png'] });
     const onAll = vi.fn();
     render(<SupervisorMemory view={view([start, branch, reviewed, second, third])} onAll={onAll} />);
     const panel = within(screen.getByRole('region', { name: 'Memoria de la ejecución' }));

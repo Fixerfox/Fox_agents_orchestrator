@@ -1,6 +1,6 @@
 # SPEC-072 · Memoria de la ejecución estructurada
 
-**Estado:** Borrador · **Hito:** M15c · **Paquetes:** `core`, `claude`, `runtime`, `editor`, `ui` · **Rama:** `feature/memoria-ejecucion`
+**Estado:** Implementada · **Hito:** M15c · **Paquetes:** `core`, `claude`, `runtime`, `store`, `editor`, `ui` · **Rama:** `feature/robustez-ejecucion`
 
 ## Propósito
 La memoria de la ejecución (SPEC-060, R60.18–R60.27) es hoy un diario de texto: una línea con la rama de git y una entrada por paso con el resumen de una o dos frases que devuelve la revisión con IA. La auditoría del 08/11 (M1–M4, M6–M8 y S4) encontró que se queda corta justo donde más importa:
@@ -58,7 +58,7 @@ Reglas comunes a todas: la memoria son datos, no órdenes; nunca lleva secretos;
    - *Segunda (elegida):* **la última vuelta entera y las anteriores en una línea** con su resultado («vuelta 2: rechazada — faltaban los tests»).
 
 ## Modelo
-`RunMemory` (en `core`, sin conocer a Claude) es una función pura de los eventos y del diagrama: `memoryFromEvents(events, diagram)`. Durante la ejecución se mantiene de forma incremental (`MemoryBuilder`, suscrito al bus como el Supervisor) y siempre da lo mismo que la función pura sobre los mismos eventos.
+`RunMemory` (en `core`, sin conocer a Claude) es una función pura de los eventos: `memoryFromEvents(events)`. Lo que ve cada paso lo filtra después `selectFor` con el diagrama de cada nivel. Durante la ejecución no hay estado aparte: al arrancar un paso se calcula sobre los eventos emitidos hasta ese momento, así que siempre da lo mismo que la función pura.
 
 | Bloque | Qué guarda | Fuente | Lo ve | Tope (tokens) |
 | --- | --- | --- | --- | --- |
@@ -75,8 +75,8 @@ Cada entrada guarda su procedencia: `source` (`events`, `supervisor` o `agent`),
 
 ## Requisitos
 ### Construcción
-- **R72.1** [M15c] `memoryFromEvents(events, diagram)` devuelve los ocho bloques de la tabla, cada entrada con su procedencia. Es pura: no llama al motor ni lee archivos.
-- **R72.2** [M15c] El `MemoryBuilder` que se mantiene durante la ejecución da en todo momento el mismo resultado que `memoryFromEvents` sobre los eventos emitidos hasta ese momento. Hay un test que lo comprueba con las grabaciones de SPEC-056.
+- **R72.1** [M15c] `memoryFromEvents(events)` devuelve los ocho bloques de la tabla, cada entrada con su procedencia. Es pura: no llama al motor ni lee archivos.
+- **R72.2** [M15c] Durante la ejecución, la memoria de un paso (`RunMemoryService`) es `memoryFromEvents` sobre los eventos emitidos hasta su arranque: no hay un segundo estado que pueda desviarse. Hay tests que lo comprueban en vivo y, sobre las grabaciones de SPEC-056, que la función es determinista y que cada prefijo solo añade.
 - **R72.3** [M15c] Lo activa la app (`createEngineOrchestrator`). Un `Orchestrator` sin memoria se comporta como antes, y por eso no cambian las grabaciones de SPEC-056.
 - **R72.4** [M15c] Las decisiones incluyen las preguntas de tipo `question`, `unfinished`, `gate`, las confirmaciones con cambios pedidos, las revisiones humanas con su corrección y la corrección de la ejecución (R53.8). No incluyen los permisos (`permission`): son ruido para los siguientes.
 - **R72.5** [M15c] Los acuerdos salen de la salida del Coordinador cuando su reparto es válido (`parseSplit`): el texto de `## Común` y, por rama, su nombre y su línea `Archivos:`.
@@ -96,7 +96,7 @@ Cada entrada guarda su procedencia: `source` (`events`, `supervisor` o `agent`),
 - **R72.13** [M15c] El prompt de sistema de todo agente explica la sección, igual en todos los pasos para no romper la caché (R72.18); si el paso no tiene pasos de agente después, la nota se guarda y nadie la recibe. La explicación dice: para lo que los siguientes deben saber y no está en la entrega (algo dejado a medias a propósito, una decisión, un riesgo), como mucho 5 líneas, y que no es para repetir la entrega.
 
 ### Lo que recibe el agente
-- **R72.14** [M15c] `renderMemory(memory, forStep, budgetTokens)` escribe los bloques visibles para ese paso en este orden: Rama, Decisiones, Acuerdos, Notas, Avisos abiertos, Camino, Pasos y Archivos. Cada bloque lleva un título que dice de dónde sale («Decisiones de la persona», «Notas que dejaron otros pasos (escritas por agentes)», «Resumen de los pasos»).
+- **R72.14** [M15c] `renderMemory(selectFor(memory, paso), { tokens })` escribe los bloques visibles para ese paso en este orden: Rama, Decisiones, Acuerdos, Notas, Avisos abiertos, Camino, Pasos y Archivos. Cada bloque lleva un título que dice de dónde sale («Decisiones de la persona», «Notas que dejaron otros pasos (escritas por agentes)», «Resumen de los pasos»).
 - **R72.15** [M15c] El tope total es `memoryTokens` (2.000 por defecto, en la nueva sección Ajustes › Memoria). Cada bloque tiene su tope de la tabla; lo que un bloque no usa pasa a los siguientes, en orden. Los tokens se estiman con `estimateTokens`, inyectable (por defecto, caracteres ÷ 3,5).
 - **R72.16** [M15c] Al pasarse un bloque: Decisiones acorta cada entrada a 160 caracteres y, si no basta, deja las más recientes y dice cuántas omitió; Pasos deja las más antiguas en una línea y luego las quita (como R63.12); Archivos agrupa por carpeta con su número; Camino y Avisos quitan las más antiguas. Rama nunca se recorta. Nunca se corta una línea por la mitad.
 - **R72.17** [M15c] Un paso con varias pasadas aparece una vez en Pasos: la última pasada entera y las anteriores en una línea cada una con su resultado (cambia R63.3).
@@ -105,7 +105,7 @@ Cada entrada guarda su procedencia: `source` (`events`, `supervisor` o `agent`),
 
 ### Persistencia, reanudar y corregir
 - **R72.20** [M15c] La ejecución escribe `runs/<runId>/memory.json` (con `schemaVersion`) y `memory.md`, la memoria completa sin topes, al terminar cada paso y al terminar la ejecución, con escritura atómica. `events.jsonl` sigue siendo la fuente: si no coinciden, manda lo que sale de los eventos.
-- **R72.21** [M15c] Al reanudar o corregir, los pasos reutilizados vuelven a emitir su rastro (R41.7), incluidos sus `memory.note`, y el `MemoryBuilder` reconstruye sus entradas. Las decisiones de la ejecución anterior entran como decisiones, marcadas «de la ejecución anterior».
+- **R72.21** [M15c] Al reanudar o corregir, los pasos reutilizados vuelven a emitir su rastro (R41.7), incluidos sus `memory.note`, y la memoria reconstruye sus entradas. Las decisiones de la ejecución anterior entran como decisiones, marcadas «de la ejecución anterior».
 
 ### Interfaz
 - **R72.22** [M15c] La pestaña «Memoria» (R69.6) enseña los bloques en el orden de R72.14 como grupos de tarjetas (R69.5), con la procedencia de cada entrada: «de los eventos», «del Supervisor» o «de <paso>».

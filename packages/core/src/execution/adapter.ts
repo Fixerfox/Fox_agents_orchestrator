@@ -74,6 +74,8 @@ export interface SupervisorVerdict {
   reason: string;
   summary: string;
   outOfScope?: string;
+  /** Lo que el paso decidió por su cuenta, solo si lo dice o lo hace explícitamente [R72.10]. */
+  decided?: string[];
   usage?: { inputTokens: number; outputTokens: number; costUsd?: number };
 }
 

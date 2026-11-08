@@ -33,7 +33,13 @@ export interface AppSettings {
   limits?: Pick<StepLimits, 'idleMinutes' | 'toolMinutes'>;
   /** Qué hacer por defecto con una pregunta que nadie responde [R70.21]. */
   unanswered?: UnansweredPolicy;
+  /** Tope de la memoria de la ejecución, en tokens [R72.15]. */
+  memoryTokens?: number;
 }
+
+/** Rango del tope de la memoria [R72.15]. */
+export const MEMORY_TOKENS_RANGE = [500, 8000] as const;
+const memoryTokensOk = (v: unknown): v is number => Number.isInteger(v) && (v as number) >= MEMORY_TOKENS_RANGE[0] && (v as number) <= MEMORY_TOKENS_RANGE[1];
 
 export const HUMAN_CHECKS = ['warn', 'fail'] as const;
 export type HumanChecks = (typeof HUMAN_CHECKS)[number];
@@ -89,6 +95,7 @@ export function validateSettings(s: unknown): FieldProblem[] {
   if (s.supervisorHumanChecks !== undefined && !(HUMAN_CHECKS as readonly unknown[]).includes(s.supervisorHumanChecks)) out.push({ field: 'supervisorHumanChecks', message: 'Elige «Avisar» o «Hacer fallar la ejecución»' });
   out.push(...limitProblems(s.limits));
   if (s.unanswered !== undefined && !readUnanswered(s.unanswered)) out.push({ field: 'unanswered', message: 'Elige qué hacer si nadie responde' });
+  if (s.memoryTokens !== undefined && !memoryTokensOk(s.memoryTokens)) out.push({ field: 'memoryTokens', message: `El tope de la memoria va de ${MEMORY_TOKENS_RANGE[0]} a ${MEMORY_TOKENS_RANGE[1]} tokens` });
   return out;
 }
 
@@ -119,5 +126,6 @@ export function normalizeSettings(raw: unknown): AppSettings {
   }
   const unanswered = readUnanswered(raw.unanswered);
   if (unanswered) out.unanswered = unanswered;
+  if (memoryTokensOk(raw.memoryTokens)) out.memoryTokens = raw.memoryTokens;
   return out;
 }

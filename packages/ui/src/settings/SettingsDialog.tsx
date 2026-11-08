@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, Clock, Eye, Folder, Gauge, KeyRound, Palette, ShieldCheck, Sparkles, type LucideIcon } from 'lucide-react';
-import { DEFAULT_IDLE_MINUTES, DEFAULT_TOOL_MINUTES, DEFAULT_UNANSWERED, MODELS, UNANSWERED_ACTIONS, loadsClaudeConfig, projectPermission, type AppSettings, type AuthMode, type Engine, type ProjectPermission, supervisorHumanChecks, supervisorModel, supervisorReviews } from '@orquestador/core';
+import { ArrowLeft, Brain, Clock, Eye, Folder, Gauge, KeyRound, Palette, ShieldCheck, Sparkles, type LucideIcon } from 'lucide-react';
+import { MEMORY_TOKENS, DEFAULT_IDLE_MINUTES, DEFAULT_TOOL_MINUTES, DEFAULT_UNANSWERED, MODELS, UNANSWERED_ACTIONS, loadsClaudeConfig, projectPermission, type AppSettings, type AuthMode, type Engine, type ProjectPermission, supervisorHumanChecks, supervisorModel, supervisorReviews } from '@orquestador/core';
 import { PermissionPicker, permissionName } from '../common';
 import { PROJECT_LEVELS, permissionMatrix, t, type ConnectionResult, type MessageKey, type PermAnswer, type ProjectApi, type SettingsView, type WorkFolderView } from '@orquestador/editor';
 import { fieldErrors } from '../common';
@@ -79,6 +79,7 @@ export function SettingsDialog({ api, onClose, onSaved }: Props) {
       ...(draft.supervisorHumanChecks !== undefined ? { supervisorHumanChecks: draft.supervisorHumanChecks } : {}),
       ...(draft.limits ? { limits: draft.limits } : {}),
       ...(draft.unanswered ? { unanswered: draft.unanswered } : {}),
+      ...(draft.memoryTokens !== undefined ? { memoryTokens: draft.memoryTokens } : {}),
     };
     const res = await api.saveSettings(body);
     if (!res.ok) {
@@ -344,6 +345,22 @@ export function SettingsDialog({ api, onClose, onSaved }: Props) {
       ),
     },
     {
+      id: 'memory',
+      group: 'general',
+      icon: Brain,
+      label: t('settings.section.memory'),
+      summary: t('settings.sum.memory', { n: draft.memoryTokens ?? MEMORY_TOKENS }),
+      intro: t('settings.memory.intro'),
+      content: (
+        <div className="orq-setrows">
+          <Row id="set-memtokens" label={t('settings.memory.tokens')} error={errors['memoryTokens']}>
+            <input id="set-memtokens" type="number" min={500} max={8000} step={100} value={draft.memoryTokens ?? MEMORY_TOKENS} onChange={(e) => set({ memoryTokens: Number(e.target.value) })} />
+          </Row>
+          <p className="orq-hint">{t('settings.memory.tokens.hint')}</p>
+        </div>
+      ),
+    },
+    {
       id: 'look',
       group: 'general',
       icon: Palette,
@@ -427,7 +444,7 @@ export function SettingsDialog({ api, onClose, onSaved }: Props) {
   );
 }
 
-type SectionId = 'claude' | 'perms' | 'supervisor' | 'budget' | 'limits' | 'look' | 'work';
+type SectionId = 'claude' | 'perms' | 'supervisor' | 'budget' | 'limits' | 'memory' | 'look' | 'work';
 
 /** Una sección de Ajustes: entrada del índice y su contenido [R67.1]. */
 interface Section {

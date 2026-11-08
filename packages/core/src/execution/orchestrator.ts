@@ -20,6 +20,7 @@ import { DECISION_TIMEOUT_MS, guardDecider } from './run/guarded-decider';
 import { RunAbort } from './run/run-abort';
 import { RunEmitter } from './run/run-emitter';
 import { Supervisor } from './run/supervisor';
+import { RunMemoryService } from './run/memory-service';
 import type { NodeStatus, RunOptions, RunStatus } from './run-types';
 import { mergeInputs } from './text/merge-inputs';
 import { splitInputs } from './text/split';
@@ -45,6 +46,8 @@ export interface OrchestratorDeps {
    * con IA. Sin él se usan `getAdapter` y `decider` tal cual [R63.13].
    */
   forRun?(): { getAdapter(agentId: Id): AgentAdapter; decider: Decider; review?(): boolean };
+  /** Memoria de la ejecución; va con el Supervisor, o sola con esto; `tokens`, su tope [R72.3][R72.15]. */
+  memory?: { tokens?(): number | undefined };
   /** Temporizadores y reloj; por defecto, los del sistema [R70.9]. */
   timers?: Timers;
   /** Límites de la ficha de un agente [R70.7]. */
@@ -114,6 +117,8 @@ export class Orchestrator {
       ? new Supervisor({ order: typeof order === 'string' ? { text: order, files: [] } : order, ...(options.correction ? { correction: { text: options.correction.text, ...(options.correction.before ? { before: options.correction.before } : {}) } } : {}), ...(deliverable ? { deliverable: JSON.stringify(deliverable) } : {}), ...(watch.checkMs !== undefined ? { checkMs: watch.checkMs } : {}), emitter, decider: engine.decider, budget, limits: options.budget, signal: stop.signal, review: () => watch.review() && (engine.review?.() ?? true), ...(watch.model ? { model: () => watch.model!() } : {}), ...(watch.humanChecks ? { humanChecks: () => watch.humanChecks!() } : {}), labelOf, ...(outputId !== undefined ? { outputId } : {}), ...(watch.settleMs !== undefined ? { settleMs: watch.settleMs } : {}) })
       : undefined;
     if (supervisor) bus.subscribe((e) => supervisor.observe(e));
+    // La memoria va con el Supervisor (como antes) o sola si se pide [R72.3].
+    const memory = watch || this.deps.memory ? new RunMemoryService(emitter, labels, new Map(), () => this.deps.memory?.tokens?.()) : undefined;
     const services: RunServices = {
       signal: stop.signal,
       emitter,
@@ -121,6 +126,7 @@ export class Orchestrator {
       limiter: new ConcurrencyLimiter(Math.max(1, options.maxConcurrency ?? 4)),
       budget,
       ...(supervisor ? { supervisor } : {}),
+      ...(memory ? { memory } : {}),
       questions,
       retry: new RetryPolicy(options.retry, this.deps.sleep, this.deps.random),
       cache: new ResumeCache(options),
@@ -227,6 +233,7 @@ async function executeDiagram(run: RunServices, nodes: NodeRegistry, diagram: Di
   }
 
   const nodeById = new Map(diagram.nodes.map((n) => [n.id, n]));
+  run.memory?.levels.set(path.join('/'), diagram);
   for (const n of diagram.nodes) run.labels.set(pathKey(path, n.id), n.label ?? n.id);
   const returns = returnEdges(diagram);
   const incoming = new Map<Id, Edge[]>();

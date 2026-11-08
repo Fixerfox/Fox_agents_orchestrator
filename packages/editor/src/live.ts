@@ -264,12 +264,14 @@ export function budgetRemaining(live: LiveView, limits: BudgetLimits): { tokens?
 
 export type TranscriptItem =
   /** `pass` solo aparece cuando el nodo se ejecutó más de una vez [R15.14]. */
-  | { kind: 'input'; attempt: number; pass?: number; agentId: Id; text: string; config?: unknown; model?: string; /** La memoria que recibió [R60.37]. */ memory?: string; /** Lo que se le contó del intento anterior [R71.15]. */ previous?: string }
+  | { kind: 'input'; attempt: number; pass?: number; agentId: Id; text: string; config?: unknown; model?: string; /** La memoria que recibió [R60.37]. */ memory?: string; /** Lo que se le contó del intento anterior [R71.15]. */ previous?: string; /** Bloques de la memoria que se recortaron [R72.23]. */ memoryTrimmed?: string[] }
   /** Empieza la pasada `n` (≥ 2); `by` y `reason`, si la devolvió una revisión [R15.14]. */
   | { kind: 'pass'; n: number; by?: Id; reason?: string }
   | { kind: 'text'; text: string }
   | { kind: 'tool'; tool: string; input?: unknown; ok?: boolean; output?: string }
   | { kind: 'question'; questionId: string; text: string; options?: string[]; answer?: string; /** Confirmación del paso [R43.9]. */ confirm?: { round: number }; /** Tipo de pregunta [R45.3]. */ ask?: QuestionKind; /** Revisión humana [R53.15]. */ review?: ReviewQuestion }
+  /** Nota que el paso dejó a los siguientes [R72.24]. */
+  | { kind: 'note'; text: string }
   | { kind: 'retry'; attempt: number; max: number; message: string; /** Por qué [R71.15]. */ cause?: 'error' | 'timeout' | 'loop' }
   | { kind: 'error'; message: string }
   | { kind: 'usage'; inputTokens: number; outputTokens: number; costUsd: number }
@@ -306,7 +308,10 @@ export function transcriptItems(events: readonly RunEvent[], nodeId: Id, nodePat
         returned = undefined;
         break;
       case 'agent.request':
-        items.push({ kind: 'input', attempt: e.attempt, pass: Math.max(1, pass), agentId: e.agentId, text: e.input.text, ...(e.snapshot ? { config: e.snapshot } : {}), ...(e.model ? { model: e.model } : {}), ...(e.memory ? { memory: e.memory } : {}), ...(e.previousAttempt ? { previous: describePreviousAttempt(e.previousAttempt) } : {}) });
+        items.push({ kind: 'input', attempt: e.attempt, pass: Math.max(1, pass), agentId: e.agentId, text: e.input.text, ...(e.snapshot ? { config: e.snapshot } : {}), ...(e.model ? { model: e.model } : {}), ...(e.memory ? { memory: e.memory } : {}), ...(e.previousAttempt ? { previous: describePreviousAttempt(e.previousAttempt) } : {}), ...(e.memoryStats && e.memoryStats.trimmed.length > 0 ? { memoryTrimmed: [...e.memoryStats.trimmed] } : {}) });
+        break;
+      case 'memory.note':
+        items.push({ kind: 'note', text: e.text });
         break;
       case 'token.stream': {
         const last = items[items.length - 1];

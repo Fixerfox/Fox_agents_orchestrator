@@ -1,5 +1,5 @@
 import { splitBranchIds, type DiagramNode } from '../../diagrams';
-import { DEFAULT_IDLE_MINUTES, DEFAULT_TOOL_MINUTES, isCoordinator, mergeExtra, stepExtra, type Id, type Payload } from '../../shared';
+import { DEFAULT_IDLE_MINUTES, DEFAULT_TOOL_MINUTES, isCoordinator, mergeExtra, neutralizeTag, stepExtra, type Id, type Payload } from '../../shared';
 import { AgentError, type AgentQuestion, type AgentStreamEvent, type AnsweredQuestion, type FileChange, type FileVia, type KnowledgeRef, type PreviousAttempt } from '../adapter';
 import type { Slot } from '../run/concurrency-limiter';
 import { LOOP_CUT, StepWatchdog, toolSignature, type TimeoutKind } from '../run/watchdog';
@@ -7,6 +7,8 @@ import { deliverableNotice } from '../text/deliverable-notice';
 import { splitRule, type SplitBranch } from '../text/split';
 import { explainTouchedFiles } from '../text/touched-files';
 import type { Outcome, StepContext } from './handler';
+import type { MemoryStats } from '../memory/memory-render';
+import { splitNote, NOTE_MAX } from '../memory/notes';
 
 /** Lo que dura todos los intentos de un paso. */
 export interface AgentTurn {
@@ -16,8 +18,10 @@ export interface AgentTurn {
   /** Intentos ya hechos, para seguir contando al repetir por el reparto [R59.8]. */
   attempts: number;
   base: number;
-  /** Memoria al arrancar el paso: no cambia entre intentos [R60.23]. */
+  /** Memoria al arrancar el paso: no cambia entre intentos [R72.9]. */
   memory?: string;
+  /** Tokens de cada bloque y qué se recortó [R72.19]. */
+  memoryStats?: MemoryStats;
   /** Límites del paso, si los declaró el Coordinador [R60.16]. */
   scope?: string[];
   /** Lo que va haciendo el intento en curso, para contárselo al siguiente [R71.7]. */
@@ -76,6 +80,7 @@ export async function attemptAgent(step: StepContext, node: DiagramNode, input: 
       ...(node.confirm ? { confirm: true } : {}),
       ...(split ? { split } : {}),
       ...(turn.memory ? { memory: turn.memory } : {}),
+      ...(turn.memoryStats ? { memoryStats: turn.memoryStats } : {}),
       ...(turn.scope ? { scope: turn.scope } : {}),
       ...(deliverable ? { deliverable } : {}),
       ...(hasExtra ? { extra: origin } : {}),
@@ -241,6 +246,12 @@ export async function attemptAgent(step: StepContext, node: DiagramNode, input: 
     if (timedOut) void Promise.resolve(iterator.return?.()).catch(() => undefined);
   }
   if (step.signal.aborted) return { status: 'cancelled' };
-  const text = explainTouchedFiles(resultText ?? streamed, files);
+  // La nota para los siguientes sale de la salida y va a la memoria [R72.11][R72.12].
+  const { text: delivered, note } = splitNote(resultText ?? streamed);
+  if (note !== undefined) {
+    if (note.length > NOTE_MAX) step.emitter.emit({ type: 'supervisor.alert', nodeId: node.id, rule: 'note-too-long', severity: 'info', detail: `La nota para los siguientes pasos tenía ${note.length} caracteres; se guardan los primeros ${NOTE_MAX}.` }, path);
+    step.emitter.emit({ type: 'memory.note', nodeId: node.id, text: neutralizeTag(note.slice(0, NOTE_MAX), 'memoria') }, path);
+  }
+  const text = explainTouchedFiles(delivered, files);
   return { status: 'succeeded', output: { text, files: [...files.keys()] } };
 }

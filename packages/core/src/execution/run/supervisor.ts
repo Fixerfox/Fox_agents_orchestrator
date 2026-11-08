@@ -6,12 +6,10 @@ import type { RunOptions } from '../run-types';
 import type { BudgetTracker } from './budget-tracker';
 import type { RunEmitter } from './run-emitter';
 import { REQUIREMENTS_UNMET } from '../text/unfinished';
-import { applyRules, branchMemoryLine, newBranchMemory, newRuleState, rememberBranch } from './supervisor-rules';
+import { applyRules, newRuleState } from './supervisor-rules';
 
 /** Tiempo que se espera a las revisiones pendientes al terminar [R60.13]. */
 const SETTLE_MS = 10_000;
-/** Tope de la memoria [R60.24]. */
-const MEMORY_MAX = 8000;
 /** Lo que espera un paso a su revisión antes de seguir sin ella [R62.8]. */
 const CHECK_MS = 60_000;
 const RESULT_CHARS = 3000;
@@ -21,14 +19,6 @@ const TAIL_ACTIONS = 30;
 const ACTION_CHARS = 160;
 /** Fallos seguidos que apagan la revisión en segundo plano [R63.8]. */
 const MAX_FAILURES = 3;
-
-interface Entry {
-  /** Paso al que pertenece (ruta): una sola entrada por paso [R63.3]. */
-  key: string;
-  label: string;
-  text: string;
-  files: readonly string[];
-}
 
 /** Lo que el Supervisor sabe de un paso mientras trabaja. */
 interface StepTrail {
@@ -82,18 +72,11 @@ function pushAction(trail: StepTrail, text: string): void {
 
 const actionsOf = (t: StepTrail): string[] => [...t.head, ...(t.omitted > 0 ? [`… (${t.omitted} acciones omitidas) …`] : []), ...t.tail];
 
-const entryLine = (e: Entry, full: boolean): string => {
-  const files = e.files.length > 0 ? ` (archivos: ${e.files.join(', ')})` : '';
-  return full && e.text ? `- ${e.label}: ${e.text}${files}` : `- ${e.label}${files}`;
-};
-
 /** Vigila una ejecución: reglas, revisión con IA y memoria [R60.1][R60.12][R60.18]. */
 export class Supervisor {
   private readonly rules = newRuleState();
   private readonly told = new Set<string>();
   private readonly trails = new Map<string, StepTrail>();
-  private readonly entries: Entry[] = [];
-  private readonly branches = newBranchMemory();
   private readonly pending = new Set<Promise<void>>();
   /** Preguntas sin responder y lo que decidió la persona [R62.17]. */
   private readonly asked = new Map<string, string>();
@@ -145,10 +128,6 @@ export class Supervisor {
       this.passes.set(step, (this.passes.get(step) ?? 0) + 1);
       return;
     }
-    if (e.type === 'git.branch') {
-      rememberBranch(this.branches, e, this.d.labelOf(e.nodeId, path));
-      return;
-    }
     if (e.type === 'agent.request') {
       const key = pathKey(path, e.nodeId);
       if (!this.trails.has(key)) this.trails.set(key, { nodeId: e.nodeId, path, input: e.input, ...(e.task ? { task: e.task } : {}), head: [], tail: [], omitted: 0, files: new Set() });
@@ -172,18 +151,10 @@ export class Supervisor {
     }
   }
 
-  /** Anota un paso en la memoria; si ya tenía entrada, la nueva la sustituye y pasa al final [R63.3]. */
-  private remember(entry: Entry): void {
-    const i = this.entries.findIndex((x) => x.key === entry.key);
-    if (i >= 0) this.entries.splice(i, 1);
-    this.entries.push(entry);
-  }
-
-  private note(trail: StepTrail, text: string, reviewed = false): void {
-    const label = this.d.labelOf(trail.nodeId, trail.path);
+  /** La nota del paso: la memoria la lee de los eventos [R72.1][R72.10]. */
+  private note(trail: StepTrail, text: string, reviewed = false, decided: string[] = []): void {
     const files = [...trail.files];
-    this.remember({ key: pathKey(trail.path, trail.nodeId), label, text, files });
-    this.d.emitter.emit({ type: 'supervisor.note', nodeId: trail.nodeId, text, files, ...(reviewed ? { reviewed } : {}) }, trail.path);
+    this.d.emitter.emit({ type: 'supervisor.note', nodeId: trail.nodeId, text, files, ...(reviewed ? { reviewed } : {}), ...(decided.length > 0 ? { decided } : {}) }, trail.path);
   }
 
   private finished(trail: StepTrail, output: Payload): void {
@@ -265,7 +236,6 @@ export class Supervisor {
   /** Devuelve a la memoria lo anotado de un paso reutilizado, sin revisarlo ni gastar [R41.8][R41.9]. */
   restore(past: Extract<EventBody, { type: 'supervisor.note' | 'supervisor.alert' }>, path: readonly Id[]): void {
     if (past.type === 'supervisor.alert') return this.alert(past.nodeId, path, past.rule, past.detail);
-    this.remember({ key: pathKey(path, past.nodeId), label: this.d.labelOf(past.nodeId, path), text: past.text, files: past.files });
     this.d.emitter.emit(past, path);
   }
 
@@ -313,7 +283,7 @@ export class Supervisor {
     }
     if (!v.ok) this.alert(trail.nodeId, trail.path, 'ai-review', v.reason || 'Lo hecho no corresponde a lo pedido.');
     if (v.outOfScope) this.alert(trail.nodeId, trail.path, 'out-of-scope', v.outOfScope);
-    this.note(trail, v.summary, true);
+    this.note(trail, v.summary, true, (v.decided ?? []).map((d) => d.trim().slice(0, 160)).filter(Boolean).slice(0, 3));
   }
 
   /** Espera a las revisiones pendientes, con un tope [R60.13]. */
@@ -331,44 +301,4 @@ export class Supervisor {
     // Lo que no llegó se cancela: no sigue gastando [R63.7].
     for (const abort of this.inflight) abort();
   }
-
-  /** La memoria tal como está ahora: la rama y el diario, que no pasa del tope [R60.23][R60.24][R60.26]. */
-  memory(): string | undefined {
-    const head = branchMemoryLine(this.branches);
-    const diary = this.diary(MEMORY_MAX - (head ? head.length + 1 : 0));
-    return [head, diary].filter(Boolean).join('\n') || undefined;
-  }
-
-  /**
-   * El diario con su tope, de lo más nuevo a lo más antiguo: lo reciente va entero, lo anterior solo con el paso y sus
-   * archivos [R60.24], y lo que ya no cabe se quita entero con un aviso al principio, sin cortar líneas [R63.12].
-   */
-  private diary(max: number): string {
-    const kept: string[] = [];
-    let used = 0;
-    let short = false;
-    let dropped = 0;
-    const note = (n: number) => `(${n} pasos anteriores omitidos)`;
-    const room = max - note(this.entries.length).length - 1;
-    for (let i = this.entries.length - 1; i >= 0; i--) {
-      const e = this.entries[i]!;
-      const full = entryLine(e, true);
-      if (!short && used + full.length + (kept.length > 0 ? 1 : 0) <= room) {
-        kept.unshift(full);
-        used += full.length + (kept.length > 1 ? 1 : 0);
-        continue;
-      }
-      short = true;
-      const brief = entryLine(e, false);
-      if (used + brief.length + (kept.length > 0 ? 1 : 0) <= room) {
-        kept.unshift(brief);
-        used += brief.length + (kept.length > 1 ? 1 : 0);
-        continue;
-      }
-      dropped = i + 1;
-      break;
-    }
-    return [...(dropped > 0 ? [note(dropped)] : []), ...kept].join('\n');
-  }
-
 }

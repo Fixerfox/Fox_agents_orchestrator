@@ -178,7 +178,7 @@ export function RunDetail(
           {step && folded ? (
             <FoldedStep events={d.events} live={live} nodeId={step.nodeId} nodePath={step.nodePath} label={label(step.nodeId, step.nodePath)} onUnfold={() => setFolded(false)} />
           ) : step ? (
-            <NodePanel key={[...step.nodePath, step.nodeId].join('/')} events={d.events} live={live} nodeId={step.nodeId} nodePath={step.nodePath} label={label(step.nodeId, step.nodePath)} labelOf={(id) => label(id, step.nodePath)} onAnswer={answerHere} closed={!running} onOpenFile={setViewing} onPreview={openPreview} renderThumb={previewCard} onFold={() => setFolded(true)} />
+            <NodePanel key={[...step.nodePath, step.nodeId].join('/')} events={d.events} live={live} nodeId={step.nodeId} nodePath={step.nodePath} label={label(step.nodeId, step.nodePath)} labelOf={(id) => label(id, step.nodePath)} onAnswer={answerHere} closed={!running} onOpenFile={setViewing} onPreview={openPreview} renderThumb={previewCard} onFold={() => setFolded(true)} onMemory={() => setModal('memory')} />
           ) : (
             <p className="orq-hint">{t('runs.step.none')}</p>
           )}

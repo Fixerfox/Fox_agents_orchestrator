@@ -27,6 +27,8 @@ interface Props {
   renderThumb?: (key: string, path: string) => ReactNode;
   /** Pliega el panel a una franja [R68.3]. */
   onFold?: () => void;
+  /** «Ver la memoria completa»: abre la pestaña «Memoria» de la ejecución [R72.23]. */
+  onMemory?: () => void;
 }
 
 /** Miniaturas que se ven en la tarjeta de una revisión humana [R54.6]. */
@@ -240,7 +242,7 @@ export function filesState(status: string | undefined, closed: boolean): 'done' 
   return 'unfinished';
 }
 
-export function NodePanel({ events, live, nodeId, nodePath, label, onAnswer, onExpand, closed = false, labelOf, onOpenFile, onPreview, renderThumb, onFold }: Props) {
+export function NodePanel({ events, live, nodeId, nodePath, label, onAnswer, onExpand, closed = false, labelOf, onOpenFile, onPreview, renderThumb, onFold, onMemory }: Props) {
   const items = transcriptItems(events, nodeId, nodePath);
   const key = [...nodePath, nodeId].join('/');
   const status = live.nodeStatus[key];
@@ -344,6 +346,13 @@ export function NodePanel({ events, live, nodeId, nodePath, label, onAnswer, onE
                         <details className="orq-t__memory">
                           <summary>{t('transcript.memory')}</summary>
                           <pre>{it.memory}</pre>
+                          {/* Qué bloques se recortaron y la memoria entera [R72.23]. */}
+                          {it.memoryTrimmed && <p className="orq-hint">{t('transcript.memory.trimmed', { blocks: it.memoryTrimmed.map((b) => t(`mem.block.${b}` as MessageKey)).join(', ') })}</p>}
+                          {onMemory && (
+                            <button type="button" className="orq-link" onClick={onMemory}>
+                              {t('transcript.memory.all')}
+                            </button>
+                          )}
                         </details>
                       )}
                       {it.previous && (
@@ -372,6 +381,17 @@ export function NodePanel({ events, live, nodeId, nodePath, label, onAnswer, onE
                 return <ToolGroup key={i} tools={it.tools} />;
               case 'question':
                 return <Question key={it.questionId} item={it} onAnswer={onAnswer} closed={closed} onOpenFile={onOpenFile} {...(it.review?.phase === 'feedback' ? { reviewFiles: filesSinceReview(events, nodeId, nodePath, it.questionId) } : {})} {...(onPreview ? { onPreview } : {})} {...(renderThumb ? { renderThumb } : {})} />;
+              case 'note':
+                // La nota que dejó para los siguientes pasos [R72.24].
+                return (
+                  <li key={i} className="orq-t orq-t--note">
+                    <div className="orq-t__card">
+                      <strong>{t('transcript.note')}</strong>
+                      <Markdown text={it.text} />
+                      <p className="orq-hint">{t('transcript.note.hint')}</p>
+                    </div>
+                  </li>
+                );
               case 'retry':
                 // Separador del reintento: por qué se repite y, desplegado, el error [R71.15].
                 return (

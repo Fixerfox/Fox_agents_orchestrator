@@ -1,11 +1,8 @@
 import { getEventListeners } from 'node:events';
 import { describe, expect, it } from 'vitest';
-import { MockAgent, MockDecider, Orchestrator, UNFINISHED_RETRY, clipMiddle, neutralizeTag, type SupervisorReview, type SupervisorVerdict } from '../src';
-import { EventBus } from '../src/execution/events';
+import { MockAgent, MockDecider, Orchestrator, UNFINISHED_RETRY, clipMiddle, neutralizeTag, renderMemory, type SupervisorReview, type SupervisorVerdict } from '../src';
 import { PauseGate } from '../src/execution/run/pause-gate';
 import { defaultSleep } from '../src/execution/run/retry-policy';
-import { RunEmitter } from '../src/execution/run/run-emitter';
-import { Supervisor } from '../src/execution/run/supervisor';
 import { ENTRY, OUTPUT, agent, chain, diagram, edge, fan, loop, ofType, router } from './helpers';
 
 const OK: SupervisorVerdict = { ok: true, reason: '', summary: 'Hizo lo pedido' };
@@ -62,8 +59,8 @@ describe('SPEC-063 · Supervisor y memoria', () => {
       if (e.type === 'agent.question') queueMicrotask(() => h.answer(e.questionId, UNFINISHED_RETRY));
     });
     await h.result;
-    const lines = (agents.callsOf('b')[0]?.memory ?? '').split('\n').filter((l) => l.startsWith('- a'));
-    expect(lines).toEqual(['- a: resumen a 2']);
+    const steps = (agents.callsOf('b')[0]?.memory ?? '').split('Resumen de los pasos:\n')[1]!.split('\n\n')[0]!.split('\n');
+    expect(steps.filter((l) => l.startsWith('- a'))).toEqual(['- a: resumen a 2']);
   });
 
   it('[R63.4] retry-loop solo salta si también falla el último intento', async () => {
@@ -152,17 +149,14 @@ describe('SPEC-063 · Supervisor y memoria', () => {
     expect(ofType(r.events, 'supervisor.alert').filter((a) => a.rule === 'empty-output')).toHaveLength(2);
   });
 
-  it('[R63.12] si no basta con acortar, se quitan las entradas más antiguas enteras', () => {
-    const stop = new AbortController();
-    const sup = new Supervisor({ order: { text: 'x', files: [] }, emitter: new RunEmitter(new EventBus('r')), decider: new MockDecider(), budget: { track: () => {} } as never, limits: undefined, signal: stop.signal, review: () => false, labelOf: (id) => id });
-    const entries = (sup as unknown as { entries: { key: string; label: string; text: string; files: string[] }[] }).entries;
-    for (let i = 0; i < 30; i++) entries.push({ key: `p${i}`, label: `paso-${i}-${'y'.repeat(400)}`, text: 'resumen', files: [] });
-    const memory = sup.memory()!;
-    const lines = memory.split('\n');
-    expect(memory.length).toBeLessThanOrEqual(8000);
-    expect(lines[0]).toMatch(/^\(\d+ pasos anteriores omitidos\)$/);
-    expect(lines.at(-1)).toBe(`- paso-29-${'y'.repeat(400)}: resumen`);
-    for (const l of lines.slice(1)) expect(l).toMatch(/^- paso-\d+-y{400}/);
+  it('[R63.12] si no basta con acortar, se quitan los pasos más antiguos enteros y se dice cuántos', () => {
+    const steps = Array.from({ length: 30 }, (_, i) => ({ nodeId: `paso-${i}-${'y'.repeat(400)}`, path: [], passes: [{ pass: 1, seq: i + 1, status: 'succeeded' as const, summary: 'resumen', reviewed: true, decided: [] }] }));
+    const { text } = renderMemory({ decisions: [], agreements: [], notes: [], alerts: [], route: [], steps, files: [], starts: [] }, { labelOf: (id) => id });
+    const lines = text!.split('\n');
+    expect(lines[0]).toBe('Resumen de los pasos:');
+    expect(lines[1]).toMatch(/^- \(\d+ pasos anteriores omitidos\)$/);
+    expect(lines.at(-1)).toBe(`- paso-29-${'y'.repeat(400)} (resumen omitido)`);
+    for (const l of lines.slice(2)) expect(l).toMatch(/^- paso-\d+-y{400}/);
   });
 });
 

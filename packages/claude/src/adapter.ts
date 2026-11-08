@@ -146,7 +146,6 @@ export class ClaudeAdapter implements AgentAdapter {
           buildSystemPrompt(agent, contexts, skills, summary ?? { text: '(carpeta del proyecto)' }, plan, {
             ...(request.confirm ? { confirm: true } : {}),
             ...(request.split ? { split: request.split } : {}),
-            ...(request.memory ? { memory: request.memory } : {}),
             ...(request.deliverable ? { deliverable: request.deliverable } : {}),
             level,
           }),
@@ -156,7 +155,7 @@ export class ClaudeAdapter implements AgentAdapter {
       };
       await branches.start();
       for (const u of tracker.inlined()) yield { type: 'knowledge', kind: u.item.kind, id: u.item.id, via: u.via, required: true };
-      for await (const msg of this.query({ prompt: buildUserPrompt(request.input, request.previousAnswers, request.task, missed.map((i) => `«${i.name}»`), request.previousAttempt), options })) {
+      for await (const msg of this.query({ prompt: buildUserPrompt(request.input, request.previousAnswers, request.task, missed.map((i) => `«${i.name}»`), request.previousAttempt, request.memory), options })) {
         if (signal.aborted) return;
         for (const ev of mapper.map(msg)) {
           if (ev.type === 'tool_call') {

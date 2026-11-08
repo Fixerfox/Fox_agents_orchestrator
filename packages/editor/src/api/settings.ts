@@ -29,7 +29,7 @@ export interface SettingsApi {
 /** Ajustes nuevos por forma: objetos, sí/no, números y palabras [R70.21]. */
 const SETTINGS_OBJECTS = ['limits', 'unanswered'];
 const SETTINGS_FLAGS: string[] = [];
-const SETTINGS_NUMBERS: string[] = [];
+const SETTINGS_NUMBERS: string[] = ['memoryTokens'];
 const SETTINGS_WORDS: string[] = [];
 
 export function parseSettingsRequest(channel: string, payload: unknown, { bad, exact, str }: RequestCheck): unknown {

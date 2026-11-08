@@ -33,7 +33,9 @@ interface EventBase { runId: Id; seq: number; ts: string; type: string; nodePath
 | `agent.usage` (`source?`) | `source: 'supervisor' \| 'judge' \| 'decision'` | Gasto de una pieza interna: suma al total, no al paso (SPEC-060, SPEC-034). `decision` (router, condiciones, evaluador de bucles) también cuenta en el presupuesto (SPEC-063) |
 | `supervisor.started` | `review, model?` | El Supervisor empieza a vigilar la ejecución (SPEC-060) |
 | `supervisor.reviewing` | `nodeId` | Empieza a revisar un paso con IA (SPEC-060) |
-| `supervisor.note` | `nodeId, text, files, reviewed?` | Entrada de la memoria de la ejecución (SPEC-060) |
+| `supervisor.note` | `nodeId, text, files, reviewed?, decided?` | Entrada de la memoria de la ejecución (SPEC-060); `decided`, hasta 3 decisiones que el paso tomó por su cuenta (SPEC-072) |
+| `memory.note` | `nodeId, text` | La nota «Notas para los siguientes pasos» que dejó un agente, ya separada de su salida (SPEC-072) |
+| `supervisor.feedback` | `alertSeq, verdict: 'false-alarm' \| 'confirmed', note?, nodeId?` | La persona dice si un aviso era cierto; un falso aviso sale de «Avisos abiertos» de la memoria (SPEC-072, SPEC-075) |
 | `supervisor.skipped` | `count, reason: 'timeout' \| 'failed'` | Revisiones que no se pudieron hacer (SPEC-060) |
 | `supervisor.verified` | `met, detail, forPerson?` | Comprobó si el resultado final cumple lo pedido (SPEC-062); `forPerson`: lo que queda para una persona (SPEC-065) |
 | `node.retrying` | `nodeId, attempt, max, delayMs, message, kind?, cause?` | Reintento automático tras error temporal; `kind`, el tipo del error si no es uno temporal normal, y `cause`, `timeout` o `loop` si lo cortó el motor (SPEC-071) |
@@ -47,7 +49,7 @@ interface EventBase { runId: Id; seq: number; ts: string; type: string; nodePath
 | `subdiagram.finished` | `nodeId, status` | Se sale del nodo compuesto con su resultado |
 | `knowledge.used` | `nodeId, attempt, kind, id, via, required` | Una skill, contexto o MCP se incluyó en el prompt (`inline`), se leyó (`read`) o se usó con una herramienta (`tool`); solo ids, nunca contenido (SPEC-036) |
 | `knowledge.unmet` | `nodeId, attempt, kind, id` | Un obligatorio no se usó en ese intento; el intento falla y se reintenta con aviso (SPEC-036) |
-| `agent.request` | `nodeId, agentId, attempt, input, task?, model?, confirm?, deliverable?, extra?, snapshot?, previousAnswers?, previousAttempt?` | Lo que recibe exactamente el agente en cada intento y la configuración usada; `previousAttempt`, lo que se le contó del intento anterior (SPEC-071) |
+| `agent.request` | `nodeId, agentId, attempt, input, task?, model?, confirm?, deliverable?, extra?, snapshot?, previousAnswers?, previousAttempt?, memory?, memoryStats?` | Lo que recibe exactamente el agente en cada intento y la configuración usada; `previousAttempt`, lo que se le contó del intento anterior (SPEC-071); `memory` y `memoryStats`, la memoria que recibió y sus tokens por bloque y lo recortado (SPEC-072) |
 | `decision` | `nodeId, kind: route\|condition\|judge, request, response` | Decisión de IA fuera de los agentes de trabajo |
 | `transform.done` | `nodeId, mode: rules\|ai, format: json\|markdown\|text, attempts, ok, errors?, warnings?` | Resultado del nodo «Transformar» (SPEC-037), antes de su `node.finished` |
 | `agent.question` | `nodeId, questionId, text, options?, confirm?: { round }, kind?: 'question' \| 'permission' \| 'gate' \| 'unfinished'` | El agente pregunta al usuario; el nodo pasa a `waiting_input`. Con `confirm` es la confirmación del paso (SPEC-043); `kind` dice si es una pregunta del agente, un permiso de la app la supervisión de R39.4 (SPEC-045) o un paso sin terminar (SPEC-062) |

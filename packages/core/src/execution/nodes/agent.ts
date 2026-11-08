@@ -22,15 +22,20 @@ function scopeOf(step: StepContext, node: DiagramNode, input: Payload): string[]
 export const agentHandler: NodeHandler = {
   kind: 'agent',
   async run(step, node, input, path) {
-    const memory = step.supervisor?.memory();
     const scope = scopeOf(step, node, input);
-    const turn: AgentTurn = { slot: { held: false }, answered: [], missing: [], attempts: 0, base: 0, trace: newTrace(), ...(memory ? { memory } : {}), ...(scope ? { scope } : {}) };
+    const turn: AgentTurn = { slot: { held: false }, answered: [], missing: [], attempts: 0, base: 0, trace: newTrace(), ...(scope ? { scope } : {}) };
     let fixes = 0;
     await step.limiter.acquire();
     turn.slot.held = true;
     try {
       if (step.signal.aborted) return { status: 'cancelled' };
       step.emitter.emit({ type: 'node.started', nodeId: node.id, input }, path);
+      // La memoria se fija al arrancar y no cambia entre intentos [R72.9].
+      const memory = step.memory?.forStep(node.id, path);
+      if (memory?.text) {
+        turn.memory = memory.text;
+        turn.memoryStats = memory.stats;
+      }
       let current = input;
       for (let round = 1; ; round++) {
         const out = await attemptsOf(step, node, current, path, turn);

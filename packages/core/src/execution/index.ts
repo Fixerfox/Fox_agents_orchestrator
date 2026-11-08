@@ -19,3 +19,8 @@ export { realTimers, MINUTE_MS, type Timers } from './run/timers';
 export { LOOP_CUT, LOOP_WARN, StepWatchdog, toolSignature } from './run/watchdog';
 export { QuestionBroker, REMINDER_MINUTES, unansweredPolicy } from './run/question-broker';
 export { RetryPolicy, type RetryConfig } from './run/retry-policy';
+export { memoryFromEvents, firstParagraph, type RunMemory, type Provenance, type MemoryDecision, type MemoryStep, type MemoryStepPass } from './memory/run-memory';
+export { selectFor, visibleTo, type LevelDiagrams, type MemoryReader } from './memory/memory-view';
+export { MEMORY_BLOCKS, MEMORY_TOKENS, estimateTokens, renderMemory, type MemoryBlock, type MemoryStats, type RenderOptions } from './memory/memory-render';
+export { NOTE_HEADING, NOTE_MAX, NOTE_RULE, splitNote } from './memory/notes';
+export { MEMORY_FILE_VERSION, diagramLabelOf, memoryFiles } from './memory/memory-file';
