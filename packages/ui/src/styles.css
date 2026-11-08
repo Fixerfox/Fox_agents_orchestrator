@@ -2288,3 +2288,8 @@ button.orq-node__alerts:hover { text-decoration: underline; }
 .orq-permtable td.is-yes { color: var(--pos); }
 .orq-permtable td.is-ask { color: var(--accent-text); }
 .orq-permtable td.is-no { color: var(--text2); }
+/* El área entera hace scroll (barra pegada al borde); solo el contenido se limita de ancho */
+.orq-settings-page__main { max-width: none; scrollbar-gutter: stable; }
+.orq-settings-page .orq-settings { max-width: 880px; }
+/* El título de la sección ya dice «Permisos de los agentes»: la leyenda queda solo para lectores de pantalla */
+.orq-setperm .orq-perm__legend { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
