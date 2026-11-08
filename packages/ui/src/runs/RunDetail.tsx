@@ -157,7 +157,7 @@ export function RunDetail(
         <div className="orq-run__left">
           <div className="orq-run__canvas">
             {diagram ? (
-              <RunCanvas diagram={diagram} live={live} events={d.events} agentNames={p.agentNames} label={label} onSupervisor={openSupervisor} onSelect={setPicked} onOpenFile={openPreview} previewCard={previewCard} />
+              <RunCanvas diagram={diagram} live={live} events={d.events} agentNames={p.agentNames} label={label} onSupervisor={openSupervisor} onMemory={() => setModal('memory')} onSelect={setPicked} onOpenFile={openPreview} previewCard={previewCard} />
             ) : (
               <p className="orq-runs2__empty">{diagram === null ? t('runs.noDiagram') : t('runs.loading')}</p>
             )}
@@ -169,7 +169,8 @@ export function RunDetail(
           </div>
         </div>
         <aside className={`orq-run__side${step && folded ? ' is-folded' : ''}`} aria-label={step ? label(step.nodeId, step.nodePath) : t('runs.step.none')}>
-          {step && step.nodePath.length === 0 && fixable.includes(step.nodeId) && (
+          {/* Plegado no cabe: el botón vuelve al desplegar [R68.3]. */}
+          {step && !folded && step.nodePath.length === 0 && fixable.includes(step.nodeId) && (
             <button type="button" className="orq-btn orq-btn--small orq-run__fixstep" onClick={() => setFix({ prefer: step.nodeId })}>
               {t('fix.open.step')}
             </button>

@@ -4,6 +4,7 @@ import { MODELS } from '@orquestador/core';
 import { t, type MessageKey, type RunSummaryView, type SupervisorAlertItem } from '@orquestador/editor';
 import { money } from './runFormat';
 import { reviewedText } from './SupervisorOverlay';
+import { MemoryCards } from './MemoryCards';
 
 type Watch = NonNullable<RunSummaryView['supervisor']>;
 
@@ -49,16 +50,7 @@ export function SupervisorMemoryList({ watch }: { watch: Watch }) {
   return (
     <>
       <h3>{t('rsum.sup.memory')}</h3>
-      {watch.branch && <p className="orq-rsum__branch">{watch.branch}</p>}
-      <ul className="orq-rsum__list">
-        {watch.notes.map((n, i) => (
-          <li key={i}>
-            <strong>{n.label}</strong>
-            {n.text ? `: ${n.text}` : ''}
-            {n.files.length > 0 ? ` (${n.files.join(', ')})` : ''}
-          </li>
-        ))}
-      </ul>
+      <MemoryCards notes={watch.notes} branch={watch.branch} warned={new Set(watch.alerts.map((a) => a.label))} />
     </>
   );
 }

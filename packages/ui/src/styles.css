@@ -2330,3 +2330,64 @@ button.orq-node__alerts:hover { text-decoration: underline; }
 ::-webkit-scrollbar-thumb:hover { background-color: color-mix(in srgb, var(--text2) 50%, transparent); }
 ::-webkit-scrollbar-thumb:active { background-color: color-mix(in srgb, var(--accent) 60%, transparent); }
 ::-webkit-scrollbar-button { display: none; height: 0; width: 0; }
+
+/* SPEC-069 · conversación como chat [R69.1] */
+.orq-transcript { gap: 12px; }
+.orq-transcript > li.orq-t--input { border-radius: 12px 12px 12px 4px; background: var(--card); }
+.orq-transcript > li.orq-t--input .orq-t__fold > summary { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+.orq-transcript > li.orq-t--text { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 10px; background: transparent; border: 0; padding: 2px 0; }
+.orq-t__av { width: 24px; height: 24px; border-radius: 7px; background: var(--raised); color: var(--accent-text); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; }
+.orq-t__msg { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: 13px; line-height: 1.55; }
+.orq-t__who { font-size: 11px; color: var(--muted); }
+.orq-transcript > li.orq-t--tools { margin-left: 34px; padding: 0; background: var(--bg-deep); overflow: hidden; }
+.orq-t__tools > summary { display: flex; align-items: center; gap: 8px; padding: 8px 10px; font-size: 12px; color: var(--text); list-style: none; }
+.orq-t__tools > summary::-webkit-details-marker { display: none; }
+.orq-t__tools > summary::before { content: '›'; color: var(--muted); transition: transform .15s; display: inline-block; }
+.orq-t__tools[open] > summary::before { transform: rotate(90deg); }
+.orq-t__toolsn { font-weight: 500; }
+.orq-t__toolskinds { flex: 1; min-width: 0; font-family: var(--mono); font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: right; }
+.orq-t__toolsfail { font-size: 11px; color: var(--neg); }
+.orq-t__tools > ol { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+.orq-t__tool { display: grid; grid-template-columns: 16px minmax(0, 1fr); gap: 8px; padding: 7px 10px; border-bottom: 1px solid var(--line); font-size: 12px; }
+.orq-t__tool:last-child { border-bottom: 0; }
+.orq-t__toolmark { color: var(--pos); font-weight: 600; }
+.orq-t__tool.is-fail .orq-t__toolmark { color: var(--neg); }
+.orq-t__toolbody { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; min-width: 0; }
+.orq-t__toolbody strong { font-weight: 500; }
+.orq-t__target { font-family: var(--mono); font-size: 11px; color: var(--text2); background: var(--raised); border-radius: 4px; padding: 1px 5px; overflow-wrap: anywhere; }
+.orq-t__toolbody > details { flex-basis: 100%; }
+.orq-transcript > li.orq-chat--question { align-self: flex-end; max-width: 88%; border-radius: 12px 12px 4px 12px; border-color: color-mix(in srgb, var(--accent) 35%, transparent); background: color-mix(in srgb, var(--accent) 7%, var(--card)); }
+.orq-transcript > li.orq-t--output { padding: 12px 14px; }
+.orq-transcript > li.orq-t--output.is-ok { border-color: color-mix(in srgb, var(--pos) 40%, transparent); background: color-mix(in srgb, var(--pos) 9%, var(--card)); }
+.orq-transcript > li.orq-t--output.is-ok > strong { color: var(--pos); }
+.orq-transcript > li.orq-t--output.is-fail { border-color: color-mix(in srgb, var(--neg) 40%, transparent); background: color-mix(in srgb, var(--neg) 7%, var(--card)); }
+.orq-transcript > li.orq-t--output.is-fail > strong { color: var(--neg); }
+.orq-transcript > li.orq-t--usage { background: transparent; border: 0; padding: 0 2px; font-family: var(--mono); font-size: 11px; color: var(--muted); }
+
+/* SPEC-069 · el Supervisor dentro del diagrama [R69.3][R69.4] */
+.orq-sup__lines { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none; }
+.orq-sup__lines path { fill: none; stroke: color-mix(in srgb, var(--tone-violet) 75%, transparent); stroke-width: 1.6; stroke-dasharray: 5 5; animation: orq-sup-dash 1.2s linear infinite; }
+.orq-sup__lines path.is-warn { stroke: var(--signal); }
+@keyframes orq-sup-dash { to { stroke-dashoffset: -20; } }
+@media (prefers-reduced-motion: reduce) { .orq-sup__lines path { animation: none; } }
+.orq-sup__anchor { position: absolute; left: 0; top: 0; width: 340px; display: flex; flex-direction: column; gap: 8px; pointer-events: all; }
+.react-flow__viewport-portal .orq-sup__tag { left: 0; top: 0; pointer-events: all; }
+.orq-sup__anchor .orq-supmem { position: static; width: auto; max-height: 260px; overflow: auto; }
+
+/* SPEC-069 · memoria en tarjetas [R69.5] */
+.orq-memcards { display: flex; flex-direction: column; gap: 10px; }
+.orq-memcards__branch { margin: 0; font-family: var(--mono); font-size: 12px; color: var(--text2); }
+.orq-memcards__filter { display: flex; gap: 6px; flex-wrap: wrap; }
+.orq-memcards__filter button { font: inherit; font-size: 12px; color: var(--text2); background: transparent; border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; cursor: pointer; }
+.orq-memcards__filter button[aria-pressed='true'] { color: var(--text); background: var(--raised); border-color: var(--ctrl-border); }
+.orq-memcards__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.orq-memcard { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); }
+.orq-memcard.is-warn { border-color: color-mix(in srgb, var(--signal) 45%, transparent); }
+.orq-memcard__head { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.orq-memcard__dot { width: 8px; height: 8px; border-radius: 50%; background: var(--pos); flex: none; }
+.orq-memcard.is-warn .orq-memcard__dot { background: var(--signal); }
+.orq-memcard__warn { margin-left: auto; font-size: 11px; color: var(--accent-text); }
+.orq-memcard__text { margin: 0; font-size: 13px; line-height: 1.5; color: var(--text); }
+.orq-memcard__files { margin: 0; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.orq-memcard__files code { font-family: var(--mono); font-size: 11px; color: var(--text2); background: var(--raised); border-radius: 6px; padding: 2px 7px; }
+.orq-memcards__all { align-self: flex-start; font-size: 12px; color: var(--accent-text); }

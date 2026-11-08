@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { AlertTriangle, Check, ChevronsRight, Loader2, Maximize2, MessageCircleQuestion, X as XIcon } from 'lucide-react';
 import { MODELS, isApproval, type RunEvent } from '@orquestador/core';
 import { pathKey } from '@orquestador/core';
-import { filesSinceReview, questionGroup, stepFiles, stepOverview, t, transcriptItems, type LiveView, type MessageKey, type TranscriptItem } from '@orquestador/editor';
+import { conversationBlocks, filesSinceReview, questionGroup, stepFiles, stepOverview, t, toolTarget, transcriptItems, type LiveView, type MessageKey, type TranscriptItem } from '@orquestador/editor';
 import { Markdown } from '../common';
 import { StepFilesBlock } from './RunFiles';
 
@@ -256,7 +256,8 @@ export function NodePanel({ events, live, nodeId, nodePath, label, onAnswer, onE
   }, [pending]);
   const shown = tab === 'files' && files.length === 0 ? 'messages' : tab;
   // Terminado bien: el bloque va tras la salida; si no, al final con su aviso [R45.9].
-  const lastOutput = state === 'done' ? items.map((it) => it.kind).lastIndexOf('output') : -1;
+  const blocks = conversationBlocks(items);
+  const lastOutput = state === 'done' ? blocks.map((it) => it.kind).lastIndexOf('output') : -1;
   const block = <StepFilesBlock files={files} state={state} onOpen={onOpenFile} />;
   const tone = stepTone(status);
   const metrics = stepMetrics(view);
@@ -322,7 +323,7 @@ export function NodePanel({ events, live, nodeId, nodePath, label, onAnswer, onE
         <p className="orq-hint">{t('transcript.empty')}</p>
       ) : (
         <ol className="orq-transcript">
-          {items.map((it, i) => {
+          {blocks.map((it, i) => {
             switch (it.kind) {
               case 'input':
                 return (
@@ -342,24 +343,20 @@ export function NodePanel({ events, live, nodeId, nodePath, label, onAnswer, onE
                   </li>
                 );
               case 'text':
+                // Lo que dice el agente, con su inicial y su nombre [R69.1].
                 return (
                   <li key={i} className="orq-t orq-t--text">
-                    <Markdown text={it.text} />
+                    <span className="orq-t__av" aria-hidden="true">
+                      {label.slice(0, 1).toUpperCase()}
+                    </span>
+                    <div className="orq-t__msg">
+                      <span className="orq-t__who">{label}</span>
+                      <Markdown text={it.text} />
+                    </div>
                   </li>
                 );
-              case 'tool':
-                return (
-                  <li key={i} className="orq-t orq-t--tool">
-                    <strong>{t('transcript.tool', { tool: it.tool })}</strong>
-                    {it.ok !== undefined && <span> — {it.ok ? t('transcript.tool.ok') : t('transcript.tool.fail')}</span>}
-                    {it.output && (
-                      <details>
-                        <summary>{t('transcript.showOutput', { lines: it.output.split('\n').length })}</summary>
-                        <pre>{it.output}</pre>
-                      </details>
-                    )}
-                  </li>
-                );
+              case 'tools':
+                return <ToolGroup key={i} tools={it.tools} />;
               case 'question':
                 return <Question key={it.questionId} item={it} onAnswer={onAnswer} closed={closed} onOpenFile={onOpenFile} {...(it.review?.phase === 'feedback' ? { reviewFiles: filesSinceReview(events, nodeId, nodePath, it.questionId) } : {})} {...(onPreview ? { onPreview } : {})} {...(renderThumb ? { renderThumb } : {})} />;
               case 'retry':
@@ -384,12 +381,14 @@ export function NodePanel({ events, live, nodeId, nodePath, label, onAnswer, onE
                 );
               case 'output':
                 return (
-                  <li key={i} className="orq-t orq-t--output">
+                  <li key={i} className={`orq-t orq-t--output is-${stepTone(it.status)}`}>
                     <strong>{t('transcript.output', { status: t(`node.status.${it.status}` as MessageKey) })}</strong>
                     {it.text && <Markdown text={it.text} />}
                     {i === lastOutput && files.length > 0 && block}
                   </li>
                 );
+              default:
+                return null;
             }
           })}
           {lastOutput === -1 && files.length > 0 && <li className="orq-t orq-t--files">{block}</li>}
@@ -446,5 +445,47 @@ export function FoldedStep({ events, live, nodeId, nodePath, label, onUnfold }: 
       <span className="orq-stepfold__label">{label}</span>
       {v.hasUsage && <span className="orq-stepfold__cost">{t('step.cost', { cost: v.costUsd.toFixed(3).replace('.', ',') })}</span>}
     </button>
+  );
+}
+
+/** Herramientas seguidas en una fila plegable: cuántas, de qué tipo y si alguna falló [R69.1]. */
+function ToolGroup({ tools }: { tools: readonly Extract<TranscriptItem, { kind: 'tool' }>[] }) {
+  const counts = new Map<string, number>();
+  for (const x of tools) counts.set(x.tool, (counts.get(x.tool) ?? 0) + 1);
+  const kinds = [...counts].map(([name, n]) => (n > 1 ? `${name} ×${n}` : name)).join(' · ');
+  const failed = tools.filter((x) => x.ok === false).length;
+  return (
+    <li className="orq-t orq-t--tools">
+      <details className="orq-t__tools">
+        <summary>
+          <span className="orq-t__toolsn">{t(tools.length === 1 ? 'transcript.tools.one' : 'transcript.tools.many', { count: tools.length })}</span>
+          <span className="orq-t__toolskinds">{kinds}</span>
+          {failed > 0 && <span className="orq-t__toolsfail">{t('transcript.tools.failed', { count: failed })}</span>}
+        </summary>
+        <ol>
+          {tools.map((x, j) => {
+            const target = toolTarget(x.input);
+            return (
+              <li key={j} className={`orq-t__tool${x.ok === false ? ' is-fail' : ''}`}>
+                <span className="orq-t__toolmark" aria-hidden="true">
+                  {x.ok === false ? '✕' : x.ok ? '✓' : '·'}
+                </span>
+                <span className="orq-t__toolbody">
+                  <strong>{t('transcript.tool', { tool: x.tool })}</strong>
+                  {x.ok !== undefined && <span className="orq-sr"> — {x.ok ? t('transcript.tool.ok') : t('transcript.tool.fail')}</span>}
+                  {target && <code className="orq-t__target">{target}</code>}
+                  {x.output && (
+                    <details>
+                      <summary>{t('transcript.showOutput', { lines: x.output.split('\n').length })}</summary>
+                      <pre>{x.output}</pre>
+                    </details>
+                  )}
+                </span>
+              </li>
+            );
+          })}
+        </ol>
+      </details>
+    </li>
   );
 }

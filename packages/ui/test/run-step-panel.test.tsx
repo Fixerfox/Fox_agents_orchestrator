@@ -76,6 +76,35 @@ describe('SPEC-068 · panel del paso en ejecución', () => {
     expect(screen.getByRole('button', { name: 'Desplegar el panel' })).toBeTruthy();
   });
 
+  it('[R69.1] la conversación: el agente con su inicial, las herramientas seguidas agrupadas con su objetivo y la salida coloreada', async () => {
+    const events = [
+      ev({ type: 'node.started', nodeId: 'rev' }),
+      ev({ type: 'agent.request', nodeId: 'rev', agentId: 'revisor', attempt: 1, input: { text: 'Revisa', files: [] } }),
+      ev({ type: 'token.stream', nodeId: 'rev', text: 'Empiezo por el build.' }),
+      ev({ type: 'tool.called', nodeId: 'rev', tool: 'Read', input: { file_path: 'src/main.ts' } }),
+      ev({ type: 'tool.result', nodeId: 'rev', tool: 'Read', ok: true, output: 'código' }),
+      ev({ type: 'tool.called', nodeId: 'rev', tool: 'Read', input: { file_path: 'src/app.ts' } }),
+      ev({ type: 'tool.result', nodeId: 'rev', tool: 'Read', ok: true }),
+      ev({ type: 'tool.called', nodeId: 'rev', tool: 'Bash', input: { command: 'npm test' } }),
+      ev({ type: 'tool.result', nodeId: 'rev', tool: 'Bash', ok: false, output: 'falla' }),
+      ev({ type: 'node.finished', nodeId: 'rev', status: 'failed', output: { text: 'No pasa', files: [] } }, '2026-11-08T10:00:30.000Z'),
+    ];
+    render(<NodePanel events={events} live={deriveLive(events)} nodeId="rev" nodePath={[]} label="Revisión" onAnswer={vi.fn()} closed />);
+    await userEvent.click(panel().getByRole('tab', { name: /^Conversación/ }));
+    const msg = document.querySelector('.orq-t--text')!;
+    expect(msg.querySelector('.orq-t__av')!.textContent).toBe('R');
+    expect(msg.querySelector('.orq-t__who')!.textContent).toBe('Revisión');
+    const groups = document.querySelectorAll('.orq-t--tools');
+    expect(groups).toHaveLength(1);
+    const summary = groups[0]!.querySelector('summary')!;
+    expect(summary.textContent).toContain('Usó 3 herramientas');
+    expect(summary.textContent).toContain('Read ×2 · Bash');
+    expect(summary.textContent).toContain('1 con error');
+    expect([...groups[0]!.querySelectorAll('.orq-t__target')].map((c) => c.textContent)).toEqual(['src/main.ts', 'src/app.ts', 'npm test']);
+    expect(groups[0]!.querySelectorAll('.orq-t__tool.is-fail')).toHaveLength(1);
+    expect(document.querySelector('.orq-t--output')!.classList.contains('is-fail')).toBe(true);
+  });
+
   it('[R68.5] las barras de scroll son finas, redondeadas, con pista transparente y colores del tema', () => {
     const css = readFileSync(join(__dirname, '..', 'src', 'styles.css'), 'utf8');
     expect(css).toMatch(/::-webkit-scrollbar \{ width: 10px; height: 10px; \}/);

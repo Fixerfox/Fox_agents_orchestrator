@@ -8,7 +8,7 @@ import { deriveLive, runTimeline, summarizeRun, supervisorView, transcriptItems 
 import { buildFlowNodes } from '../src/diagrams/Canvas';
 import { OrqNode } from '../src/diagrams/OrqNode';
 import { SummaryBody } from '../src/runs/RunSummary';
-import { SupervisorCard, SupervisorMemory, beamTo, targetNode } from '../src/runs/SupervisorOverlay';
+import { SupervisorCard, SupervisorMemory, lineTo, supervisorAnchor, targetNode } from '../src/runs/SupervisorOverlay';
 import { createMemoryApi } from '../src/memoryApi';
 
 const D: Diagram = {
@@ -58,7 +58,8 @@ describe('SPEC-060 · el Resumen', () => {
     render(<SummaryBody summary={summarizeRun([...started, alert, note], labels)} onPick={vi.fn()} />);
     const s = section();
     expect(s.getByRole('button', { name: /src\/api\/x\.ts: fuera de sus archivos/ }).textContent).toContain('Pintor');
-    expect(s.getByText(/Pintó el cielo/).textContent).toContain('cielo.png');
+    // Cada entrada es una tarjeta con su texto y sus ficheros [R69.5].
+    expect(s.getByText(/Pintó el cielo/).closest('.orq-memcard')!.textContent).toContain('cielo.png');
     expect(s.getByRole('heading', { name: 'Memoria de la ejecución' })).toBeTruthy();
   });
 
@@ -104,7 +105,7 @@ describe('SPEC-060 · lo que se ve de la ejecución', () => {
     expect(v).toMatchObject({ costUsd: 0.002, branch: 'feature/login (creada por Pintor)', memory: [{ label: 'Pintor', text: 'Pintó el cielo' }] });
   });
 
-  it('[R60.33] con varios agentes a la vez señala a todos y los nombra', () => {
+  it('[R69.3] con varios agentes a la vez señala a todos y los nombra', () => {
     const on = (nodeId: string) => ev({ type: 'supervisor.reviewing', nodeId });
     const two = view([start, on('a'), on('b')]);
     expect(two.targets.map((x) => x.key)).toEqual(['a', 'b']);
@@ -112,13 +113,13 @@ describe('SPEC-060 · lo que se ve de la ejecución', () => {
     expect(screen.getByRole('button', { name: /Supervisor/ }).textContent).toContain('Revisando «Pintor» y «b»');
   });
 
-  it('[R60.33] si son más de dos, los cuenta', () => {
+  it('[R69.3] si son más de dos, los cuenta', () => {
     const on = (nodeId: string) => ev({ type: 'supervisor.reviewing', nodeId });
     render(<SupervisorCard view={view([start, on('a'), on('b'), on('c')])} />);
     expect(screen.getByRole('button', { name: /Supervisor/ }).textContent).toContain('Revisando 3 pasos a la vez');
   });
 
-  it('[R60.33] uno que termina no apaga a los demás, y un paso sigue hasta que acaben las suyas', () => {
+  it('[R69.3] uno que termina no apaga a los demás, y un paso sigue hasta que acaben las suyas', () => {
     const on = (nodeId: string) => ev({ type: 'supervisor.reviewing', nodeId });
     const off = (nodeId: string) => ev({ type: 'supervisor.note', nodeId, text: '', files: [], reviewed: true });
     expect(view([start, on('a'), on('b'), off('a')]).reviewing).toEqual(['b']);
@@ -126,39 +127,31 @@ describe('SPEC-060 · lo que se ve de la ejecución', () => {
     expect(view([start, on('a'), on('a'), off('a'), off('a')]).status).toBe('watching');
   });
 
-  it('[R60.33] sin revisiones en marcha no señala a nadie, y mientras revisa un paso con aviso va en amarillo', () => {
+  it('[R69.3] sin revisiones en marcha no señala a nadie, y mientras revisa un paso con aviso va en amarillo', () => {
     expect(view([start, alert])).toMatchObject({ status: 'alert', lastAlert: 'src/api/x.ts: fuera de sus archivos', targets: [] });
     expect(view([start, alert, reviewing]).targets).toEqual([{ key: 'a', warn: true }]);
   });
 
-  it('[R60.33] un paso de un subdiagrama se señala en su nodo visible', () => {
+  it('[R69.3] un paso de un subdiagrama se señala en su nodo visible', () => {
     expect(targetNode('sub/a', [])).toBe('sub');
     expect(targetNode('sub/a', ['sub'])).toBe('a');
     expect(targetNode('otro/a', ['sub'])).toBeUndefined();
     expect(targetNode('a', ['sub'])).toBeUndefined();
   });
 
-  it('[R60.33] el haz va de la tarjeta al paso', () => {
-    const beam = beamTo({ x: 100, y: 400, width: 200, height: 80 }, { width: 1000, height: 700 });
-    expect(beam).toMatchObject({ offscreen: false, end: { x: 200, y: 388 } });
-    expect(beam.d.startsWith('M500 132')).toBe(true);
+  it('[R69.3] la tarjeta va centrada sobre los pasos, por encima del más alto, y sus líneas llegan a lo alto del paso', () => {
+    const rects = [
+      { x: 0, y: 300, width: 200, height: 80 },
+      { x: 600, y: 200, width: 200, height: 80 },
+    ];
+    expect(supervisorAnchor(rects)).toEqual({ x: 400, y: 80 });
+    expect(supervisorAnchor([])).toEqual({ x: 0, y: 0 });
+    const d = lineTo({ x: 400, y: 80 }, rects[0]!);
+    expect(d.startsWith('M400 80')).toBe(true);
+    expect(d.endsWith('100 294')).toBe(true);
   });
 
-  it('[R60.33] rodea el paso que se interpone y entra por el lado', () => {
-    const view2 = { width: 1000, height: 700 };
-    const api = { x: 400, y: 460, width: 200, height: 80 };
-    const web = { x: 400, y: 240, width: 200, height: 60 };
-    const beam = beamTo(api, view2, [web]);
-    expect(beam.end).toEqual({ x: 612, y: 500 });
-    expect(beam.d).toContain('L648');
-    expect(beamTo(web, view2, [api]).end).toEqual({ x: 500, y: 228 });
-  });
-
-  it('[R60.34] fuera de la vista, llega hasta el borde', () => {
-    expect(beamTo({ x: 2000, y: 400, width: 200, height: 80 }, { width: 1000, height: 700 })).toMatchObject({ offscreen: true, end: { x: 984, y: 388 } });
-  });
-
-  it('[R60.32] la tarjeta dice qué hace, cuánto lleva y en qué rama', () => {
+  it('[R69.3] la tarjeta dice qué hace, cuánto lleva y en qué rama, y al pulsarla abre su pestaña', () => {
     const open = vi.fn();
     render(<SupervisorCard view={view([start, spent, branch, reviewing])} onOpen={open} />);
     const card = screen.getByRole('button', { name: /Supervisor/ });
@@ -169,12 +162,17 @@ describe('SPEC-060 · lo que se ve de la ejecución', () => {
     expect(open).toHaveBeenCalled();
   });
 
-  it('[R60.35] el panel enseña la memoria, la última primero, y se pliega', () => {
+  it('[R69.4] la tarjeta enseña la rama y las dos últimas entradas de la memoria, se pliega y «Ver las N entradas» pide la pestaña', () => {
     const second = ev({ type: 'supervisor.note', nodeId: 'a', text: 'Luego el mar', files: [] });
-    render(<SupervisorMemory view={view([start, branch, reviewed, second])} />);
+    const third = ev({ type: 'supervisor.note', nodeId: 'a', text: 'Y las nubes', files: ['cielo.png', 'mar.png', 'nubes.png'] });
+    const onAll = vi.fn();
+    render(<SupervisorMemory view={view([start, branch, reviewed, second, third])} onAll={onAll} />);
     const panel = within(screen.getByRole('region', { name: 'Memoria de la ejecución' }));
     expect(panel.getByText(/feature\/login/)).toBeTruthy();
-    expect(panel.getAllByRole('listitem').map((li) => li.textContent)).toEqual(['Pintor: Luego el mar', 'Pintor: Pintó el cielo']);
+    expect(panel.getAllByRole('listitem').map((li) => li.querySelector('.orq-memcard__text')!.textContent)).toEqual(['Y las nubes', 'Luego el mar']);
+    expect(panel.getByText('+1')).toBeTruthy();
+    fireEvent.click(panel.getByRole('button', { name: 'Ver las 3 entradas' }));
+    expect(onAll).toHaveBeenCalled();
     fireEvent.click(panel.getByRole('button', { name: 'Plegar la memoria' }));
     expect(panel.queryByRole('listitem')).toBeNull();
   });

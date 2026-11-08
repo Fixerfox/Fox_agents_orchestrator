@@ -16,6 +16,7 @@ El hito indica cuándo debe estar cubierto por tests. `npm run spec:check` exige
 ## Índice
 | Spec | Título | Hito | Estado |
 |---|---|---|---|
+| [069](069-conversacion-memoria-supervisor.md) | Mejoras visuales (4): conversación como chat con las herramientas agrupadas, memoria en tarjetas (también en la pestaña «Memoria») y Supervisor dentro del diagrama | M14 | Implementada |
 | [068](068-panel-del-paso-y-scroll.md) | Mejoras visuales (3): panel del paso en ejecución con estado, pestañas Resumen · Conversación · Ficheros y plegado a una franja; barras de scroll finas en toda la app | M14 | Implementada |
 | [067](067-ajustes-por-secciones.md) | Mejoras visuales (2): Ajustes con índice «General / Este proyecto», una sección cada vez, estado de Claude arriba, opciones en tarjetas y reglas junto a los permisos | M14 | Implementada |
 | [066](066-mejoras-visuales.md) | Mejoras visuales (1): la ventana «Configurar» pasa a un índice con una sección cada vez, marcas de lo cambiado en el paso, «Editar el agente» dentro y pie con «Restablecer paso»; el lateral de cada nodo estrena cabecera con su tipo y secciones plegables | M14 | Implementada |
