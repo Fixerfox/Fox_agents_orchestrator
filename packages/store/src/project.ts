@@ -30,6 +30,7 @@ import {
   type LibraryFolders,
 } from '@orquestador/core';
 import { atomicWrite } from './fs-util';
+import * as memory from './project-memory';
 import { StoreError } from './errors';
 import { ProjectPaths } from './paths';
 import * as files from './project-files';
@@ -307,30 +308,28 @@ export class ProjectStore {
   stageAttachment(name: string, data: Uint8Array): Promise<AttachmentView> {
     return files.stageAttachment(this, name, data);
   }
-
   attachmentInputPath(id: string): Promise<string> {
     return files.attachmentInputPath(this, id);
   }
-
   inputFiles(rels: string[]): Promise<{ path: string; size: number; image: boolean }[]> {
     return files.inputFiles(this, rels);
   }
-
   inputBase(): Promise<string> {
     return files.inputBase(this);
   }
-
   backupFile(runId: Id, abs: string, rel: string): Promise<void> {
     return files.backupFile(this, runId, abs, rel);
   }
-
   listBackups(runId: Id): Promise<string[]> {
     return files.listBackups(this, runId);
   }
-
   readRunFile(runId: Id, rel: string, opts: { blocked?: (rel: string) => boolean; maxBytes?: number } = {}): Promise<RunFileView> {
     return files.readRunFile(this, runId, rel, opts);
   }
+
+  /** Memoria del proyecto [R76.2]. */
+  loadProjectMemory = () => memory.loadProjectMemory(this.paths);
+  saveProjectMemory = (entries: Parameters<typeof memory.saveProjectMemory>[1]) => memory.saveProjectMemory(this.paths, entries);
 
   restoreBackup(runId: Id, rel: string, dir?: string): Promise<boolean> {
     return files.restoreBackup(this, runId, rel, dir);

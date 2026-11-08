@@ -33,3 +33,4 @@ export { caseAgrees, feedbackStats, supervisorCase, type FeedbackVerdict, type R
 export { CHECK_DETAIL_CHARS, CHECK_RUN, CHECK_SKIP, UNAPPROVED, checkApprovalQuestion, describeFailedChecks, mergeChecks, runChecks } from './run/checks';
 export { VERIFY_HEADING, parseVerification, verifyTask } from './run/verifier';
 export { EVIDENCE_DIFF_CHARS } from './run/supervisor';
+export { MAX_PROPOSALS, MEMORY_LOOKBACK_RUNS, applyProposal, markUsed, memorySignals, ruleProposals, withoutDiscarded, type MemoryProposal, type MemorySignal } from './memory-proposals';

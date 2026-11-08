@@ -9,7 +9,7 @@ import { LOOP_WARN, toolSignature } from './watchdog';
 export interface SupervisorAlert {
   nodeId: Id;
   path: readonly Id[];
-  rule: 'undeclared-file' | 'empty-output' | 'unexpected-branch' | 'retry-loop' | 'budget-burn' | 'tool-loop';
+  rule: 'undeclared-file' | 'empty-output' | 'unexpected-branch' | 'retry-loop' | 'budget-burn' | 'tool-loop' | 'instructions-changed';
   detail: string;
 }
 
@@ -56,6 +56,8 @@ export function applyRules(state: RuleState, e: RunEvent, budget: RunOptions['bu
     }
     case 'file.produced': {
       state.loops.delete(pathKey(path, e.nodeId));
+      // Tocar las instrucciones del proyecto cambia todas las ejecuciones siguientes [R76.19].
+      if (!e.reused && INSTRUCTIONS.test(e.path)) return alert(e.nodeId, 'instructions-changed', `${e.change === 'created' ? 'Creó' : 'Cambió'} ${e.path}: eso cambia cómo trabajan los agentes en todas las ejecuciones siguientes.`);
       const declared = state.declared.get(pathKey(path, e.nodeId));
       return declared && !withinDeclared(e.path, declared) ? alert(e.nodeId, 'undeclared-file', `Tocó ${e.path}, que no estaba entre sus archivos (${declared.join(', ')}).`) : [];
     }
@@ -102,6 +104,9 @@ export function applyRules(state: RuleState, e: RunEvent, budget: RunOptions['bu
       return [];
   }
 }
+
+/** Archivos de instrucciones de Claude Code y de otros agentes [R76.19]. */
+const INSTRUCTIONS = /(^|\/)(CLAUDE\.md|CLAUDE\.local\.md|AGENTS\.md)$|(^|\/)\.claude\//;
 
 /** La rama de git de una ejecución y quién creó cada una [R60.26]. */
 export interface BranchMemory {

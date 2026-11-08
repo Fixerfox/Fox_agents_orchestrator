@@ -2409,3 +2409,29 @@ button.orq-node__alerts:hover { text-decoration: underline; }
 .orq-checks__actions, .orq-checks__add { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .orq-t--checks.is-bad summary { color: var(--tone-amber); }
 .orq-t--checks pre { white-space: pre-wrap; max-height: 200px; overflow: auto; font-size: 11px; }
+
+/* Memoria del proyecto: «Para recordar» y su pantalla [R76.10][R76.11] */
+.orq-memprops ul,
+.orq-pmem__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.orq-memprop,
+.orq-pmem__item {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  display: grid;
+  gap: 4px;
+}
+.orq-memprop.is-save { border-color: var(--pos); }
+.orq-memprop.is-discard { opacity: 0.6; }
+.orq-memprop__head { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 0; }
+.orq-memprop__diff del { opacity: 0.7; }
+.orq-memprop__actions,
+.orq-pmem__actions,
+.orq-pmem__bar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.orq-pmem__edit { display: grid; gap: 6px; }

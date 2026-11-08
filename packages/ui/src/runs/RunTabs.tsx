@@ -8,6 +8,7 @@ import { SupervisorPanel } from './SupervisorTab';
 import { useEffect, useState } from 'react';
 import type { RuleStats } from '@orquestador/core';
 import { MemoryCards } from './MemoryCards';
+import { MemoryProposals, useMemoryEntries } from './MemoryProposals';
 import { Gantt, RunStory } from './Timeline';
 import type { RunData } from './useRunData';
 
@@ -20,7 +21,13 @@ export function RunTabBody({ tab, data: d, api, runId, selected, onPick, onExpor
   if (!d.live) return null;
   if (tab === 'summary') {
     const summary = summarizeRun(d.events, d.label, 600, Date.now(), d.status === 'interrupted');
-    return <SummaryBody summary={summary} onPick={onPick} wide={wide} onAlert={onAlert} {...(onOpenDeliverable ? { onOpenDeliverable } : {})} />;
+    return (
+      <>
+        <SummaryBody summary={summary} onPick={onPick} wide={wide} onAlert={onAlert} {...(onOpenDeliverable ? { onOpenDeliverable } : {})} />
+        {/* «Para recordar» [R76.10]. */}
+        <SummaryMemory events={d.events} api={api} runId={runId} />
+      </>
+    );
   }
   if (tab === 'supervisor') {
     const { supervisor } = summarizeRun(d.events, d.label, 600, Date.now(), d.status === 'interrupted');
@@ -79,4 +86,11 @@ function SupervisorTabWithFeedback({ watch, events, label, api, runId, focus, on
       stats={stats}
     />
   );
+}
+
+/** «Para recordar» con las entradas actuales, para ver qué cambia una actualización [R76.10]. */
+function SummaryMemory({ events, api, runId }: { events: readonly RunEvent[]; api: ProjectApi; runId: string }) {
+  const decided = events.filter((e) => e.type === 'memory.decided').length;
+  const entries = useMemoryEntries(api, decided);
+  return <MemoryProposals events={events} api={api} runId={runId} entries={entries} />;
 }

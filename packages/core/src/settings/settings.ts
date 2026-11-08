@@ -43,6 +43,10 @@ export interface AppSettings {
   memoryTokens?: number;
   /** Cada rama en paralelo trabaja en su propio espacio y se junta al terminar; activo por defecto [R73.2]. */
   isolateBranches?: boolean;
+  /** Dejar que Claude Code guarde su propia memoria (local al equipo); apagado por defecto [R76.18]. */
+  claudeAutoMemory?: boolean;
+  /** Tope de la memoria del proyecto en el prompt, en tokens [R76.14]. */
+  projectMemoryTokens?: number;
 }
 
 /** ¿Se aíslan las ramas en paralelo? Sí, salvo que se apague [R73.2]. */
@@ -106,6 +110,8 @@ export function validateSettings(s: unknown): FieldProblem[] {
   }
   if (s.permissions !== undefined && !(PROJECT_PERMISSIONS as readonly unknown[]).includes(s.permissions)) out.push({ field: 'permissions', message: 'Elige un nivel de permisos de la lista' });
   if (s.claudeConfig !== undefined && typeof s.claudeConfig !== 'boolean') out.push({ field: 'claudeConfig', message: '«Cargar la configuración de Claude Code» no es válido' });
+  if (s.claudeAutoMemory !== undefined && typeof s.claudeAutoMemory !== 'boolean') out.push({ field: 'claudeAutoMemory', message: '«Memoria propia de Claude Code» no es válido' });
+  if (s.projectMemoryTokens !== undefined && !(Number.isInteger(s.projectMemoryTokens) && (s.projectMemoryTokens as number) >= 300 && (s.projectMemoryTokens as number) <= 6000)) out.push({ field: 'projectMemoryTokens', message: 'El tope de la memoria del proyecto va de 300 a 6000 tokens' });
   if (s.isolateBranches !== undefined && typeof s.isolateBranches !== 'boolean') out.push({ field: 'isolateBranches', message: '«Aislar las ramas en paralelo» no es válido' });
   if (s.supervisorReview !== undefined && typeof s.supervisorReview !== 'boolean') out.push({ field: 'supervisorReview', message: 'La revisión del Supervisor tiene que estar activa o no' });
   if (s.supervisorModel !== undefined && !known(s.supervisorModel)) out.push({ field: 'supervisorModel', message: 'Elige un modelo de la lista' });
@@ -131,6 +137,8 @@ export function normalizeSettings(raw: unknown): AppSettings {
   if (Number.isInteger(raw.defaultMaxTokens) && (raw.defaultMaxTokens as number) > 0) out.defaultMaxTokens = raw.defaultMaxTokens as number;
   if (typeof raw.supervisorReview === 'boolean') out.supervisorReview = raw.supervisorReview;
   if (typeof raw.isolateBranches === 'boolean') out.isolateBranches = raw.isolateBranches;
+  if (typeof raw.claudeAutoMemory === 'boolean') out.claudeAutoMemory = raw.claudeAutoMemory;
+  if (Number.isInteger(raw.projectMemoryTokens) && (raw.projectMemoryTokens as number) >= 300 && (raw.projectMemoryTokens as number) <= 6000) out.projectMemoryTokens = raw.projectMemoryTokens as number;
   if (known(raw.supervisorModel)) out.supervisorModel = raw.supervisorModel as string;
   if ((HUMAN_CHECKS as readonly unknown[]).includes(raw.supervisorHumanChecks)) out.supervisorHumanChecks = raw.supervisorHumanChecks as HumanChecks;
   if ((STOP_AT as readonly unknown[]).includes(raw.supervisorStopAt)) out.supervisorStopAt = raw.supervisorStopAt as StopAt;

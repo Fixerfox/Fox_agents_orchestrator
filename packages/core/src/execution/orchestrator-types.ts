@@ -44,6 +44,10 @@ export interface OrchestratorDeps {
   restoreFiles?(runId: Id, files: { path: string; change?: FileChange }[], dir?: string): Promise<RestoreResult>;
   /** Espacios para aislar las ramas en paralelo de esta ejecución; sin él, comparten carpeta [R73.2]. */
   spaces?(runId: Id): BranchSpaces | undefined;
+  /** Memoria del proyecto de un paso (la de la copia de la ejecución) [R76.13][R76.14]. */
+  projectMemory?(runId: Id, o: { diagramId: Id; agentId: Id }): Promise<{ text: string; ids: Id[]; scopes?: string[] } | undefined>;
+  /** Avisos que la persona marcó como falsos, para el Supervisor [R76.17]. */
+  falseAlarms?(runId: Id, o: { diagramId: Id; agentId?: Id }): Promise<string[]>;
   /** ¿Puede escribir el agente? Por defecto, sí [R73.2]. */
   canWrite?(agentId: Id, runId: Id): boolean | Promise<boolean>;
 }

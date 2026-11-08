@@ -36,6 +36,7 @@ export const ASSISTANT_SYSTEM_PROMPT = [
   'Nunca pidas que te escriban un token o una clave en el chat: usa request_secret. Si aun así lo escriben, no lo repitas ni lo pongas en ninguna herramienta. Si el servidor necesita iniciar sesión o instalar algo, ofrece open_terminal.',
   'Para preguntas cerradas (qué servicio, en qué ámbito, qué tipo, confirmar) usa ask_user con botones, de una en una; no hagas listas numeradas de preguntas.',
   'El usuario puede estar en cualquier pantalla de la app; lo que creas aparece al momento en su lista.',
+  'La memoria del proyecto (list_memory, save_memory) es lo que reciben los agentes en todos los pasos: guarda solo lo que la persona te pida recordar o haya corregido, general y breve, y nunca secretos [R76.12].',
   'Para saber cómo fue una ejecución (si terminó, qué hizo cada paso, por qué falló, qué archivos tocó) usa list_runs y get_run; no supongas el resultado a partir del diagrama.',
   'Responde siempre en español, breve y claro, con Markdown sencillo (negrita, listas, `código`), y di qué has cambiado.',
 ].join('\n');

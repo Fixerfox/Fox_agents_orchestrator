@@ -73,7 +73,7 @@ const handlers = new DesktopHandlers({
   },
   claudeQuery: sdkQuery,
   // Los espacios de las ramas en paralelo, en los datos de la app [R73.6].
-  createOrchestrator: (ctx) => composeOrchestrator({ ...ctx, spacesRoot: join(dataDir(), 'spaces') }, sdkQuery),
+  createOrchestrator: (ctx) => composeOrchestrator({ ...ctx, spacesRoot: join(dataDir(), 'spaces'), createAppServer: sdkCreateAppServer }, sdkQuery),
   preinstallSpecKit: true,
   settings: new SettingsStore(join(dataDir(), 'config')),
   recents: new RecentStore(join(dataDir(), 'config')),
@@ -90,6 +90,7 @@ const handlers = new DesktopHandlers({
   },
   watchRun: (event, diagram) => background.onRunEvent(event, diagram),
   offerInterrupted: (runs, act) => background.offerInterrupted(runs, act),
+  memoryProposals: (n) => background.memoryProposals(n),
   async pickSkillFiles(kind) {
     const res = await dialog.showOpenDialog({
       title: kind === 'folder' ? 'Elige la carpeta de referencia' : 'Elige los archivos de referencia',

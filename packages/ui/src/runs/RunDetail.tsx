@@ -16,6 +16,7 @@ import { type Btab } from './RunTabs';
 import { QuestionCard } from './QuestionCard';
 import { RunModalView } from './RunModal';
 import { AcceptDialog } from './AcceptDialog';
+import { MemoryEntryCard, useMemoryEntries } from './MemoryProposals';
 
 /** Vista de una ejecución: cabecera, avisos, lienzo, mensajes del paso y pestañas inferiores [R35.8–R35.10]. */
 export function RunDetail(
@@ -48,6 +49,10 @@ export function RunDetail(
   }, []);
   /** Fichero abierto en el visor [R45.10]. */
   const [viewing, setViewing] = useState<string>();
+  // La memoria del proyecto que recibió cada paso, con su ficha [R76.22].
+  const memoryEntries = useMemoryEntries(p.api);
+  const memoryTitles = Object.fromEntries(memoryEntries.map((e) => [e.id, e.title]));
+  const [memoryEntry, setMemoryEntry] = useState<string>();
   /** Ventana «Pedir corrección», con el paso desde el que se abrió [R53.13]. */
   const [fix, setFix] = useState<{ prefer?: string }>();
   /** Vista previa en grande de un archivo de un paso [R54.5]. */
@@ -178,7 +183,7 @@ export function RunDetail(
           {step && folded ? (
             <FoldedStep events={d.events} live={live} nodeId={step.nodeId} nodePath={step.nodePath} label={label(step.nodeId, step.nodePath)} onUnfold={() => setFolded(false)} />
           ) : step ? (
-            <NodePanel key={[...step.nodePath, step.nodeId].join('/')} events={d.events} live={live} nodeId={step.nodeId} nodePath={step.nodePath} label={label(step.nodeId, step.nodePath)} labelOf={(id) => label(id, step.nodePath)} onAnswer={answerHere} closed={!running} onOpenFile={setViewing} onPreview={openPreview} renderThumb={previewCard} onFold={() => setFolded(true)} onMemory={() => setModal('memory')} />
+            <NodePanel key={[...step.nodePath, step.nodeId].join('/')} events={d.events} live={live} nodeId={step.nodeId} nodePath={step.nodePath} label={label(step.nodeId, step.nodePath)} labelOf={(id) => label(id, step.nodePath)} onAnswer={answerHere} closed={!running} onOpenFile={setViewing} onPreview={openPreview} renderThumb={previewCard} onFold={() => setFolded(true)} onMemory={() => setModal('memory')} memoryTitles={memoryTitles} onMemoryEntry={setMemoryEntry} />
           ) : (
             <p className="orq-hint">{t('runs.step.none')}</p>
           )}
@@ -211,6 +216,7 @@ export function RunDetail(
           onOpen={(id) => (setFix(undefined), p.index.refresh(), p.onNav({ section: p.nav.section, runId: id }))}
         />
       )}
+      {memoryEntry !== undefined && <MemoryEntryCard id={memoryEntry} entry={memoryEntries.find((e) => e.id === memoryEntry)} onClose={() => setMemoryEntry(undefined)} />}
       {viewing !== undefined && <FileViewer api={p.api} runId={p.runId} events={d.events} path={viewing} labelOf={label} onClose={() => setViewing(undefined)} />}
     </div>
   );

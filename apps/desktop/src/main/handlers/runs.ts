@@ -5,7 +5,7 @@ import { CHECK_TIMEOUT_SEC, clipMiddle, redactString, type CheckResult, type Run
 import { checkRunnerFor } from '../checks';
 import type { ProjectStore } from '@orquestador/store';
 import { CHANNELS, type RunAction, type StartRunRequest } from '@orquestador/editor';
-import { Batcher } from '@orquestador/runtime';
+import { Batcher, type RunService } from '@orquestador/runtime';
 import { MAX_ATTACHMENT_BYTES, MAX_INPUT_FILES, StoreError } from '@orquestador/store';
 import { UNHANDLED, requireRuns, requireStore, type HandlerState } from './state';
 
@@ -70,6 +70,17 @@ export async function handleRuns(h: HandlerState, channel: string, arg: unknown)
     }
     case CHANNELS.supervisorStats:
       return requireRuns(h).supervisorStats(arg as string);
+    case CHANNELS.decideMemory: {
+      const { runId, ...req } = arg as { runId: string; proposalId: string; decision: 'save' | 'discard'; edited?: { title?: string; text?: string } };
+      return requireRuns(h).decideMemory(runId, req);
+    }
+    case CHANNELS.projectMemory:
+      return requireRuns(h).projectMemory();
+    case CHANNELS.saveMemoryEntry: {
+      // Lo que guarda el asistente queda como suyo [R76.12].
+      const { by, ...entry } = arg as Parameters<RunService['saveMemoryEntry']>[0] & { by?: 'user' | 'assistant' };
+      return requireRuns(h).saveMemoryEntry(entry, by ?? 'user');
+    }
     case CHANNELS.tryCheck:
       return tryCheck(requireStore(h), h.root ?? requireStore(h).paths.root, arg as StepCheck);
     case CHANNELS.controlRun: {

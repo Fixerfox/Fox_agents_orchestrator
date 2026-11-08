@@ -11,6 +11,9 @@ export function buildEnv(settings: AppSettings, apiKey: string | undefined, base
   } else {
     delete env['ANTHROPIC_API_KEY'];
   }
+  // La memoria propia de Claude Code se apaga salvo que se pida: toda la memoria que cambia a los agentes, a la vista [R76.18].
+  if (settings.claudeAutoMemory === true) delete env['CLAUDE_CODE_DISABLE_AUTO_MEMORY'];
+  else env['CLAUDE_CODE_DISABLE_AUTO_MEMORY'] = '1';
   return env;
 }
 

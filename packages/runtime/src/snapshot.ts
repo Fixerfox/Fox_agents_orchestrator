@@ -1,4 +1,4 @@
-import type { AgentDefinition, ContextDefinition, Diagram, Id, LibraryReader, McpServerDefinition, SkillDefinition } from '@orquestador/core';
+import type { AgentDefinition, ContextDefinition, Diagram, Id, LibraryReader, McpServerDefinition, MemoryEntry, SkillDefinition } from '@orquestador/core';
 
 /** Copia de lo que usa una ejecución, tomada al lanzarla [R52.1]. */
 export interface LibrarySnapshot {
@@ -8,6 +8,8 @@ export interface LibrarySnapshot {
   mcp: McpServerDefinition[];
   /** Subdiagramas a los que llega el diagrama, también los anidados. */
   templates: Map<Id, Diagram>;
+  /** Memoria del proyecto al lanzar la ejecución [R76.13]. */
+  memory?: MemoryEntry[];
 }
 
 /** Ids de los subdiagramas de un diagrama, también dentro de bucles. */
@@ -35,7 +37,8 @@ export async function takeSnapshot(library: LibraryReader, diagram: Diagram): Pr
       /* no existe: el orquestador lo dirá al llegar al paso */
     }
   }
-  return { agents: structuredClone(agents), contexts: structuredClone(contexts), skills: structuredClone(skills), mcp: structuredClone(mcp), templates };
+  const memory = await library.projectMemory?.().catch(() => [] as MemoryEntry[]);
+  return { agents: structuredClone(agents), contexts: structuredClone(contexts), skills: structuredClone(skills), mcp: structuredClone(mcp), templates, ...(memory ? { memory: structuredClone(memory) } : {}) };
 }
 
 /** Copias de las ejecuciones en marcha, por `runId` [R52.1]. */
@@ -65,5 +68,6 @@ export function snapshotLibrary(base: LibraryReader, snapshots: RunSnapshots | u
     mcp: async (runId) => snap(runId)?.mcp ?? base.mcp(),
     diagram: async (id, runId) => snap(runId)?.templates.get(id) ?? base.diagram(id),
     diagramIds: () => base.diagramIds(),
+    projectMemory: async (runId) => snap(runId)?.memory ?? (await base.projectMemory?.()) ?? [],
   };
 }

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Brain, Clock, Eye, Folder, Gauge, KeyRound, Palette, ShieldCheck, Sparkles } from 'lucide-react';
-import { MEMORY_TOKENS, isolatesBranches, DEFAULT_IDLE_MINUTES, DEFAULT_TOOL_MINUTES, DEFAULT_UNANSWERED, MODELS, UNANSWERED_ACTIONS, loadsClaudeConfig, projectPermission, type AppSettings, type AuthMode, type Engine, type StopAt, supervisorHumanChecks, supervisorModel, supervisorReviews, supervisorStopAt, supervisorUnverified, supervisorVerifyModel } from '@orquestador/core';
+import { MEMORY_TOKENS, PROJECT_MEMORY_TOKENS, isolatesBranches, DEFAULT_IDLE_MINUTES, DEFAULT_TOOL_MINUTES, DEFAULT_UNANSWERED, MODELS, UNANSWERED_ACTIONS, loadsClaudeConfig, projectPermission, type AppSettings, type AuthMode, type Engine, type StopAt, supervisorHumanChecks, supervisorModel, supervisorReviews, supervisorStopAt, supervisorUnverified, supervisorVerifyModel } from '@orquestador/core';
 import { PermissionPicker, permissionName } from '../common';
 import { t, type ConnectionResult, type MessageKey, type ProjectApi, type SettingsView, type WorkFolderView } from '@orquestador/editor';
 import { fieldErrors } from '../common';
@@ -85,6 +85,8 @@ export function SettingsDialog({ api, onClose, onSaved }: Props) {
       ...(draft.unanswered ? { unanswered: draft.unanswered } : {}),
       ...(draft.memoryTokens !== undefined ? { memoryTokens: draft.memoryTokens } : {}),
       ...(draft.isolateBranches !== undefined ? { isolateBranches: draft.isolateBranches } : {}),
+      ...(draft.claudeAutoMemory !== undefined ? { claudeAutoMemory: draft.claudeAutoMemory } : {}),
+      ...(draft.projectMemoryTokens !== undefined ? { projectMemoryTokens: draft.projectMemoryTokens } : {}),
     };
     const res = await api.saveSettings(body);
     if (!res.ok) {
@@ -388,6 +390,13 @@ export function SettingsDialog({ api, onClose, onSaved }: Props) {
             <input id="set-memtokens" type="number" min={500} max={8000} step={100} value={draft.memoryTokens ?? MEMORY_TOKENS} onChange={(e) => set({ memoryTokens: Number(e.target.value) })} />
           </Row>
           <p className="orq-hint">{t('settings.memory.tokens.hint')}</p>
+          {/* La memoria del proyecto y la propia de Claude Code [R76.14][R76.18]. */}
+          <Row id="set-pmemtokens" label={t('settings.memory.project')} error={errors['projectMemoryTokens']}>
+            <input id="set-pmemtokens" type="number" min={300} max={6000} step={100} value={draft.projectMemoryTokens ?? PROJECT_MEMORY_TOKENS} onChange={(e) => set({ projectMemoryTokens: Number(e.target.value) })} />
+          </Row>
+          <Row id="set-automem" label={t('settings.memory.auto')} hint={t('settings.memory.auto.hint')}>
+            <input id="set-automem" type="checkbox" className="orq-toggle" checked={draft.claudeAutoMemory === true} onChange={(e) => set({ claudeAutoMemory: e.target.checked })} />
+          </Row>
         </div>
       ),
     },

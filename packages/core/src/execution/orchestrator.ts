@@ -1,6 +1,7 @@
 import { finalSteps, forwardEdges, returnEdges, splitBranchIds, validateDiagram, type Diagram, type DiagramNode, type Edge, type ReturnInfo } from '../diagrams';
 import { isCoordinator, mergeLimits, type Id, type KnowledgeExtra, type Payload } from '../shared';
-import type { FileChange } from './adapter';
+import type { FileChange, MemoryProposalRequest, TransformUsage } from './adapter';
+import { MAX_PROPOSALS, ruleProposals, type MemoryProposal } from './memory-proposals';
 import { proposeCorrectionWith } from './corrections';
 import { EventBus, type RunEvent } from './events';
 import { pathKey } from './replay';
@@ -67,7 +68,7 @@ export class Orchestrator {
     let failReason: string | undefined;
     const watch = this.deps.supervisor;
     const supervisor = watch
-      ? new Supervisor({ ...supervisorExtras(watch, this.deps.checks, diagram, { emitter, questions, signal: stop.signal, final: () => finalOutput }), order: typeof order === 'string' ? { text: order, files: [] } : order, ...(options.correction ? { correction: { text: options.correction.text, ...(options.correction.before ? { before: options.correction.before } : {}) } } : {}), ...(deliverable ? { deliverable: JSON.stringify(deliverable) } : {}), ...(watch.checkMs !== undefined ? { checkMs: watch.checkMs } : {}), emitter, decider: engine.decider, budget, limits: options.budget, signal: stop.signal, review: () => watch.review() && (engine.review?.() ?? true), ...(watch.model ? { model: () => watch.model!() } : {}), ...(watch.humanChecks ? { humanChecks: () => watch.humanChecks!() } : {}), labelOf, ...(outputId !== undefined ? { outputId } : {}), ...(watch.settleMs !== undefined ? { settleMs: watch.settleMs } : {}) })
+      ? new Supervisor({ ...supervisorExtras(watch, this.deps.checks, diagram, { emitter, questions, signal: stop.signal, final: () => finalOutput }), ...(this.deps.falseAlarms ? { falseAlarms: (agentId?: Id) => this.deps.falseAlarms!(runId, { diagramId: diagram.id, ...(agentId ? { agentId } : {}) }).catch(() => []) } : {}), order: typeof order === 'string' ? { text: order, files: [] } : order, ...(options.correction ? { correction: { text: options.correction.text, ...(options.correction.before ? { before: options.correction.before } : {}) } } : {}), ...(deliverable ? { deliverable: JSON.stringify(deliverable) } : {}), ...(watch.checkMs !== undefined ? { checkMs: watch.checkMs } : {}), emitter, decider: engine.decider, budget, limits: options.budget, signal: stop.signal, review: () => watch.review() && (engine.review?.() ?? true), ...(watch.model ? { model: () => watch.model!() } : {}), ...(watch.humanChecks ? { humanChecks: () => watch.humanChecks!() } : {}), labelOf, ...(outputId !== undefined ? { outputId } : {}), ...(watch.settleMs !== undefined ? { settleMs: watch.settleMs } : {}) })
       : undefined;
     if (supervisor) bus.subscribe((e) => supervisor.observe(e));
     // La memoria va con el Supervisor (como antes) o sola si se pide [R72.3].
@@ -84,6 +85,7 @@ export class Orchestrator {
       ...(memory ? { memory } : {}),
       ...(spaces ? { spaces } : {}),
       ...(this.deps.checks?.runner ? { checkRunner: this.deps.checks.runner } : {}),
+      ...(this.deps.projectMemory ? { projectMemory: (agentId: Id) => this.deps.projectMemory!(runId, { diagramId: diagram.id, agentId }).catch(() => undefined) } : {}),
       ...(this.deps.checks?.agentChecks ? { agentChecks: (agentId: Id) => this.deps.checks!.agentChecks!(agentId, runId) } : {}),
       ...(this.deps.canWrite ? { canWrite: async (agentId: Id) => this.deps.canWrite!(agentId, runId) } : {}),
       halt: (reason) => {
@@ -194,6 +196,17 @@ export class Orchestrator {
       },
       pendingQuestions: () => questions.list(),
     };
+  }
+
+  /**
+   * Propuestas para la memoria del proyecto [R76.6]: con el motor, una consulta de un turno; sin `proposeMemory`
+   * (el simulado), la regla fija [R76.9].
+   */
+  async proposeMemory(req: MemoryProposalRequest, signal: AbortSignal): Promise<{ proposals: MemoryProposal[]; usage?: TransformUsage }> {
+    const decider = this.deps.forRun?.().decider ?? this.deps.decider;
+    if (!decider.proposeMemory) return { proposals: ruleProposals(req.signals) };
+    const r = await decider.proposeMemory(req, signal);
+    return { proposals: r.proposals.slice(0, MAX_PROPOSALS).map((p, i) => ({ ...p, id: `p${i + 1}` })), ...(r.usage ? { usage: r.usage } : {}) };
   }
 
   /** Candidatos y propuesta para corregir una ejecución terminada [R53.10]. */

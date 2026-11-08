@@ -29,7 +29,7 @@ interface EventBase { runId: Id; seq: number; ts: string; type: string; nodePath
 | `file.produced` | `nodeId, path, change?: 'created' \| 'modified'` | Un agente crea o modifica un archivo; se emite al terminar la herramienta que lo escribió, también si luego el paso falla (SPEC-045) |
 | `git.branch` | `nodeId, branch, via: 'head' \| 'command' \| 'mcp' \| 'ran', created?` | El paso creó una rama o actuó en ella (SPEC-058) |
 | `git.action` | `nodeId, branch, action: 'commit' \| 'push' \| 'pr' \| 'merge' \| 'delete' \| 'switch', url?` | El paso hizo eso en esa rama; `url` es la de la PR (SPEC-058) |
-| `supervisor.alert` | `nodeId?, rule, severity, detail, gravity?, evidence?` | El Supervisor detecta algo o bloquea una acción (SPEC-060); `gravity` y `evidence`, la gravedad y la evidencia de la revisión con IA (SPEC-075) |
+| `supervisor.alert` | `nodeId?, rule, severity, detail, gravity?, evidence?` | El Supervisor detecta algo o bloquea una acción (SPEC-060); `instructions-changed` si un paso toca `CLAUDE.md`, `AGENTS.md` o `.claude/` (SPEC-076); `gravity` y `evidence`, la gravedad y la evidencia de la revisión con IA (SPEC-075) |
 | `agent.usage` (`source?`) | `source: 'supervisor' \| 'judge' \| 'decision'` | Gasto de una pieza interna: suma al total, no al paso (SPEC-060, SPEC-034). `decision` (router, condiciones, evaluador de bucles) también cuenta en el presupuesto (SPEC-063) |
 | `supervisor.started` | `review, model?` | El Supervisor empieza a vigilar la ejecución (SPEC-060) |
 | `supervisor.reviewing` | `nodeId` | Empieza a revisar un paso con IA (SPEC-060) |
@@ -43,6 +43,8 @@ interface EventBase { runId: Id; seq: number; ts: string; type: string; nodePath
 | `verify.result` | `nodeId, met, findings[{severity, where, what}]` | Lo que encontró el agente verificador (SPEC-075) |
 | `memory.note` | `nodeId, text` | La nota «Notas para los siguientes pasos» que dejó un agente, ya separada de su salida (SPEC-072) |
 | `supervisor.feedback` | `alertSeq, verdict: 'false-alarm' \| 'confirmed', note?, nodeId?` | La persona dice si un aviso era cierto; un falso aviso sale de «Avisos abiertos» de la memoria (SPEC-072, SPEC-075) |
+| `memory.proposed` | `proposals[{id, action: add\|update\|archive, entryId?, kind, scope, title, text, reason?, origin}], usage?` | Lo que la ejecución propone recordar; va después de `run.finished` y nada se guarda solo (SPEC-076) |
+| `memory.decided` | `proposalId, decision: 'save' \| 'discard', entryId?, edited?, by?` | La persona guardó (o editó y guardó) o descartó una propuesta (SPEC-076) |
 | `supervisor.skipped` | `count, reason: 'timeout' \| 'failed'` | Revisiones que no se pudieron hacer (SPEC-060) |
 | `supervisor.verified` | `met, detail, forPerson?` | Comprobó si el resultado final cumple lo pedido (SPEC-062); `forPerson`: lo que queda para una persona (SPEC-065) |
 | `node.retrying` | `nodeId, attempt, max, delayMs, message, kind?, cause?` | Reintento automático tras error temporal; `kind`, el tipo del error si no es uno temporal normal, y `cause`, `timeout` o `loop` si lo cortó el motor (SPEC-071) |
@@ -54,7 +56,7 @@ interface EventBase { runId: Id; seq: number; ts: string; type: string; nodePath
 | `subdiagram.finished` | `nodeId, status` | Se sale del nodo compuesto con su resultado |
 | `knowledge.used` | `nodeId, attempt, kind, id, via, required` | Una skill, contexto o MCP se incluyó en el prompt (`inline`), se leyó (`read`) o se usó con una herramienta (`tool`); solo ids, nunca contenido (SPEC-036) |
 | `knowledge.unmet` | `nodeId, attempt, kind, id` | Un obligatorio no se usó en ese intento; el intento falla y se reintenta con aviso (SPEC-036) |
-| `agent.request` | `nodeId, agentId, attempt, input, task?, model?, confirm?, deliverable?, extra?, snapshot?, previousAnswers?, previousAttempt?, memory?, memoryStats?` | Lo que recibe exactamente el agente en cada intento y la configuración usada; `previousAttempt`, lo que se le contó del intento anterior (SPEC-071); `memory` y `memoryStats`, la memoria que recibió y sus tokens por bloque y lo recortado (SPEC-072) |
+| `agent.request` | `nodeId, agentId, attempt, input, task?, model?, confirm?, deliverable?, extra?, snapshot?, previousAnswers?, previousAttempt?, memory?, memoryStats?, projectMemory?` | Lo que recibe exactamente el agente en cada intento y la configuración usada; `previousAttempt`, lo que se le contó del intento anterior (SPEC-071); `memory` y `memoryStats`, la memoria que recibió y sus tokens por bloque y lo recortado (SPEC-072); `projectMemory`, los ids de las entradas de la memoria del proyecto que recibió (SPEC-076) |
 | `node.reused` | `nodeId, fromRunId, costUsd?` | El paso no se ejecuta: se reutiliza su salida de la ejecución anterior; `costUsd`, lo que costó allí (SPEC-041, SPEC-074) |
 | `decision` | `nodeId, kind: route\|condition\|judge, request, response, reused?` | Decisión de IA fuera de los agentes de trabajo; `reused`, tomada de la ejecución que se reanuda (SPEC-074) |
 | `transform.done` | `nodeId, mode: rules\|ai, format: json\|markdown\|text, attempts, ok, errors?, warnings?` | Resultado del nodo «Transformar» (SPEC-037), antes de su `node.finished` |

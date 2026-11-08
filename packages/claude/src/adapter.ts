@@ -6,7 +6,7 @@ import { baseOptions } from './connection';
 import { explainThrown } from './errors';
 import { MessageMapper } from './mapper';
 import { buildSystemPrompt, buildUserPrompt, claudeCodePrompt } from './prompt';
-import type { PermissionResult, QueryFn } from './sdk-types';
+import type { PermissionResult, QueryFn, SdkMcpServer } from './sdk-types';
 import { createMcpPolicy, sdkMcpConfig, type ResolvedMcp } from './mcp';
 import { KnowledgeTracker, describeKnowledge, planKnowledge } from './knowledge';
 import { agentTools, createWritePolicy, withIsolation, withScope, withVerifier, guardedPolicy, summarizeFolder, type WritePolicyDeps } from './workfolder';
@@ -30,7 +30,13 @@ export interface ClaudeEnvironment {
   loadMcp?(ids: string[], runId?: string): Promise<ResolvedMcp[]>;
   /** Archivos creados, cambiados o denegados, para el registro [R31.7]. */
   onFileEvent?(nodeId: string, event: Parameters<NonNullable<WritePolicyDeps['note']>>[0]): void;
+  /** Servidor MCP en proceso `memoria_proyecto`, de solo lectura, con los ámbitos del paso [R76.15]. */
+  memoryServer?(runId: string | undefined, scopes: readonly string[]): Promise<unknown | undefined>;
 }
+
+/** Nombre del servidor de la memoria del proyecto y prefijo de sus herramientas [R76.15]. */
+export const MEMORY_SERVER = 'memoria_proyecto';
+const MEMORY_TOOL = `mcp__${MEMORY_SERVER}__`;
 
 /** Las herramientas MCP pasan por su política; el resto, por la de escritura [R30.4]. */
 const withMcp =
@@ -70,7 +76,10 @@ export class ClaudeAdapter implements AgentAdapter {
       this.env.apiKey(),
       known.mcpIds && this.env.loadMcp ? this.env.loadMcp(known.mcpIds, request.runId) : Promise.resolve([] as ResolvedMcp[]),
     ]);
-    const mcpServers = sdkMcpConfig(mcp);
+    const mcpServers: Record<string, SdkMcpServer> = sdkMcpConfig(mcp);
+    // La memoria del proyecto, para leer bajo demanda lo que no cabe en el prompt [R76.15].
+    const memoryServer = request.projectMemory && this.env.memoryServer ? await this.env.memoryServer(request.runId, request.projectMemory.scopes ?? ['project']).catch(() => undefined) : undefined;
+    if (memoryServer) mcpServers[MEMORY_SERVER] = memoryServer as SdkMcpServer;
     const mcpPolicy = createMcpPolicy(mcp, request.ask, { noAsk: effectivePermission(agent, this.env.settings()) === 'full' });
     const controller = new AbortController();
     const abort = () => controller.abort();
@@ -113,7 +122,7 @@ export class ClaudeAdapter implements AgentAdapter {
           watch,
           root,
           withMcp(
-            mcpPolicy,
+            async (tool, input) => (tool.startsWith(MEMORY_TOOL) ? { behavior: 'allow' as const, updatedInput: input } : mcpPolicy(tool, input)),
             withVerifier(request.verify, note, withIsolation(original, note, withScope(request.scope, root, note, createWritePolicy({
             root,
             level,
@@ -150,6 +159,7 @@ export class ClaudeAdapter implements AgentAdapter {
             ...(request.confirm ? { confirm: true } : {}),
             ...(request.split ? { split: request.split } : {}),
             ...(request.deliverable ? { deliverable: request.deliverable } : {}),
+            ...(request.projectMemory ? { projectMemory: request.projectMemory.text } : {}),
             level,
           }),
         ),

@@ -55,6 +55,15 @@ export const ASSISTANT_TOOLS: readonly AssistantToolSpec[] = [
     destructive: true,
     alwaysConfirm: true,
   },
+  { name: 'list_memory', description: 'Lista la memoria del proyecto: lo que se aprendió en ejecuciones anteriores (id, tipo, ámbito, título, texto, estado).', params: { query: s('Texto que buscar', true) }, readOnly: true },
+  {
+    name: 'save_memory',
+    description:
+      'Guarda o cambia una entrada de la memoria del proyecto, que reciben los agentes en los pasos siguientes. Solo lo que la persona dijo o pidió recordar, general para el proyecto. kind: convention, preference, lesson o false-alarm. scope: project, diagram:<id> o agent:<id>. Sin id crea una; con id la cambia; status archived la archiva. Pide permiso siempre.',
+    params: { id: s('Id de la entrada que cambiar', true), kind: s('Tipo'), scope: s('Ámbito'), title: s('Título (80 caracteres como mucho)'), text: s('Qué hay que recordar (600 como mucho)'), status: s('active o archived', true) },
+    destructive: true,
+    alwaysConfirm: true,
+  },
   { name: 'get_diagram', description: 'Describe el diagrama abierto: pasos (id, tipo, nombre, agente, tarea) y conexiones.', params: {}, readOnly: true },
   {
     name: 'create_agent',

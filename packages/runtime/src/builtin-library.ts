@@ -18,5 +18,6 @@ export function withBuiltinAgents(library: LibraryReader): LibraryReader {
     mcp: (runId) => library.mcp(runId),
     diagram: (id, runId) => library.diagram(id, runId),
     diagramIds: () => library.diagramIds(),
+    ...(library.projectMemory ? { projectMemory: (runId?: string) => library.projectMemory!(runId) } : {}),
   };
 }

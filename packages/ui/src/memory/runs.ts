@@ -15,6 +15,7 @@ import {
 } from '@orquestador/core';
 import { fail, ok, type ApiResult, type QueuedRunView, type RunSummary } from '@orquestador/editor';
 import type { MemoryApi, MemoryApiOptions, MemoryState, RunEntry } from './types';
+import { memoryProjectMemory } from './project-memory';
 
 function defaultOrchestrator(saved: Map<string, Diagram>): Orchestrator {
   const agents = new Proxy({} as Record<string, never>, {
@@ -34,6 +35,10 @@ function defaultOrchestrator(saved: Map<string, Diagram>): Orchestrator {
 
 /** Ejecuciones: lanzar y controlar, cola, entrada, resultados, correcciones y copias. */
 export function memoryRuns(s: MemoryState, options: MemoryApiOptions) {
+  const memory = memoryProjectMemory(s, (runId, events) => {
+    const r = s.runs.get(runId);
+    if (r?.subscribed) queueMicrotask(() => listeners.forEach((l) => l(runId, events)));
+  });
   const { saved, runs } = s;
   const orchestrator = options.orchestrator ?? defaultOrchestrator(saved);
   const listeners = new Set<(runId: string, events: RunEvent[]) => void>();
@@ -66,8 +71,11 @@ export function memoryRuns(s: MemoryState, options: MemoryApiOptions) {
       },
       { fromSeq: 1 }, // incluye lo emitido antes de suscribirse
     );
-    // Al terminar, arranca el siguiente de la cola de su diagrama [R52.3].
-    const done = () => drainQueue(d.id);
+    // Al terminar, arranca el siguiente de la cola de su diagrama [R52.3] y propone qué recordar [R76.5].
+    const done = () => {
+      memory.proposeFor(handle.runId);
+      drainQueue(d.id);
+    };
     void handle.result.then(done, done);
     return { runId: handle.runId };
   };
@@ -85,6 +93,9 @@ export function memoryRuns(s: MemoryState, options: MemoryApiOptions) {
   const missing = () => fail('not-found', 'No existe esa ejecución en curso');
 
   return {
+    decideMemory: memory.decideMemory,
+    projectMemory: memory.projectMemory,
+    saveMemoryEntry: memory.saveMemoryEntry,
     restored,
     async resumeRun(runId) {
       // Reanudar en otra ejecución que reutiliza lo que terminó bien [R41.1][R41.2].

@@ -1,5 +1,7 @@
 import type { TransformFormat } from '../diagrams';
 import type { Id, KnowledgeExtra, KnowledgeKind, Payload, Severity } from '../shared';
+import type { MemoryKind } from '../knowledge';
+import type { MemoryProposal, MemorySignal } from './memory-proposals';
 
 export type FileChange = 'created' | 'modified';
 /** Cómo se cambió: con un comando, sin pasar por las herramientas de edición ni dejar copia [R55.3]. */
@@ -73,6 +75,8 @@ export interface ReviewEvidence {
 
 export interface SupervisorReview {
   step: string;
+  /** Avisos que la persona marcó como falsos antes para este agente o diagrama [R76.17]. */
+  falseAlarms?: string[];
   /** Evidencia de lo hecho [R75.7]. */
   evidence?: ReviewEvidence;
   /** Lo que pidió la persona: es el criterio [R62.2]. */
@@ -121,6 +125,8 @@ export interface RunVerification {
   deliverableItems?: { item: string; ok: boolean; detail?: string }[];
   /** Por paso, la gravedad y los problemas de su revisión [R75.18]. */
   reviews?: { step: string; severity: Severity; problems: string[] }[];
+  /** Avisos que la persona marcó como falsos antes [R76.17]. */
+  falseAlarms?: string[];
 }
 
 export interface RunVerdict {
@@ -217,6 +223,8 @@ export interface AgentRequest {
   workspace?: { dir: string };
   /** Verificador: puede ejecutar comandos pero no editar archivos [R75.14]. */
   verify?: boolean;
+  /** Memoria del proyecto del paso: el texto del prompt, qué entradas lleva y de qué ámbitos [R76.14][R76.15]. */
+  projectMemory?: { text: string; ids: Id[]; scopes?: string[] };
 }
 
 /** Lo que un intento fallido le deja al siguiente [R71.7]. */
@@ -319,8 +327,16 @@ export interface Decider {
   supervise?(request: SupervisorReview, signal: AbortSignal): Promise<SupervisorVerdict>;
   /** ¿El resultado cumple lo que pidió la persona? [R62.9] */
   verifyRun?(request: RunVerification, signal: AbortSignal): Promise<RunVerdict>;
+  /** Propuestas para la memoria del proyecto a partir de lo que dijo la persona. Opcional [R76.6]. */
+  proposeMemory?(request: MemoryProposalRequest, signal: AbortSignal): Promise<{ proposals: Omit<MemoryProposal, 'id'>[]; usage?: TransformUsage }>;
   /** Nodo «Transformar» con Claude: devuelve el texto convertido. Opcional: sin él, el nodo falla [R37.6]. */
   transform?(request: TransformRequest, signal: AbortSignal): Promise<{ text: string; usage?: TransformUsage }>;
+}
+
+/** Lo que recibe la propuesta de memoria: las señales, como datos, y lo que ya hay [R76.6]. */
+export interface MemoryProposalRequest {
+  signals: MemorySignal[];
+  entries: { id: Id; kind: MemoryKind; scope: string; title: string; text: string }[];
 }
 
 export interface TransformRequest {

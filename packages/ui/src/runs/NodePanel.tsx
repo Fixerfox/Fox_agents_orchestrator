@@ -24,6 +24,10 @@ interface Props {
   onOpenFile?: (path: string) => void;
   /** Abre en grande la vista previa de un archivo de un paso [R54.6]. */
   onPreview?: (key: string, path: string) => void;
+  /** Abre una entrada de la memoria del proyecto [R76.22]. */
+  onMemoryEntry?: ((id: string) => void) | undefined;
+  /** Títulos de las entradas de la memoria del proyecto, por id. */
+  memoryTitles?: Readonly<Record<string, string>> | undefined;
   /** Miniatura de un archivo de un paso [R54.6]. */
   renderThumb?: (key: string, path: string) => ReactNode;
   /** Pliega el panel a una franja [R68.3]. */
@@ -244,7 +248,7 @@ export function filesState(status: string | undefined, closed: boolean): 'done' 
   return 'unfinished';
 }
 
-export function NodePanel({ events, live, nodeId, nodePath, label, onAnswer, onExpand, closed = false, labelOf, onOpenFile, onPreview, renderThumb, onFold, onMemory }: Props) {
+export function NodePanel({ events, live, nodeId, nodePath, label, onAnswer, onExpand, closed = false, labelOf, onOpenFile, onPreview, renderThumb, onFold, onMemory, onMemoryEntry, memoryTitles }: Props) {
   const items = transcriptItems(events, nodeId, nodePath);
   const key = [...nodePath, nodeId].join('/');
   const status = live.nodeStatus[key];
@@ -355,6 +359,21 @@ export function NodePanel({ events, live, nodeId, nodePath, label, onAnswer, onE
                               {t('transcript.memory.all')}
                             </button>
                           )}
+                        </details>
+                      )}
+                      {/* La memoria del proyecto que le llegó; cada entrada abre su ficha [R76.22]. */}
+                      {it.projectMemory && (
+                        <details className="orq-t__memory">
+                          <summary>{t('transcript.projectMemory', { n: it.projectMemory.length })}</summary>
+                          <ul>
+                            {it.projectMemory.map((id) => (
+                              <li key={id}>
+                                <button type="button" className="orq-link" disabled={!onMemoryEntry} onClick={() => onMemoryEntry?.(id)}>
+                                  {memoryTitles?.[id] ?? id}
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
                         </details>
                       )}
                       {it.previous && (

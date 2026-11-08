@@ -92,6 +92,7 @@ export function AppSections({ app }: { app: AppModel }) {
           onChanged={() => void app.lib.reloadAgents()}
           onGoDiagrams={app.goDiagrams}
           onOpenSettings={() => setSection('settings')}
+          onOpenRun={(runId) => app.goRuns({ section: 'history', runId })}
         />
       )}
       {section === 'settings' && <SettingsDialog api={api} onSaved={app.config.setSettings} />}

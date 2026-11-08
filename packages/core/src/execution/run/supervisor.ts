@@ -24,6 +24,7 @@ const ACTION_CHARS = 160;
 interface StepTrail {
   nodeId: Id;
   path: readonly Id[];
+  agentId?: Id;
   input: Payload;
   task?: string;
   /** Primeras acciones, últimas y cuántas se omitieron entre ambas [R63.1]. */
@@ -85,6 +86,8 @@ export interface SupervisorDeps {
   evidence?: EvidenceSource;
   /** Comprobaciones del diagrama, al ir a acabar bien [R75.17]. */
   runChecks?(): Promise<CheckResult[]>;
+  /** Avisos que la persona marcó como falsos antes, del agente o del diagrama [R76.17]. */
+  falseAlarms?(agentId?: Id): Promise<string[]>;
 }
 
 function pushAction(trail: StepTrail, text: string): void {
@@ -160,7 +163,7 @@ export class Supervisor {
     if (e.type === 'agent.request') {
       const key = pathKey(path, e.nodeId);
       // Los pasos internos (verificar, juntar) no son un paso nuevo [R75.14].
-      if (!this.trails.has(key) && e.kind === undefined) this.trails.set(key, { nodeId: e.nodeId, path, input: e.input, ...(e.task ? { task: e.task } : {}), head: [], tail: [], omitted: 0, files: new Set(), changes: new Map(), toolErrors: { count: 0, last: [] }, checks: [] });
+      if (!this.trails.has(key) && e.kind === undefined) this.trails.set(key, { nodeId: e.nodeId, path, agentId: e.agentId, input: e.input, ...(e.task ? { task: e.task } : {}), head: [], tail: [], omitted: 0, files: new Set(), changes: new Map(), toolErrors: { count: 0, last: [] }, checks: [] });
       return;
     }
     if (e.type === 'deliverable.done') {
@@ -278,7 +281,10 @@ export class Supervisor {
     trail.checked = true;
     this.d.emitter.emit({ type: 'supervisor.reviewing', nodeId }, path);
     try {
-      const verdict = await this.limited(async (s) => decider.supervise!({ ...this.request(trail, output), ...(purpose ? { purpose } : {}), evidence: await this.evidenceOf(trail, how.priority ?? [], s) }, s));
+      const verdict = await this.limited(async (s) => {
+        const falseAlarms = (await this.d.falseAlarms?.(trail.agentId)) ?? [];
+        return decider.supervise!({ ...this.request(trail, output), ...(purpose ? { purpose } : {}), evidence: await this.evidenceOf(trail, how.priority ?? [], s), ...(falseAlarms.length > 0 ? { falseAlarms } : {}) }, s);
+      });
       const severity = this.reviewed(trail, verdict);
       if (verdict.ok && !(trail.verification && !trail.verification.met && severity === 'high')) return undefined;
       return stops(severity, this.d.stopAt?.() ?? 'high') ? verdict.reason || verdict.problems?.[0]?.text || 'Lo hecho no corresponde a lo pedido.' : undefined;
@@ -317,7 +323,8 @@ export class Supervisor {
     if (!decider.verifyRun || !review()) return undefined;
     try {
       const files = await this.fileLines(signal);
-      const v = await this.limited((s) => decider.verifyRun!({ order, ...(deliverable ? { deliverable } : {}), ...(correction ? { correction: correction.text, before: correction.before ?? [] } : {}), ...(this.decisions.length > 0 ? { decisions: this.decisions } : {}), steps: this.results, ...(files.length > 0 ? { files } : {}), ...(checks.length > 0 ? { checks: checks.map((c) => ({ label: c.label, ok: c.ok, detail: c.detail })) } : {}), ...(this.deliverableItems ? { deliverableItems: this.deliverableItems } : {}), ...(this.reviews.length > 0 ? { reviews: this.reviews } : {}) }, s));
+      const falseAlarms = (await this.d.falseAlarms?.().catch(() => [])) ?? [];
+      const v = await this.limited((s) => decider.verifyRun!({ order, ...(deliverable ? { deliverable } : {}), ...(correction ? { correction: correction.text, before: correction.before ?? [] } : {}), ...(this.decisions.length > 0 ? { decisions: this.decisions } : {}), steps: this.results, ...(files.length > 0 ? { files } : {}), ...(checks.length > 0 ? { checks: checks.map((c) => ({ label: c.label, ok: c.ok, detail: c.detail })) } : {}), ...(this.deliverableItems ? { deliverableItems: this.deliverableItems } : {}), ...(this.reviews.length > 0 ? { reviews: this.reviews } : {}), ...(falseAlarms.length > 0 ? { falseAlarms } : {}) }, s));
       if (v.usage) {
         this.d.budget.track(v.usage.inputTokens, v.usage.outputTokens, v.usage.costUsd);
         // Sale en los eventos como el resto del Supervisor, para que el total cuadre [R63.5].

@@ -1,6 +1,6 @@
 # SPEC-076 · Memoria del proyecto
 
-**Estado:** Borrador · **Hito:** M15g · **Paquetes:** `core`, `store`, `claude`, `runtime`, `editor`, `ui` · **Rama:** `feature/memoria-proyecto`
+**Estado:** Implementada · **Hito:** M15g · **Paquetes:** `core`, `store`, `claude`, `runtime`, `apps/desktop`, `editor`, `ui` · **Rama:** `feature/robustez-ejecucion`
 
 ## Propósito
 Cada ejecución empieza de cero. Lo que la persona enseña en una ejecución se pierde al terminarla (auditoría del 08/11, M5 y S6):
@@ -51,20 +51,20 @@ Esta spec añade la **capa 3 de la memoria**: lo que el proyecto ha aprendido, g
 ### Modelo y almacén
 - **R76.1** [M15g] Una entrada de memoria tiene: `id`, `kind` (`convention`, `preference`, `lesson`, `false-alarm`), `scope` (`project`, `diagram:<id>` o `agent:<id>`), `title` (80 caracteres como máximo), `text` (600 como máximo), `status` (`active` o `archived`), `source` (`runId?`, `nodeId?`, `origin`: `correction`, `review`, `retry`, `confirm`, `repeated-question`, `alert-feedback`, `manual` o `assistant`), `createdAt`, `updatedAt`, `lastUsedAt?`, `uses` e historial de cambios.
 - **R76.2** [M15g] Las entradas se guardan en `.orquestador/memory/entries.json` (`schemaVersion`, con migración como el resto del proyecto, SPEC-010) y se vuelve a escribir `.orquestador/memory/MEMORIA.md`, un índice legible por ámbito. Escritura atómica.
-- **R76.3** [M15g] Al escribir se ocultan los secretos (`redactSecrets`) y se rechaza el texto que parezca una clave. Ningún archivo de memoria puede estar fuera de `.orquestador/memory/` (se comprueba la ruta real, como R54.4).
+- **R76.3** [M15g] Al escribir se rechaza una entrada activa que parezca una clave (se comprueba antes de ocultar nada) y del resto se ocultan los secretos (`redactSecrets`). Ningún archivo de memoria puede estar fuera de `.orquestador/memory/` (se comprueba la ruta real, como R54.4).
 - **R76.4** [M15g] Un proyecto tiene como mucho 300 entradas activas. Al pasar de 200 se avisa en la pantalla de memoria de que conviene archivar.
 
 ### Propuestas
-- **R76.5** [M15g] Al terminar una ejecución (también fallida o cancelada), `proposeMemories` reúne las señales de la decisión 3: correcciones (R53), revisiones humanas con cambios, «Repetir el paso» con texto (R62.5), confirmaciones con cambios (R43.7), avisos marcados (R75.21) y preguntas cuyo texto ya se respondió en alguna de las 20 ejecuciones anteriores del proyecto.
+- **R76.5** [M15g] Al terminar una ejecución (también fallida o cancelada), `RunMemory.afterRun` reúne con `memorySignals` las señales de la decisión 3: correcciones (R53), revisiones humanas con cambios, «Repetir el paso» con texto (R62.5), confirmaciones con cambios (R43.7), avisos marcados (R75.21) y preguntas cuyo texto ya se respondió en alguna de las 20 ejecuciones anteriores del proyecto.
 - **R76.6** [M15g] Si hay señales, una sola consulta de un turno al modelo del Supervisor (`Decider.proposeMemory`) recibe las señales, como datos, y las entradas activas de los ámbitos afectados. Devuelve como mucho 5 propuestas, cada una `add`, `update` (con el `id` y el texto nuevo) o `archive` (con el `id` y el motivo), con su ámbito y su tipo. Lo que gasta cuenta en el uso de la ejecución, sin disparar su límite (como R60.14).
 - **R76.7** [M15g] El prompt dice: que solo se propone lo que la persona dijo o corrigió; que una propuesta es general para el proyecto, no un detalle de esta ejecución; que no se repite lo que ya hay; y que en caso de duda no se propone.
 - **R76.8** [M15g] Las propuestas salen como `memory.proposed` (`proposals`) después de `run.finished`, como `run.accepted` (R65.5). Ninguna se guarda sola.
-- **R76.9** [M15g] Sin señales no se consulta al modelo. Con el motor simulado las propuestas salen de una regla fija para poder probarlas.
+- **R76.9** [M15g] Sin señales no se consulta al modelo. Con un motor sin `proposeMemory` (el simulado) las propuestas salen de una regla fija (`ruleProposals`) para poder probarlas.
 
 ### Aprobación
 - **R76.10** [M15g] El Resumen de la ejecución tiene «Para recordar» con cada propuesta: su tipo, su ámbito, el texto (en las de `update`, la diferencia con el actual) y de qué señal sale, con «Guardar», «Editar y guardar» y «Descartar». La bandeja avisa: «3 cosas para recordar de <diagrama>».
 - **R76.11** [M15g] Guardar o descartar se anota en el historial de la entrada y en el registro de la ejecución (`memory.decided`). Una propuesta descartada no se vuelve a proponer igual (se compara el texto normalizado) en las 20 ejecuciones siguientes.
-- **R76.12** [M15g] El asistente puede proponer y, con permiso de la persona (como R65), guardar entradas. Lo que guarda lleva `origin: 'assistant'`.
+- **R76.12** [M15g] El asistente puede leer la memoria (`list_memory`, sin permiso) y, con permiso de la persona cada vez (`save_memory`, como R65.9), guardar, cambiar o archivar entradas. Lo que guarda lleva `origin: 'assistant'` y `by: 'assistant'` en su historial.
 
 ### Lo que reciben los agentes
 - **R76.13** [M15g] Al lanzar una ejecución, la memoria del proyecto entra en su copia (R52.1): la ejecución usa la memoria tal como estaba al arrancar.

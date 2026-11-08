@@ -74,6 +74,8 @@ export interface RunRepository {
   findPreview(runId: string, key: string, rel: string): Promise<string | undefined>;
   /** Añade lo que dijo la persona de un aviso a una ejecución terminada [R75.21]. */
   addFeedback?(runId: string, body: { alertSeq: number; verdict: 'false-alarm' | 'confirmed'; note?: string; nodeId?: string }): Promise<void>;
+  /** Añade un evento al final del registro de una ejecución terminada (propuestas de memoria y lo decidido) [R76.8]. */
+  appendEvent?(runId: string, body: Record<string, unknown>): Promise<void>;
   /** Guarda un caso de referencia del Supervisor [R75.23]. */
   addSupervisorCase?(c: unknown): Promise<void>;
   /** Ruta absoluta de una versión guardada de un conflicto (`<rama>/rama|destino/<ruta>`), si existe [R73.16]. */

@@ -75,6 +75,8 @@ export interface RunServices {
   restoreFiles?(files: { path: string; change?: FileChange }[], dir?: string): Promise<RestoreResult>;
   /** Ejecuta las comprobaciones que lanzan procesos o miran el disco [R75.4]. */
   checkRunner?: CheckRunner;
+  /** Memoria del proyecto que recibe un agente [R76.14]. */
+  projectMemory?(agentId: Id): Promise<{ text: string; ids: Id[]; scopes?: string[] } | undefined>;
   /** Comprobaciones de la ficha de un agente [R75.2]. */
   agentChecks?(agentId: Id): Promise<StepCheck[] | undefined>;
   /** Espacios de las ramas en paralelo, si la app las aísla [R73.2]. */

@@ -39,6 +39,9 @@ export interface InterruptedItem {
 /** Texto de una ejecución interrumpida en la bandeja [R74.12]. */
 export const interruptedLabel = (r: { diagramName: string; lastStep?: string }): string => (r.lastStep ? `${r.diagramName}: interrumpida tras «${r.lastStep}»` : `${r.diagramName}: interrumpida al empezar`);
 
+/** «3 cosas para recordar de <diagrama>» [R76.10]. */
+export const memoryNoticeTitle = (count: number, name: string): string => (count === 1 ? `1 cosa para recordar de ${name}` : `${count} cosas para recordar de ${name}`);
+
 export const HIDDEN_NOTICE = {
   title: 'Orquestador sigue abierto',
   body: 'Las ejecuciones continúan. Vuelve desde el icono junto a la hora o abriendo la app otra vez.',
@@ -137,6 +140,15 @@ export class Background {
     } catch {
       /* lo dice la app al abrir la ejecución */
     }
+  }
+
+  /** Una ejecución dejó cosas para recordar: lo dice la bandeja y abre su Resumen [R76.10]. */
+  memoryProposals(n: { runId: string; diagramName: string; count: number }): void {
+    if (n.count <= 0) return;
+    this.deps.notify({ title: memoryNoticeTitle(n.count, n.diagramName), body: 'Revisa «Para recordar» en el Resumen: nada se guarda sin tu «Guardar».' }, () => {
+      this.open();
+      this.deps.openRun({ runId: n.runId, live: false });
+    });
   }
 
   /** Evento de cualquier ejecución [R61.7][R61.8]. */

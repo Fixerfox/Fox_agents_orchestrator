@@ -306,6 +306,15 @@ export async function acceptRun(runDir: string, acceptance: RunAcceptance, now: 
   return true;
 }
 
+/** Un evento más al final del registro de una ejecución terminada, con su meta al día [R76.8]. */
+export async function appendRunEvent(runDir: string, body: Record<string, unknown>, now: Date = new Date()): Promise<void> {
+  const meta = await readRunMeta(runDir);
+  await appendEvent(runDir, meta.runId, body, now.toISOString());
+  const usage = body['usage'] as { inputTokens?: number; outputTokens?: number; costUsd?: number } | undefined;
+  const next = { ...meta, eventCount: meta.eventCount + 1, ...(usage ? { usage: { inputTokens: meta.usage.inputTokens + (usage.inputTokens ?? 0), outputTokens: meta.usage.outputTokens + (usage.outputTokens ?? 0), costUsd: meta.usage.costUsd + (usage.costUsd ?? 0) } } : {}) };
+  atomicWriteSync(path.join(runDir, 'meta.json'), `${JSON.stringify(next, null, 2)}\n`);
+}
+
 /** Lo que dijo la persona de un aviso en una ejecución ya terminada [R75.21]. */
 export async function addFeedback(runDir: string, body: { alertSeq: number; verdict: 'false-alarm' | 'confirmed'; note?: string; nodeId?: string }, now: Date = new Date()): Promise<void> {
   const meta = await readRunMeta(runDir);

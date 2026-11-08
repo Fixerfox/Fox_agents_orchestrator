@@ -55,6 +55,9 @@ export const agentHandler: NodeHandler = {
         turn.memory = memory.text;
         turn.memoryStats = memory.stats;
       }
+      // Y la del proyecto, tal como estaba al lanzar la ejecución [R76.13][R76.14].
+      const known = node.agentId && step.projectMemory ? await step.projectMemory(node.agentId) : undefined;
+      if (known) turn.projectMemory = known;
       let current = input;
       for (let round = 1; ; round++) {
         const out = await attemptsOf(step, node, current, path, turn);

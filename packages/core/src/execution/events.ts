@@ -4,6 +4,7 @@ import type { AgentErrorKind, AgentSnapshot, AnsweredQuestion, ConflictQuestion,
 import type { DeliverableItemResult, DeliverableLinks } from './deliverable';
 import type { NodeStatus, RunStatus } from './run-types';
 import type { SplitProblem } from './text/split';
+import type { MemoryProposal } from './memory-proposals';
 import type { MemoryStats } from './memory/memory-render';
 
 export type EventBody =
@@ -41,6 +42,8 @@ export type EventBody =
       kind?: 'merge' | 'verify';
       /** El paso trabaja en el espacio aislado de su rama (sin la ruta) [R73.8]. */
       isolated?: boolean;
+      /** Entradas de la memoria del proyecto que recibió [R76.16]. */
+      projectMemory?: Id[];
       /** Aviso del entregable que recibe este paso [R46.4]. */
       deliverable?: { role: 'final' | 'goal'; text: string };
       /** Lo añadido por el diagrama y por el paso, para saber de dónde vino cada cosa [R33.4]. */
@@ -119,6 +122,10 @@ export type EventBody =
   | { type: 'supervisor.note'; nodeId: Id; text: string; files: string[]; /** Salió de una revisión con IA [R60.29]. */ reviewed?: boolean; /** Lo que el paso decidió por su cuenta [R72.10]. */ decided?: string[] }
   /** Nota que un paso deja a los siguientes, sacada de su salida [R72.11]. */
   | { type: 'memory.note'; nodeId: Id; text: string }
+  /** Propuestas para la memoria del proyecto, al terminar la ejecución; ninguna se guarda sola [R76.8]. */
+  | { type: 'memory.proposed'; proposals: MemoryProposal[]; usage?: { inputTokens: number; outputTokens: number; costUsd?: number } }
+  /** Lo que la persona hizo con una propuesta [R76.11]. */
+  | { type: 'memory.decided'; proposalId: string; decision: 'save' | 'discard'; entryId?: Id; edited?: boolean; by?: 'user' | 'assistant' }
   /** Resultado de una comprobación determinista del paso [R75.3]. */
   | { type: 'check.result'; nodeId: Id; checkId: string; label: string; kind: 'command' | 'files' | 'output' | 'schema'; ok: boolean; detail: string; durationMs: number }
   /** Lo que encontró el agente verificador [R75.15]. */

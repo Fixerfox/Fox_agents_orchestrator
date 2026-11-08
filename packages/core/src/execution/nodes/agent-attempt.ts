@@ -32,6 +32,8 @@ export interface AgentTurn {
   previous?: PreviousAttempt;
   /** Respuestas de la persona en esta pasada de la ejecución que se reanuda [R74.6]. */
   replay?: { question: string; answer: string }[];
+  /** Memoria del proyecto del paso, fija durante el paso [R76.14]. */
+  projectMemory?: { text: string; ids: string[]; scopes?: string[] };
 }
 
 /** Traza vacía de un intento [R71.7]. */
@@ -90,6 +92,7 @@ export async function attemptAgent(step: StepContext, node: DiagramNode, input: 
       ...(answered.length > 0 ? { previousAnswers: [...answered] } : {}),
       ...(turn.previous ? { previousAttempt: turn.previous } : {}),
       ...(step.space ? { isolated: true } : {}),
+      ...(turn.projectMemory ? { projectMemory: [...turn.projectMemory.ids] } : {}),
     },
     path,
   );
@@ -143,7 +146,7 @@ export async function attemptAgent(step: StepContext, node: DiagramNode, input: 
         watchdog.resume();
       }
     });
-  const request = { nodeId: node.id, agentId, runId: step.emitter.runId, input, ...(task ? { task } : {}), ...(node.model ? { model: node.model } : {}), ...(node.confirm ? { confirm: true } : {}), ...(split ? { split } : {}), ...(turn.memory ? { memory: turn.memory } : {}), ...(turn.scope ? { scope: turn.scope } : {}), ...(deliverable ? { deliverable } : {}), ...(hasExtra ? { extra } : {}), ...(missing.length > 0 ? { missing } : {}), attempt, ask, previousAnswers: [...answered], ...(turn.previous ? { previousAttempt: turn.previous } : {}), ...(step.space ? { workspace: { dir: step.space.dir } } : {}) };
+  const request = { nodeId: node.id, agentId, runId: step.emitter.runId, input, ...(task ? { task } : {}), ...(node.model ? { model: node.model } : {}), ...(node.confirm ? { confirm: true } : {}), ...(split ? { split } : {}), ...(turn.memory ? { memory: turn.memory } : {}), ...(turn.scope ? { scope: turn.scope } : {}), ...(deliverable ? { deliverable } : {}), ...(hasExtra ? { extra } : {}), ...(missing.length > 0 ? { missing } : {}), attempt, ask, previousAnswers: [...answered], ...(turn.previous ? { previousAttempt: turn.previous } : {}), ...(step.space ? { workspace: { dir: step.space.dir } } : {}), ...(turn.projectMemory ? { projectMemory: turn.projectMemory } : {}) };
 
   // Misma acción seguida sin cambiar archivos [R70.10][R70.11].
   let lastSig = '';

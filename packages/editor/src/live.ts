@@ -278,7 +278,7 @@ export function budgetRemaining(live: LiveView, limits: BudgetLimits): { tokens?
 
 export type TranscriptItem =
   /** `pass` solo aparece cuando el nodo se ejecutó más de una vez [R15.14]. */
-  | { kind: 'input'; attempt: number; pass?: number; agentId: Id; text: string; config?: unknown; model?: string; /** La memoria que recibió [R60.37]. */ memory?: string; /** Lo que se le contó del intento anterior [R71.15]. */ previous?: string; /** Bloques de la memoria que se recortaron [R72.23]. */ memoryTrimmed?: string[] }
+  | { kind: 'input'; attempt: number; pass?: number; agentId: Id; text: string; config?: unknown; model?: string; /** La memoria que recibió [R60.37]. */ memory?: string; /** Lo que se le contó del intento anterior [R71.15]. */ previous?: string; /** Bloques de la memoria que se recortaron [R72.23]. */ memoryTrimmed?: string[]; /** Entradas de la memoria del proyecto que recibió [R76.22]. */ projectMemory?: string[] }
   /** Empieza la pasada `n` (≥ 2); `by` y `reason`, si la devolvió una revisión [R15.14]. */
   | { kind: 'pass'; n: number; by?: Id; reason?: string }
   | { kind: 'text'; text: string }
@@ -324,7 +324,7 @@ export function transcriptItems(events: readonly RunEvent[], nodeId: Id, nodePat
         returned = undefined;
         break;
       case 'agent.request':
-        items.push({ kind: 'input', attempt: e.attempt, pass: Math.max(1, pass), agentId: e.agentId, text: e.input.text, ...(e.snapshot ? { config: e.snapshot } : {}), ...(e.model ? { model: e.model } : {}), ...(e.memory ? { memory: e.memory } : {}), ...(e.previousAttempt ? { previous: describePreviousAttempt(e.previousAttempt) } : {}), ...(e.memoryStats && e.memoryStats.trimmed.length > 0 ? { memoryTrimmed: [...e.memoryStats.trimmed] } : {}) });
+        items.push({ kind: 'input', attempt: e.attempt, pass: Math.max(1, pass), agentId: e.agentId, text: e.input.text, ...(e.snapshot ? { config: e.snapshot } : {}), ...(e.model ? { model: e.model } : {}), ...(e.memory ? { memory: e.memory } : {}), ...(e.previousAttempt ? { previous: describePreviousAttempt(e.previousAttempt) } : {}), ...(e.memoryStats && e.memoryStats.trimmed.length > 0 ? { memoryTrimmed: [...e.memoryStats.trimmed] } : {}), ...(e.projectMemory && e.projectMemory.length > 0 ? { projectMemory: [...e.projectMemory] } : {}) });
         break;
       case 'memory.note':
         items.push({ kind: 'note', text: e.text });

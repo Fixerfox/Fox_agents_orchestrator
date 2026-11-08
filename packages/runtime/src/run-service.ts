@@ -1,7 +1,9 @@
-import type { Diagram, Orchestrator, PendingQuestion, RunAcceptance, RunEvent, RunMeta, RunOptions } from '@orquestador/core';
+import type { Diagram, MemoryEntry, Orchestrator, PendingQuestion, RunAcceptance, RunEvent, RunMeta, RunOptions } from '@orquestador/core';
 import { RunControl } from './run-control';
 import { RunCorrections } from './run-corrections';
 import { RunFeedback } from './run-feedback';
+import { RunMemory } from './run-memory';
+import { RunError } from './errors';
 import { RunFiles, type FilePreview, type OutputFile } from './run-files';
 import { RunHistory } from './run-history';
 import { RunLauncher } from './run-launcher';
@@ -34,13 +36,62 @@ export class RunService {
     this.history = new RunHistory(live, ports.runs, ports.library);
     this.files = new RunFiles(live, ports.runs, ports.policy, ports.files, this.history, ports.stepDir ? (runId, key) => ports.stepDir!(runId, key) : undefined);
     this.launcher = new RunLauncher(ports.runs, ports.library, defaults, snapshots);
-    this.queue = new RunQueue(live, ports.runs, orchestrator, snapshots, (runId, key, files) => this.files.snapshotStep(runId, key, files));
+    this.memory = ports.memory ? new RunMemory(ports.runs, orchestrator, ports.memory) : undefined;
+    this.queue = new RunQueue(live, ports.runs, orchestrator, snapshots, (runId, key, files) => this.files.snapshotStep(runId, key, files), (runId, diagram) => void this.proposeAfter(runId, diagram));
     this.control = new RunControl(live);
     this.corrections = new RunCorrections(live, ports.runs, orchestrator, this.history, this.launcher, this.queue);
     this.feedback = new RunFeedback(live, ports.runs);
   }
 
   private readonly feedback: RunFeedback;
+  private readonly memory: RunMemory | undefined;
+  /** Propuestas pendientes, para esperar a ellas (pruebas y cierre). */
+  private readonly proposing = new Map<string, Promise<unknown>>();
+  private readonly memoryWatchers = new Set<(n: { runId: string; diagramName: string; count: number }) => void>();
+
+  /** Al terminar, qué recordar; un fallo aquí no afecta a la ejecución [R76.5]. */
+  private proposeAfter(runId: string, diagram: Diagram): void {
+    if (!this.memory) return;
+    const job = this.memory
+      .afterRun(runId)
+      .then((ps) => {
+        if (ps.length > 0) for (const w of this.memoryWatchers) w({ runId, diagramName: diagram.name, count: ps.length });
+      })
+      .catch(() => undefined)
+      .finally(() => this.proposing.delete(runId));
+    this.proposing.set(runId, job);
+  }
+
+  /** Avisa cuando una ejecución deja cosas para recordar (para la bandeja) [R76.10]. */
+  onMemoryProposals(watcher: (n: { runId: string; diagramName: string; count: number }) => void): () => void {
+    this.memoryWatchers.add(watcher);
+    return () => void this.memoryWatchers.delete(watcher);
+  }
+
+  /** Espera a que estén las propuestas de una ejecución [R76.8]. */
+  async memoryProposed(runId: string): Promise<void> {
+    await this.settled(runId);
+    await this.proposing.get(runId);
+  }
+
+  private requireMemory(): RunMemory {
+    if (!this.memory) throw new RunError('bad-request', 'Este proyecto no tiene memoria');
+    return this.memory;
+  }
+
+  /** «Guardar», «Editar y guardar» o «Descartar» una propuesta [R76.10]. */
+  decideMemory(runId: string, req: Parameters<RunMemory['decide']>[1]): Promise<MemoryEntry[]> {
+    return this.requireMemory().decide(runId, req);
+  }
+
+  /** La pantalla de memoria: listar y editar, archivar o restaurar [R76.21]. */
+  projectMemory(): Promise<MemoryEntry[]> {
+    return this.requireMemory().list();
+  }
+
+  saveMemoryEntry(entry: Parameters<RunMemory['upsert']>[0], by: 'user' | 'assistant' = 'user'): Promise<MemoryEntry[]> {
+    return this.requireMemory().upsert(entry, by);
+  }
 
   /** «No era un problema» / «Sí lo era» en un aviso del Supervisor [R75.21]. */
   supervisorFeedback(runId: string, req: { alertSeq: number; verdict: 'false-alarm' | 'confirmed'; note?: string }): Promise<boolean> {

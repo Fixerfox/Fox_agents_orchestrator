@@ -1,3 +1,4 @@
+import type { ProjectMemoryPort } from './run-memory';
 import type { DeliverableSpec, Diagram, LibraryReader, Payload, PathPolicy, RunHandle, RunOptions, RunRepository, WorkspaceFiles, UnansweredPolicy } from '@orquestador/core';
 import { RunError } from './errors';
 import type { LibrarySnapshot } from './snapshot';
@@ -10,6 +11,8 @@ export interface RunPorts {
   files: WorkspaceFiles;
   /** Carpeta en la que trabaja ahora un paso de una rama aislada, si la hay [R73.19]. */
   stepDir?(runId: string, key: string): string | undefined;
+  /** Memoria del proyecto [R76.2]. */
+  memory?: ProjectMemoryPort;
 }
 
 export interface StartRunInput {

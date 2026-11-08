@@ -1,5 +1,5 @@
-import { checkProblems, deliverableProblems, isRelativeInside, readUnanswered } from '@orquestador/core';
-import type { CheckResult, DeliverableSpec, Diagram, Id, PendingQuestion, RuleStats, RunEvent, StepCheck, UnansweredPolicy } from '@orquestador/core';
+import { checkProblems, deliverableProblems, isRelativeInside, memoryEntryProblems, readUnanswered } from '@orquestador/core';
+import type { CheckResult, DeliverableSpec, Diagram, Id, MemoryEntry, MemoryKind, PendingQuestion, RuleStats, RunEvent, StepCheck, UnansweredPolicy } from '@orquestador/core';
 import { UNHANDLED, isObject, safeId, type RequestCheck } from './check';
 import { CHANNELS } from './contract';
 import type { ApiResult } from './result';
@@ -133,6 +133,12 @@ export interface RunsApi {
   supervisorStats(runId: string): Promise<ApiResult<{ run: RuleStats[]; recent: RuleStats[] }>>;
   /** «Ejecutar ahora» una comprobación desde el lateral del paso [R75.24]. */
   tryCheck(check: StepCheck): Promise<ApiResult<CheckResult>>;
+  /** «Guardar», «Editar y guardar» o «Descartar» una propuesta de memoria [R76.10]. */
+  decideMemory(req: { runId: string; proposalId: string; decision: 'save' | 'discard'; edited?: { title?: string; text?: string } }): Promise<ApiResult<MemoryEntry[]>>;
+  /** La memoria del proyecto [R76.21]. */
+  projectMemory(): Promise<ApiResult<MemoryEntry[]>>;
+  /** Añadir, editar, archivar o restaurar una entrada [R76.21]. */
+  saveMemoryEntry(entry: { id?: string; kind: MemoryKind; scope: string; title: string; text: string; status?: 'active' | 'archived'; by?: 'user' | 'assistant' }): Promise<ApiResult<MemoryEntry[]>>;
   /** Pasos que se pueden corregir de una ejecución que no está en marcha y cuál propone el asistente [R53.12]. */
   proposeCorrection(req: { runId: string; text: string; prefer?: string }): Promise<ApiResult<CorrectionProposal>>;
   /** Vista previa de un archivo que hizo el paso `key` (`ruta/id`) en una ejecución [R54.4]. */
@@ -231,6 +237,33 @@ export function parseRunsRequest(channel: string, payload: unknown, { bad, exact
     case CHANNELS.supervisorStats:
       if (!safeId(payload)) throw bad('runId no válido');
       return payload;
+    case CHANNELS.decideMemory: {
+      if (!isObject(payload)) throw bad('se esperaba un objeto');
+      exact(payload, ['runId', 'proposalId', 'decision', 'edited']);
+      if (!safeId(payload.runId)) throw bad('runId no válido');
+      if (!safeId(payload.proposalId)) throw bad('proposalId no válido');
+      if (payload.decision !== 'save' && payload.decision !== 'discard') throw bad('decision no válida');
+      if (payload.edited !== undefined) {
+        if (!isObject(payload.edited)) throw bad('edited no válido');
+        exact(payload.edited, ['title', 'text']);
+        if (payload.edited.title !== undefined) str(payload.edited.title, 'title', 80);
+        if (payload.edited.text !== undefined) str(payload.edited.text, 'text', 600);
+      }
+      return payload;
+    }
+    case CHANNELS.projectMemory:
+      if (payload !== undefined && payload !== null) throw bad('no admite argumentos');
+      return undefined;
+    case CHANNELS.saveMemoryEntry: {
+      if (!isObject(payload)) throw bad('se esperaba un objeto');
+      exact(payload, ['id', 'kind', 'scope', 'title', 'text', 'status', 'by']);
+      if (payload.by !== undefined && payload.by !== 'user' && payload.by !== 'assistant') throw bad('by no válido');
+      if (payload.id !== undefined && !safeId(payload.id)) throw bad('id no válido');
+      const problems = memoryEntryProblems(payload as Partial<MemoryEntry>);
+      if (problems.length > 0 && payload.status !== 'archived') throw bad(problems[0]!);
+      if (payload.status !== undefined && payload.status !== 'active' && payload.status !== 'archived') throw bad('status no válido');
+      return payload;
+    }
     case CHANNELS.tryCheck: {
       const problems = checkProblems([payload]);
       if (problems.length > 0) throw bad(problems[0]!);

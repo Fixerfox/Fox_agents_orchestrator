@@ -1,5 +1,5 @@
 import { COORDINATOR_ID } from '@orquestador/core';
-import { canResume, deliverableProblems, newAgent, newContext, newMcpServer, newSkill, slugify, type AgentDefinition, type DeliverableItem, type DeliverableSpec, type Diagram, type McpServerDefinition } from '@orquestador/core';
+import { canResume, deliverableProblems, newAgent, newContext, newMcpServer, newSkill, slugify, type AgentDefinition, type DeliverableItem, type DeliverableSpec, type Diagram, type McpServerDefinition, type MemoryKind } from '@orquestador/core';
 import { ASSISTANT_TOOLS, deliverableLabel, summarizeRun, t, type EditorSession, type McpView, type ProjectApi, type TerminalProgram } from '@orquestador/editor';
 import { nodeLabel } from '../runs';
 
@@ -162,6 +162,18 @@ export async function runAssistantTool(host: AssistantHost, name: string, args: 
       case 'resume_run': {
         const r = must(await api.resumeRun(str(args['runId'])));
         return { ok: true, summary: t('as.tool.resumed'), result: { runId: r.runId } };
+      }
+      case 'list_memory': {
+        const q = str(args['query']).toLowerCase();
+        const entries = must(await api.projectMemory()).filter((e) => !q || `${e.title} ${e.text}`.toLowerCase().includes(q));
+        return { ok: true, summary: t('as.tool.read', { what: t('pmem.screen') }), result: entries.slice(0, 50).map((e) => ({ id: e.id, kind: e.kind, scope: e.scope, title: e.title, text: e.text, status: e.status })) };
+      }
+      case 'save_memory': {
+        // Lo que guarda el asistente lleva origin 'assistant' [R76.12].
+        const status = str(args['status']) === 'archived' ? 'archived' : 'active';
+        const id = str(args['id']);
+        const entries = must(await api.saveMemoryEntry({ ...(id ? { id } : {}), kind: str(args['kind']) as MemoryKind, scope: str(args['scope']) || 'project', title: str(args['title']), text: str(args['text']), status, by: 'assistant' }));
+        return { ok: true, summary: t('pmem.savedBy.assistant'), result: { saved: true, active: entries.filter((e) => e.status === 'active').length } };
       }
       case 'get_diagram': {
         const d = session.diagram;
