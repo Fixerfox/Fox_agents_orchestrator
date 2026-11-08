@@ -1,10 +1,8 @@
-import { useState } from 'react';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { BookOpen, Maximize2 } from 'lucide-react';
 import { MODELS } from '@orquestador/core';
 import { ViewportPortal, useReactFlow, useStore } from '@xyflow/react';
 import { t, type MessageKey, type SupervisorView } from '@orquestador/editor';
 import { money } from './runFormat';
-import { MemoryCards } from './MemoryCards';
 
 /** Distancia entre la tarjeta y el paso más alto, en coordenadas del lienzo [R69.3]. */
 const GAP = 120;
@@ -100,27 +98,19 @@ export function memoryCounts(memory: SupervisorView['memory']): string {
     .join(' · ');
 }
 
-/**
- * La memoria bajo la tarjeta, con su ancho y su forma: plegada, una línea con lo que hay por bloque; desplegada, la
- * rama y las dos últimas entradas. Sin nada anotado no se muestra [R69.4].
- */
-export function SupervisorMemory({ view: v, onAll, initialOpen = false }: { view: SupervisorView; onAll?: (() => void) | undefined; initialOpen?: boolean }) {
-  const [open, setOpen] = useState(initialOpen);
+/** El botón «Memoria» bajo la tarjeta: lo que hay por bloque; abre la memoria completa en un modal. Sin nada anotado no se muestra [R69.4]. */
+export function SupervisorMemory({ view: v, onAll }: { view: SupervisorView; onAll?: (() => void) | undefined }) {
   if (v.memory.length === 0 && !v.branch) return null;
-  const counts = memoryCounts(v.memory);
+  const counts = memoryCounts(v.memory) || v.branch;
   return (
-    <section className={`orq-supmem${open ? ' is-open' : ''}`} aria-label={t('rsum.sup.memory')}>
-      <button type="button" className="orq-supmem__head" aria-expanded={open} aria-label={t(open ? 'sup.memory.fold' : 'sup.memory.unfold')} onClick={() => setOpen(!open)}>
+    <button type="button" className="orq-supmem" aria-label={t('sup.memory.open', { counts: counts ?? '' })} onClick={() => onAll?.()}>
+      <span className="orq-supmem__head">
+        <BookOpen size={13} aria-hidden="true" />
         <span className="orq-supmem__title">{t('sup.memory.short')}</span>
-        <span className="orq-supmem__counts">{counts || v.branch}</span>
-        {open ? <ChevronUp size={14} aria-hidden="true" /> : <ChevronDown size={14} aria-hidden="true" />}
-      </button>
-      {open && (
-        <div className="orq-supmem__body">
-          <MemoryCards notes={v.memory} branch={v.branch} limit={2} onAll={onAll} />
-        </div>
-      )}
-    </section>
+        <span className="orq-supmem__counts">{counts}</span>
+        <Maximize2 size={13} aria-hidden="true" />
+      </span>
+    </button>
   );
 }
 

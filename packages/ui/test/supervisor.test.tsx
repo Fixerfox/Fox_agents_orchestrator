@@ -162,24 +162,15 @@ describe('SPEC-060 · lo que se ve de la ejecución', () => {
     expect(open).toHaveBeenCalled();
   });
 
-  it('[R69.4] bajo la tarjeta, la memoria plegada dice cuántas entradas hay por bloque; desplegada enseña la rama y las dos últimas y «Ver las N entradas» pide la pestaña', () => {
-    // Un paso sale una sola vez en la memoria [R72.17]: cada nota es de un paso distinto.
+  it('[R69.4] bajo la tarjeta, el botón «Memoria» dice cuántas entradas hay por bloque y abre la memoria en un modal', () => {
     const second = ev({ type: 'supervisor.note', nodeId: 'b', text: 'Luego el mar', files: [] });
     const third = ev({ type: 'supervisor.note', nodeId: 'c', text: 'Y las nubes', files: ['cielo.png', 'mar.png', 'nubes.png'] });
     const onAll = vi.fn();
     render(<SupervisorMemory view={view([start, branch, reviewed, second, third])} onAll={onAll} />);
-    const panel = within(screen.getByRole('region', { name: 'Memoria de la ejecución' }));
-    // Plegada: una línea con lo que hay por bloque.
-    expect(panel.getByRole('button', { name: 'Desplegar la memoria' }).textContent).toContain('3 pasos');
-    expect(panel.queryByRole('listitem')).toBeNull();
-    fireEvent.click(panel.getByRole('button', { name: 'Desplegar la memoria' }));
-    expect(panel.getByText(/feature\/login/)).toBeTruthy();
-    expect(panel.getAllByRole('listitem').map((li) => li.querySelector('.orq-memcard__text')!.textContent)).toEqual(['Y las nubes', 'Luego el mar']);
-    expect(panel.getByText('+1')).toBeTruthy();
-    fireEvent.click(panel.getByRole('button', { name: 'Ver las 3 entradas' }));
+    const button = screen.getByRole('button', { name: 'Abrir la memoria de la ejecución: 3 pasos' });
+    expect(button.textContent).toContain('3 pasos');
+    fireEvent.click(button);
     expect(onAll).toHaveBeenCalled();
-    fireEvent.click(panel.getByRole('button', { name: 'Plegar la memoria' }));
-    expect(panel.queryByRole('listitem')).toBeNull();
   });
 
   it('[R69.4] sin nada anotado, la memoria no ocupa el lienzo', () => {

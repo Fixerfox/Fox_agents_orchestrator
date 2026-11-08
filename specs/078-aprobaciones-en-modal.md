@@ -18,6 +18,10 @@ Una confirmación (R43) o una revisión humana (R53) trae el resumen entero del 
    - *Revisión:* es justo lo que la persona tiene que hacer para que la ejecución siga; un botón más es un paso más.
    - *Segunda (elegida):* **en la pantalla de la ejecución se abre solo una vez por pregunta**. Cerrarlo no responde: la pregunta queda como una línea compacta con «Revisar y responder». En la bandeja de preguntas, que puede tener varias, no se abre solo.
 3. **Quién pregunta** va siempre a la vista, en la cabecera fija del modal: el paso y su agente.
+4. **Decidir con datos.**
+   - *Primera:* el resumen del agente y el botón.
+   - *Revisión:* el resumen es lo que el agente dice que hizo; aprobar solo con eso es fiarse de su palabra, justo lo que el Supervisor evita (SPEC-075).
+   - *Segunda (elegida):* **junto al resumen, lo que hizo de verdad**: los archivos que tocó según los eventos, con su vista previa, lo que ha costado y los avisos del Supervisor.
 
 ## Requisitos
 - **R78.1** [M15i] `questionNeedsModal(q)` (pura, en `editor`) es verdadera para confirmaciones, revisiones humanas y preguntas de más de 600 caracteres o más de 8 líneas.
@@ -26,6 +30,8 @@ Una confirmación (R43) o una revisión humana (R53) trae el resumen entero del 
 - **R78.4** [M15i] En la pantalla de la ejecución el modal se abre solo la primera vez que aparece cada pregunta así. Cerrarlo (✕, Escape o fuera) no responde nada.
 - **R78.5** [M15i] Al responder, el modal se cierra y la respuesta va por el mismo camino que la tarjeta (R43.6, R53.4).
 - **R78.6** [M15i] Las preguntas cortas siguen como hasta ahora, en su tarjeta.
+- **R78.7** [M15i] En la ejecución, el modal de una confirmación o revisión tiene un lateral con lo que hizo el paso según los eventos, no según lo que cuenta: los archivos que creó o modificó (cada uno abre su vista previa, SPEC-054), lo que lleva gastado (tokens, coste, tiempo) y los avisos del Supervisor de ese paso. `stepFacts(events, nodeId, nodePath)` (pura, en `editor`) lo calcula.
+- **R78.8** [M15i] En una confirmación o revisión, el pie tiene «Aprobar» destacado («la ejecución sigue») y «Pedir cambios», que despliega el cuadro con la explicación «El paso se repite con lo que escribas». Ctrl+Intro envía. La cabecera dice qué se revisa, la ronda («ronda 2») y que la ejecución espera.
 
 ## Escenarios
 - **E78.a** *Dado* un Especificador que pide confirmar un resumen de 40 líneas, *entonces* al entrar en la ejecución se abre el modal con «Confirmar lo que ha hecho Especificador · agente Spec Writer» arriba y «Aprobar» abajo, siempre a la vista.

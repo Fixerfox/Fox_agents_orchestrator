@@ -1,14 +1,12 @@
-import { type ReactNode, useEffect, useRef, useState } from 'react';
-import { MessageCircleQuestion, X } from 'lucide-react';
-import { type ReviewQuestion } from '@orquestador/core';
-import { questionNeedsModal, questionPreview, t } from '@orquestador/editor';
+import { type ReactNode, useState } from 'react';
+import { questionNeedsModal, questionPreview, t, type StepFacts } from '@orquestador/editor';
 import { Markdown } from '../common';
+import { QuestionModal, questionTitle, type QuestionItem } from './QuestionModal';
 
-type Item = { text: string; options?: string[]; confirm?: { round: number }; review?: ReviewQuestion };
+export { QuestionModal } from './QuestionModal';
 
-/** «<paso> espera tu confirmación», «… tu revisión» o «Pregunta de <paso>» [R43.8][R53.15]. */
-const titleOf = (item: Item, from: string) =>
-  item.review ? t(item.review.phase === 'route' ? 'hreview.inbox.route' : 'hreview.inbox', { node: from }) : item.confirm ? t('confirm.inbox', { node: from }) : t('runs.inbox.from', { node: from });
+type Item = QuestionItem;
+const titleOf = questionTitle;
 
 /** Las opciones y otra respuesta escrita; en el modal, en varias líneas [R78.3]. */
 function Answer({ item, onAnswer, multiline = false }: { item: Item; onAnswer: (text: string) => void; multiline?: boolean }) {
@@ -61,51 +59,11 @@ function Answer({ item, onAnswer, multiline = false }: { item: Item; onAnswer: (
   );
 }
 
-/** La pregunta entera en un modal: quién pregunta arriba, el texto con su scroll y las respuestas fijas abajo [R78.3]. */
-export function QuestionModal({ item, from, agent, context, onAnswer, onClose }: { item: Item; from: string; agent?: string | undefined; context?: string | undefined; onAnswer: (text: string) => void; onClose: () => void }) {
-  const title = titleOf(item, from);
-  const box = useRef<HTMLDivElement>(null);
-  useEffect(() => box.current?.focus(), []);
-  return (
-    <div
-      className="orq-modal orq-modal--center"
-      onPointerDown={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-      onKeyDown={(e) => {
-        if (e.key === 'Escape') {
-          e.stopPropagation();
-          onClose();
-        }
-      }}
-    >
-      <div ref={box} tabIndex={-1} className="orq-picker orq-qmodal" role="dialog" aria-modal="true" aria-label={title}>
-        <header className="orq-picker__head orq-qmodal__head">
-          <MessageCircleQuestion size={18} aria-hidden="true" />
-          <div className="orq-qmodal__who">
-            <h2>{title}</h2>
-            <p className="orq-hint">{[agent ? t('qmodal.agent', { agent }) : undefined, context].filter(Boolean).join(' · ')}</p>
-          </div>
-          <button type="button" className="orq-icon-btn" aria-label={t('picker.close')} title={t('picker.close')} onClick={onClose}>
-            <X size={18} aria-hidden="true" />
-          </button>
-        </header>
-        <div className="orq-qmodal__body" tabIndex={0} aria-label={t('runs.inbox.text')}>
-          <Markdown text={item.text} className={item.confirm || item.review ? 'orq-confirm__doc' : undefined} />
-        </div>
-        <footer className="orq-qmodal__foot">
-          <Answer item={item} onAnswer={onAnswer} multiline />
-        </footer>
-      </div>
-    </div>
-  );
-}
-
 /**
  * Una pregunta de un paso. Las largas (confirmaciones, revisiones, textos largos) se ven en una línea y se responden
  * en un modal, que con `autoOpen` se abre solo la primera vez [R78.2]–[R78.4].
  */
-export function QuestionCard({ item, from, agent, context, onAnswer, children, autoOpen = false }: { item: Item; from: string; agent?: string | undefined; context?: string; onAnswer: (text: string) => void; children?: ReactNode; autoOpen?: boolean }) {
+export function QuestionCard({ item, from, agent, context, facts, onOpenFile, onAnswer, children, autoOpen = false }: { item: Item; from: string; agent?: string | undefined; context?: string; facts?: StepFacts | undefined; onOpenFile?: ((path: string) => void) | undefined; onAnswer: (text: string) => void; children?: ReactNode; autoOpen?: boolean }) {
   const long = questionNeedsModal(item);
   const [open, setOpen] = useState(long && autoOpen);
   const title = titleOf(item, from);
@@ -130,6 +88,8 @@ export function QuestionCard({ item, from, agent, context, onAnswer, children, a
             from={from}
             agent={agent}
             context={context}
+            facts={facts}
+            onOpenFile={onOpenFile}
             onClose={() => setOpen(false)}
             onAnswer={(text) => {
               setOpen(false);

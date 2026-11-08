@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { ArrowLeft, Play, Pause, Square } from 'lucide-react';
 import { correctionTargets, type RunEvent } from '@orquestador/core';
-import { type HistoryRow, type RunAction, defaultStep, t, formatDuration, filesByStep } from '@orquestador/editor';
+import { type HistoryRow, type RunAction, defaultStep, t, formatDuration, filesByStep, stepFacts } from '@orquestador/editor';
 import { CorrectionDialog } from './CorrectionDialog';
 import { PreviewThumb, PreviewDialog } from './Preview';
 import { FoldedStep, NodePanel } from './NodePanel';
@@ -108,7 +108,7 @@ export function RunDetail(
         <div className="orq-run__asks">
           {live.pending.map((q) => (
             <div key={q.questionId} className="orq-run__banner">
-              <QuestionCard item={q} from={label(q.nodeId, q.nodePath)} agent={agentOf(q.nodeId, q.nodePath)} autoOpen onAnswer={(text) => answerHere(q.questionId, text)} />
+              <QuestionCard item={q} from={label(q.nodeId, q.nodePath)} agent={agentOf(q.nodeId, q.nodePath)} facts={stepFacts(d.events, q.nodeId, q.nodePath)} onOpenFile={setViewing} autoOpen onAnswer={(text) => answerHere(q.questionId, text)} />
             </div>
           ))}
         </div>
