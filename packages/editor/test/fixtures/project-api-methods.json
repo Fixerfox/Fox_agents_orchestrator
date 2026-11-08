@@ -80,12 +80,15 @@
   "stageAttachment",
   "startRun",
   "subscribeRun",
+  "supervisorFeedback",
+  "supervisorStats",
   "terminalKill",
   "terminalResize",
   "terminalStart",
   "terminalWrite",
   "testConnection",
   "testMcp",
+  "tryCheck",
   "unqueue",
   "unsubscribeRun"
 ]

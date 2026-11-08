@@ -1,6 +1,6 @@
 import { finalSteps, forwardEdges, returnEdges, splitBranchIds, validateDiagram, type Diagram, type DiagramNode, type Edge, type ReturnInfo } from '../diagrams';
-import { isCoordinator, mergeLimits, type Id, type KnowledgeExtra, type Payload, type StepLimits } from '../shared';
-import type { AgentAdapter, AgentProfile, AgentSnapshot, Decider, FileChange, RestoreResult } from './adapter';
+import { isCoordinator, mergeLimits, type Id, type KnowledgeExtra, type Payload } from '../shared';
+import type { FileChange } from './adapter';
 import { proposeCorrectionWith } from './corrections';
 import { EventBus, type RunEvent } from './events';
 import { pathKey } from './replay';
@@ -13,7 +13,7 @@ import { BudgetTracker } from './run/budget-tracker';
 import { ConcurrencyLimiter } from './run/concurrency-limiter';
 import { PauseGate } from './run/pause-gate';
 import { QuestionBroker, unansweredPolicy, type PendingQuestion } from './run/question-broker';
-import { realTimers, type Timers } from './run/timers';
+import { realTimers } from './run/timers';
 import { ResumeCache } from './run/resume-cache';
 import { RetryPolicy } from './run/retry-policy';
 import { DECISION_TIMEOUT_MS, guardDecider } from './run/guarded-decider';
@@ -25,71 +25,14 @@ import { LevelIsolation } from './run/isolation';
 import { replayDecider } from './run/replay-decider';
 import { stepKey } from './replay-plan';
 import { validateTree } from './run/prevalidate';
-import type { BranchSpaces, SpaceRef } from './branch-spaces';
+import { supervisorExtras } from './run/supervisor-extras';
+import type { SpaceRef } from './branch-spaces';
 import type { NodeStatus, RunOptions, RunStatus } from './run-types';
 import { mergeInputs } from './text/merge-inputs';
 import { splitInputs } from './text/split';
 
-export interface OrchestratorDeps {
-  getAdapter(agentId: Id): AgentAdapter;
-  decider: Decider;
-  /** Foto de la configuración del agente para dejarla en el log. */
-  describeAgent?(agentId: Id): AgentSnapshot | undefined;
-  /** Ficha de un agente para quien reparte [R59.18]. */
-  agentProfile?(agentId: Id, extra: KnowledgeExtra | undefined, runId: Id): Promise<AgentProfile | undefined>;
-  /** `runId`: un subdiagrama se lee de la copia que se hizo al lanzar la ejecución [R52.1]. */
-  resolveTemplate?(templateId: Id, version: number | 'latest', runId?: Id): Promise<Diagram> | Diagram;
-  sleep?(ms: number, signal: AbortSignal): Promise<void>;
-  now?(): Date;
-  newRunId?(): Id;
-  /** Activa el Supervisor; `review` dice si revisa con IA, y se pregunta en cada paso [R60.1]. */
-  supervisor?: { review(): boolean; model?(): string; humanChecks?(): 'warn' | 'fail'; settleMs?: number; checkMs?: number };
-  /** Tipos de nodo; por defecto, los de la aplicación [R56.12]. */
-  nodes?: NodeRegistry;
-  /**
-   * Fija al arrancar cada ejecución el motor que usará hasta el final: agentes, decisiones y si el Supervisor revisa
-   * con IA. Sin él se usan `getAdapter` y `decider` tal cual [R63.13].
-   */
-  forRun?(): { getAdapter(agentId: Id): AgentAdapter; decider: Decider; review?(): boolean };
-  /** Memoria de la ejecución; va con el Supervisor, o sola con esto; `tokens`, su tope [R72.3][R72.15]. */
-  memory?: { tokens?(): number | undefined };
-  /** Temporizadores y reloj; por defecto, los del sistema [R70.9]. */
-  timers?: Timers;
-  /** Límites de la ficha de un agente [R70.7]. */
-  agentLimits?(agentId: Id, runId: Id): StepLimits | undefined | Promise<StepLimits | undefined>;
-  /** Aleatorio de las esperas con jitter [R71.3]. */
-  random?(): number;
-  /** Devuelve al punto de partida lo que tocó un intento fallido [R71.10]. */
-  restoreFiles?(runId: Id, files: { path: string; change?: FileChange }[], dir?: string): Promise<RestoreResult>;
-  /** Espacios para aislar las ramas en paralelo de esta ejecución; sin él, comparten carpeta [R73.2]. */
-  spaces?(runId: Id): BranchSpaces | undefined;
-  /** ¿Puede escribir el agente? Por defecto, sí [R73.2]. */
-  canWrite?(agentId: Id, runId: Id): boolean | Promise<boolean>;
-}
-
-export interface RunResult {
-  runId: Id;
-  status: RunStatus;
-  reason?: string;
-  output?: Payload;
-  events: readonly RunEvent[];
-  usage: { inputTokens: number; outputTokens: number; costUsd: number };
-}
-
-export type { PendingQuestion };
-
-export interface RunHandle {
-  runId: Id;
-  bus: EventBus;
-  result: Promise<RunResult>;
-  /** Pausa cooperativa: se detiene antes de empezar nodos y entre pasos de un agente. */
-  pause(): void;
-  resume(): void;
-  cancel(reason?: string): void;
-  /** Responde a una pregunta de un agente. `false` si no existe o ya se respondió. */
-  answer(questionId: string, text: string): boolean;
-  pendingQuestions(): PendingQuestion[];
-}
+import type { OrchestratorDeps, RunHandle, RunResult } from './orchestrator-types';
+export type { OrchestratorDeps, RunHandle, RunResult, PendingQuestion };
 
 /** Tipos de paso cuya salida se puede reutilizar al reanudar [R41.1]. */
 const REUSABLE = new Set<string>(['agent', 'transform', 'subdiagram']);
@@ -118,12 +61,13 @@ export class Orchestrator {
     const engine = this.deps.forRun?.() ?? { getAdapter: (agentId: Id) => this.deps.getAdapter(agentId), decider: this.deps.decider };
     // Etiquetas de cada paso por ruta, también dentro de bucles y subdiagramas [R63.6].
     const labels = new Map<string, string>();
+    let finalOutput: Payload | undefined;
     const labelOf = (id: Id, path: readonly Id[] = []) => labels.get(pathKey(path, id)) ?? diagram.nodes.find((n) => n.id === id)?.label ?? id;
     const outputId = diagram.nodes.find((n) => n.kind === 'output')?.id;
     let failReason: string | undefined;
     const watch = this.deps.supervisor;
     const supervisor = watch
-      ? new Supervisor({ order: typeof order === 'string' ? { text: order, files: [] } : order, ...(options.correction ? { correction: { text: options.correction.text, ...(options.correction.before ? { before: options.correction.before } : {}) } } : {}), ...(deliverable ? { deliverable: JSON.stringify(deliverable) } : {}), ...(watch.checkMs !== undefined ? { checkMs: watch.checkMs } : {}), emitter, decider: engine.decider, budget, limits: options.budget, signal: stop.signal, review: () => watch.review() && (engine.review?.() ?? true), ...(watch.model ? { model: () => watch.model!() } : {}), ...(watch.humanChecks ? { humanChecks: () => watch.humanChecks!() } : {}), labelOf, ...(outputId !== undefined ? { outputId } : {}), ...(watch.settleMs !== undefined ? { settleMs: watch.settleMs } : {}) })
+      ? new Supervisor({ ...supervisorExtras(watch, this.deps.checks, diagram, { emitter, questions, signal: stop.signal, final: () => finalOutput }), order: typeof order === 'string' ? { text: order, files: [] } : order, ...(options.correction ? { correction: { text: options.correction.text, ...(options.correction.before ? { before: options.correction.before } : {}) } } : {}), ...(deliverable ? { deliverable: JSON.stringify(deliverable) } : {}), ...(watch.checkMs !== undefined ? { checkMs: watch.checkMs } : {}), emitter, decider: engine.decider, budget, limits: options.budget, signal: stop.signal, review: () => watch.review() && (engine.review?.() ?? true), ...(watch.model ? { model: () => watch.model!() } : {}), ...(watch.humanChecks ? { humanChecks: () => watch.humanChecks!() } : {}), labelOf, ...(outputId !== undefined ? { outputId } : {}), ...(watch.settleMs !== undefined ? { settleMs: watch.settleMs } : {}) })
       : undefined;
     if (supervisor) bus.subscribe((e) => supervisor.observe(e));
     // La memoria va con el Supervisor (como antes) o sola si se pide [R72.3].
@@ -139,6 +83,8 @@ export class Orchestrator {
       ...(supervisor ? { supervisor } : {}),
       ...(memory ? { memory } : {}),
       ...(spaces ? { spaces } : {}),
+      ...(this.deps.checks?.runner ? { checkRunner: this.deps.checks.runner } : {}),
+      ...(this.deps.checks?.agentChecks ? { agentChecks: (agentId: Id) => this.deps.checks!.agentChecks!(agentId, runId) } : {}),
       ...(this.deps.canWrite ? { canWrite: async (agentId: Id) => this.deps.canWrite!(agentId, runId) } : {}),
       halt: (reason) => {
         failReason = reason;
@@ -205,6 +151,7 @@ export class Orchestrator {
       } else if (status === 'failed' && failReason) {
         reason = failReason;
       }
+      if (outcome.output) finalOutput = outcome.output;
       await supervisor?.settle();
       // Acabar bien exige haber conseguido lo pedido [R62.10].
       const unmet = status === 'succeeded' ? await supervisor?.verify() : undefined;
@@ -239,6 +186,12 @@ export class Orchestrator {
       },
       cancel: (reason) => stop.abort('cancelled', reason),
       answer: (questionId, text) => questions.answer(questionId, text),
+      feedback: (alertSeq, verdict, note) => {
+        const alert = bus.history().find((e) => e.type === 'supervisor.alert' && e.seq === alertSeq);
+        if (!alert || alert.type !== 'supervisor.alert') return false;
+        emitter.emit({ type: 'supervisor.feedback', alertSeq, verdict, ...(note?.trim() ? { note: note.trim().slice(0, 1000) } : {}), ...(alert.nodeId !== undefined ? { nodeId: alert.nodeId } : {}) }, alert.nodePath ?? []);
+        return true;
+      },
       pendingQuestions: () => questions.list(),
     };
   }

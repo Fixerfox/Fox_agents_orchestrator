@@ -32,14 +32,24 @@ export interface SupervisorAlertItem {
   rule: string;
   detail: string;
   at: string;
+  /** Para marcarlo como falso o acertado [R75.21]. */
+  seq: number;
+  /** Gravedad de la revisión con IA y la evidencia que cita [R75.10][R75.25]. */
+  gravity?: string;
+  evidence?: string[];
+  /** Lo que dijo la persona del aviso [R75.21]. */
+  feedback?: 'false-alarm' | 'confirmed';
 }
 
 export function supervisorAlerts(events: readonly RunEvent[], labelOf: (id: Id, path: readonly Id[]) => string): SupervisorAlertItem[] {
+  const said = new Map<number, 'false-alarm' | 'confirmed'>();
+  for (const e of events) if (e.type === 'supervisor.feedback') said.set(e.alertSeq, e.verdict);
   return events.flatMap((e) => {
     if (e.type !== 'supervisor.alert') return [];
     const path = e.nodePath ?? [];
     const step = e.nodeId === undefined ? { label: '' } : { key: pathKey(path, e.nodeId), label: labelOf(e.nodeId, path) };
-    return [{ ...step, rule: e.rule, detail: e.detail, at: e.ts }];
+    const feedback = said.get(e.seq);
+    return [{ ...step, rule: e.rule, detail: e.detail, at: e.ts, seq: e.seq, ...(e.gravity ? { gravity: e.gravity } : {}), ...(e.evidence ? { evidence: e.evidence } : {}), ...(feedback ? { feedback } : {}) }];
   });
 }
 

@@ -286,6 +286,8 @@ export type TranscriptItem =
   | { kind: 'question'; questionId: string; text: string; options?: string[]; answer?: string; /** Confirmación del paso [R43.9]. */ confirm?: { round: number }; /** Tipo de pregunta [R45.3]. */ ask?: QuestionKind; /** Revisión humana [R53.15]. */ review?: ReviewQuestion; /** Conflicto al juntar ramas [R73.16]. */ conflict?: ConflictQuestion }
   /** Nota que el paso dejó a los siguientes [R72.24]. */
   | { kind: 'note'; text: string }
+  /** Comprobaciones seguidas del paso, en una fila que se despliega [R75.25]. */
+  | { kind: 'checks'; results: { label: string; ok: boolean; detail: string }[] }
   | { kind: 'retry'; attempt: number; max: number; message: string; /** Por qué [R71.15]. */ cause?: 'error' | 'timeout' | 'loop' }
   | { kind: 'error'; message: string }
   | { kind: 'usage'; inputTokens: number; outputTokens: number; costUsd: number }
@@ -327,6 +329,13 @@ export function transcriptItems(events: readonly RunEvent[], nodeId: Id, nodePat
       case 'memory.note':
         items.push({ kind: 'note', text: e.text });
         break;
+      case 'check.result': {
+        const last = items.at(-1);
+        const r = { label: e.label, ok: e.ok, detail: e.detail };
+        if (last?.kind === 'checks') last.results.push(r);
+        else items.push({ kind: 'checks', results: [r] });
+        break;
+      }
       case 'token.stream': {
         const last = items[items.length - 1];
         if (last?.kind === 'text') last.text += e.text;

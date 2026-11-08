@@ -1,6 +1,7 @@
 import type { Diagram, Orchestrator, PendingQuestion, RunAcceptance, RunEvent, RunMeta, RunOptions } from '@orquestador/core';
 import { RunControl } from './run-control';
 import { RunCorrections } from './run-corrections';
+import { RunFeedback } from './run-feedback';
 import { RunFiles, type FilePreview, type OutputFile } from './run-files';
 import { RunHistory } from './run-history';
 import { RunLauncher } from './run-launcher';
@@ -36,6 +37,19 @@ export class RunService {
     this.queue = new RunQueue(live, ports.runs, orchestrator, snapshots, (runId, key, files) => this.files.snapshotStep(runId, key, files));
     this.control = new RunControl(live);
     this.corrections = new RunCorrections(live, ports.runs, orchestrator, this.history, this.launcher, this.queue);
+    this.feedback = new RunFeedback(live, ports.runs);
+  }
+
+  private readonly feedback: RunFeedback;
+
+  /** «No era un problema» / «Sí lo era» en un aviso del Supervisor [R75.21]. */
+  supervisorFeedback(runId: string, req: { alertSeq: number; verdict: 'false-alarm' | 'confirmed'; note?: string }): Promise<boolean> {
+    return this.feedback.give(runId, req);
+  }
+
+  /** Cuánto acierta el Supervisor, por regla [R75.22]. */
+  supervisorStats(runId: string): ReturnType<RunFeedback['stats']> {
+    return this.feedback.stats(runId);
   }
 
   /** Escucha todas las ejecuciones, no solo la que muestra la interfaz [R61.9]. */

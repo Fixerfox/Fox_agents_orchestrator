@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, Brain, Clock, Eye, Folder, Gauge, KeyRound, Palette, ShieldCheck, Sparkles, type LucideIcon } from 'lucide-react';
-import { MEMORY_TOKENS, isolatesBranches, DEFAULT_IDLE_MINUTES, DEFAULT_TOOL_MINUTES, DEFAULT_UNANSWERED, MODELS, UNANSWERED_ACTIONS, loadsClaudeConfig, projectPermission, type AppSettings, type AuthMode, type Engine, type ProjectPermission, supervisorHumanChecks, supervisorModel, supervisorReviews } from '@orquestador/core';
+import { Brain, Clock, Eye, Folder, Gauge, KeyRound, Palette, ShieldCheck, Sparkles } from 'lucide-react';
+import { MEMORY_TOKENS, isolatesBranches, DEFAULT_IDLE_MINUTES, DEFAULT_TOOL_MINUTES, DEFAULT_UNANSWERED, MODELS, UNANSWERED_ACTIONS, loadsClaudeConfig, projectPermission, type AppSettings, type AuthMode, type Engine, type StopAt, supervisorHumanChecks, supervisorModel, supervisorReviews, supervisorStopAt, supervisorUnverified, supervisorVerifyModel } from '@orquestador/core';
 import { PermissionPicker, permissionName } from '../common';
-import { PROJECT_LEVELS, permissionMatrix, t, type ConnectionResult, type MessageKey, type PermAnswer, type ProjectApi, type SettingsView, type WorkFolderView } from '@orquestador/editor';
+import { t, type ConnectionResult, type MessageKey, type ProjectApi, type SettingsView, type WorkFolderView } from '@orquestador/editor';
 import { fieldErrors } from '../common';
 import { applyTheme, loadTheme, saveTheme, type Theme } from './theme';
+import { Choice, PermMatrix, RULES, Row, Shell, type Section, type SectionId } from './SettingsParts';
 
 interface Props {
   api: ProjectApi;
@@ -77,6 +78,9 @@ export function SettingsDialog({ api, onClose, onSaved }: Props) {
       ...(draft.supervisorReview !== undefined ? { supervisorReview: draft.supervisorReview } : {}),
       ...(draft.supervisorModel !== undefined ? { supervisorModel: draft.supervisorModel } : {}),
       ...(draft.supervisorHumanChecks !== undefined ? { supervisorHumanChecks: draft.supervisorHumanChecks } : {}),
+      ...(draft.supervisorStopAt !== undefined ? { supervisorStopAt: draft.supervisorStopAt } : {}),
+      ...(draft.supervisorVerifyModel !== undefined ? { supervisorVerifyModel: draft.supervisorVerifyModel } : {}),
+      ...(draft.supervisorUnverified !== undefined ? { supervisorUnverified: draft.supervisorUnverified } : {}),
       ...(draft.limits ? { limits: draft.limits } : {}),
       ...(draft.unanswered ? { unanswered: draft.unanswered } : {}),
       ...(draft.memoryTokens !== undefined ? { memoryTokens: draft.memoryTokens } : {}),
@@ -292,6 +296,29 @@ export function SettingsDialog({ api, onClose, onSaved }: Props) {
               <option value="fail">{t('set.sup.human.fail')}</option>
             </select>
           </Row>
+          {/* Cuándo para la revisión, con qué modelo se comprueba el final y qué hacer si no se puede [R75.10][R75.19][R75.20]. */}
+          <Row id="set-sup-stop" label={t('set.sup.stop')} hint={t('set.sup.stop.hint')} error={errors['supervisorStopAt']}>
+            <select id="set-sup-stop" value={supervisorStopAt(draft)} onChange={(e) => set({ supervisorStopAt: e.target.value as StopAt })}>
+              <option value="high">{t('set.sup.stop.high')}</option>
+              <option value="medium">{t('set.sup.stop.medium')}</option>
+              <option value="never">{t('set.sup.stop.never')}</option>
+            </select>
+          </Row>
+          <Row id="set-sup-vmodel" label={t('set.sup.vmodel')} hint={t('set.sup.vmodel.hint')} error={errors['supervisorVerifyModel']}>
+            <select id="set-sup-vmodel" value={supervisorVerifyModel(draft)} onChange={(e) => set({ supervisorVerifyModel: e.target.value })}>
+              {MODELS.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name}
+                </option>
+              ))}
+            </select>
+          </Row>
+          <Row id="set-sup-unverified" label={t('set.sup.unverified')} error={errors['supervisorUnverified']}>
+            <select id="set-sup-unverified" value={supervisorUnverified(draft)} onChange={(e) => set({ supervisorUnverified: e.target.value as 'warn' | 'fail' })}>
+              <option value="warn">{t('set.sup.human.warn')}</option>
+              <option value="fail">{t('set.sup.human.fail')}</option>
+            </select>
+          </Row>
         </div>
       ),
     },
@@ -445,156 +472,5 @@ export function SettingsDialog({ api, onClose, onSaved }: Props) {
         )}
       </form>
     </Shell>
-  );
-}
-
-type SectionId = 'claude' | 'perms' | 'supervisor' | 'budget' | 'limits' | 'memory' | 'look' | 'work';
-
-/** Una sección de Ajustes: entrada del índice y su contenido [R67.1]. */
-interface Section {
-  id: SectionId;
-  group: 'general' | 'project';
-  icon: LucideIcon;
-  label: string;
-  summary: string;
-  intro: string;
-  content: React.ReactNode;
-}
-
-const ANSWER_MARK: Record<PermAnswer, string> = { yes: '✓', ask: '?', no: '✕' };
-
-/** «Lo que pasará con cada nivel»: acciones × niveles, con el nivel elegido resaltado [R67.6]. */
-function PermMatrix({ level }: { level: ProjectPermission }) {
-  return (
-    <div className="orq-permtable">
-      <table>
-        <caption>{t('perm.matrix')}</caption>
-        <thead>
-          <tr>
-            <th scope="col">{t('perm.matrix.action')}</th>
-            {PROJECT_LEVELS.map((l) => (
-              <th key={l} scope="col" className={l === level ? 'is-on' : undefined} aria-current={l === level ? 'true' : undefined}>
-                {permissionName(l)}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {permissionMatrix().map((r) => (
-            <tr key={r.action}>
-              <th scope="row">{t(`perm.row.${r.action}` as MessageKey)}</th>
-              {PROJECT_LEVELS.map((l) => (
-                <td key={l} className={`is-${r.answers[l]}${l === level ? ' is-on' : ''}`}>
-                  <span aria-hidden="true">{ANSWER_MARK[r.answers[l]]}</span> {t(`perm.ans.${r.answers[l]}` as MessageKey)}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-/** Opciones con consecuencias: tarjetas con su explicación debajo [R67.3]. */
-function Choice<V extends string>({ legend, name, value, options, onChange, error, list = false }: { legend: string; name: string; value: V; options: { value: V; label: string; hint: string }[]; onChange: (v: V) => void; error?: string | undefined; list?: boolean }) {
-  return (
-    <fieldset className="orq-field orq-choice">
-      <legend>{legend}</legend>
-      <div className={`orq-choice__opts${list ? ' is-list' : ''}`} role="radiogroup">
-        {options.map((o) => (
-          <div key={o.value} className={`orq-choice__opt${value === o.value ? ' is-on' : ''}`}>
-            <label>
-              <input type="radio" name={name} checked={value === o.value} aria-describedby={`${name}-${o.value}-hint`} onChange={() => onChange(o.value)} />
-              <span>{o.label}</span>
-            </label>
-            <p className="orq-hint" id={`${name}-${o.value}-hint`}>
-              {o.hint}
-            </p>
-          </div>
-        ))}
-      </div>
-      {error && (
-        <p className="orq-field__error" role="alert">
-          {error}
-        </p>
-      )}
-    </fieldset>
-  );
-}
-
-/** Fila de ajuste: texto a la izquierda y el control a la derecha [R67.3]. */
-function Row({ id, label, hint, error, children }: { id: string; label: string; hint?: string | undefined; error?: string | undefined; children: React.ReactNode }) {
-  return (
-    <div className={`orq-field orq-setrow${error ? ' has-error' : ''}`}>
-      <div className="orq-setrow__text">
-        <label htmlFor={id}>{label}</label>
-        {hint && <p className="orq-hint">{hint}</p>}
-        {error && (
-          <p className="orq-field__error" id={`${id}-error`} role="alert">
-            {error}
-          </p>
-        )}
-      </div>
-      <div className="orq-setrow__ctrl">{children}</div>
-    </div>
-  );
-}
-
-/** Reglas que siguen todos los agentes, tal como las aplica el motor [R31.14]. */
-const RULES = (level: ProjectPermission): MessageKey[] => [
-  'settings.rules.read',
-  'settings.rules.create',
-  level === 'ask' ? 'settings.rules.modify.ask' : 'settings.rules.modify.auto',
-  level === 'ask' ? 'settings.rules.commands' : level === 'auto' ? 'settings.rules.commands.auto' : 'settings.rules.commands.full',
-  'settings.rules.agent',
-  level === 'full' ? 'settings.rules.outside.full' : 'settings.rules.outside',
-  'settings.rules.explain',
-  'settings.rules.record',
-];
-
-/** Página de Ajustes: índice por grupos a la izquierda, una sección cada vez y el estado del guardado al pie [R67.1][R67.5]. */
-function Shell({ onClose, children, status, items, current, onPick }: { onClose?: (() => void) | undefined; children: React.ReactNode; status?: string | undefined; items: readonly Section[]; current: SectionId; onPick: (id: SectionId) => void }) {
-  const groups = (['general', 'project'] as const).map((g) => ({ g, rows: items.filter((x) => x.group === g) })).filter((x) => x.rows.length > 0);
-  return (
-    <section className="orq-page orq-settings-page" aria-label={t('settings.title')}>
-      <aside className="orq-settings-page__nav">
-        {onClose && (
-          <button type="button" className="orq-btn orq-btn--ghost orq-btn--small" onClick={onClose}>
-            <ArrowLeft size={16} aria-hidden="true" />
-            {t('settings.back')}
-          </button>
-        )}
-        <h1>{t('settings.title')}</h1>
-        <nav aria-label={t('settings.title')}>
-          {groups.map(({ g, rows }) => (
-            <div key={g} className="orq-setnav__group">
-              <span className="orq-setnav__label">{t(g === 'general' ? 'settings.group.general' : 'settings.group.project')}</span>
-              {rows.map((x) => {
-                const Icon = x.icon;
-                return (
-                  <button key={x.id} type="button" className="orq-setnav__item" aria-current={x.id === current ? 'page' : undefined} onClick={() => onPick(x.id)}>
-                    <Icon size={16} strokeWidth={1.7} aria-hidden="true" className="orq-setnav__icon" />
-                    <span className="orq-setnav__text">
-                      <span className="orq-setnav__title">{x.label}</span>
-                      <span className="orq-setnav__sum">{x.summary}</span>
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          ))}
-        </nav>
-        <p className="orq-hint orq-settings-page__auto">
-          {t('settings.autosaved')}{' '}
-          {status && (
-            <span role="status" className="orq-settings-page__status">
-              {status}
-            </span>
-          )}
-        </p>
-      </aside>
-      <div className="orq-settings-page__main">{children}</div>
-    </section>
   );
 }

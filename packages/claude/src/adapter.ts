@@ -9,7 +9,7 @@ import { buildSystemPrompt, buildUserPrompt, claudeCodePrompt } from './prompt';
 import type { PermissionResult, QueryFn } from './sdk-types';
 import { createMcpPolicy, sdkMcpConfig, type ResolvedMcp } from './mcp';
 import { KnowledgeTracker, describeKnowledge, planKnowledge } from './knowledge';
-import { agentTools, createWritePolicy, withIsolation, withScope, guardedPolicy, summarizeFolder, type WritePolicyDeps } from './workfolder';
+import { agentTools, createWritePolicy, withIsolation, withScope, withVerifier, guardedPolicy, summarizeFolder, type WritePolicyDeps } from './workfolder';
 import { CommandWatch } from './changes';
 import { classifyCommand } from './commands';
 
@@ -114,7 +114,7 @@ export class ClaudeAdapter implements AgentAdapter {
           root,
           withMcp(
             mcpPolicy,
-            withIsolation(original, note, withScope(request.scope, root, note, createWritePolicy({
+            withVerifier(request.verify, note, withIsolation(original, note, withScope(request.scope, root, note, createWritePolicy({
             root,
             level,
             appDirs: [...new Set([path.join(root, '.orquestador'), path.join(this.env.projectRoot, '.orquestador')])],
@@ -126,7 +126,7 @@ export class ClaudeAdapter implements AgentAdapter {
             onAsked: () => {
               asked = true;
             },
-          })), root),
+          })), root)),
           ),
         ),
       );

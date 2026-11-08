@@ -383,6 +383,25 @@ export function NodePanel({ events, live, nodeId, nodePath, label, onAnswer, onE
                 return <ToolGroup key={i} tools={it.tools} />;
               case 'question':
                 return <Question key={it.questionId} item={it} onAnswer={onAnswer} closed={closed} onOpenFile={onOpenFile} {...(it.review?.phase === 'feedback' ? { reviewFiles: filesSinceReview(events, nodeId, nodePath, it.questionId) } : {})} {...(onPreview ? { onPreview } : {})} {...(renderThumb ? { renderThumb } : {})} />;
+              case 'checks': {
+                // «3 de 4 comprobaciones bien», con la salida de cada una al desplegar [R75.25].
+                const good = it.results.filter((r) => r.ok).length;
+                return (
+                  <li key={i} className={`orq-t orq-t--checks${good < it.results.length ? ' is-bad' : ''}`}>
+                    <details>
+                      <summary>{t('step.checks.row', { ok: good, total: it.results.length })}</summary>
+                      <ul>
+                        {it.results.map((r, j) => (
+                          <li key={j} className={r.ok ? 'is-ok' : 'is-bad'}>
+                            <strong>{`${r.ok ? '✓' : '✗'} ${r.label}`}</strong>
+                            {r.detail && <pre>{r.detail}</pre>}
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  </li>
+                );
+              }
               case 'note':
                 // La nota que dejó para los siguientes pasos [R72.24].
                 return (

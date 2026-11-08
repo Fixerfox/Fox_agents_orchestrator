@@ -1,4 +1,4 @@
-import type { Id, KnowledgeExtra, StepLimits } from '../shared';
+import type { AiReviewMode, Id, KnowledgeExtra, StepCheck, StepLimits, VerifySettings } from '../shared';
 
 export const CURRENT_SCHEMA_VERSION = 1;
 
@@ -93,6 +93,12 @@ export interface DiagramNode {
   limits?: StepLimits;
   /** Solo en nodos `agent`: qué hacer con lo que dejó un intento fallido; por defecto, conservarlo [R71.10]. */
   onRetry?: 'keep' | 'restore';
+  /** Solo en nodos `agent`: comprobaciones deterministas al terminar [R75.1]. */
+  checks?: StepCheck[];
+  /** Solo en nodos `agent`: cuándo lo revisa la IA; por defecto, siempre [R75.11]. */
+  aiReview?: AiReviewMode;
+  /** Solo en nodos `agent`: verificar con un agente que ejecuta y observa [R75.13]. */
+  verify?: VerifySettings;
   router?: RouterConfig;
   loop?: LoopConfig;
   review?: ReviewConfig;
@@ -122,6 +128,10 @@ export interface Diagram {
   extra?: KnowledgeExtra;
   /** Qué se entrega al final de la ejecución; solo cuenta en el diagrama principal [R46.3]. */
   deliverable?: DeliverableSpec;
+  /** Comprobaciones de la ejecución entera, antes de la comprobación final [R75.17]. */
+  checks?: StepCheck[];
+  /** Verificar con un agente cada paso final [R75.13]. */
+  verify?: VerifySettings;
 }
 
 /** Un elemento del entregable de una ejecución [R46.1]. */

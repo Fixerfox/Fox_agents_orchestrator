@@ -1,5 +1,5 @@
 import type { TransformFormat } from '../diagrams';
-import type { Id, KnowledgeExtra, KnowledgeKind, Payload } from '../shared';
+import type { Id, KnowledgeExtra, KnowledgeKind, Payload, Severity } from '../shared';
 
 export type FileChange = 'created' | 'modified';
 /** Cómo se cambió: con un comando, sin pasar por las herramientas de edición ni dejar copia [R55.3]. */
@@ -54,8 +54,27 @@ export interface AgentProfile {
 }
 
 /** Lo que el Supervisor revisa de un paso [R60.12]. */
+/** Un hallazgo del verificador [R75.15]. */
+export interface VerifyFinding {
+  severity: 'high' | 'medium' | 'low';
+  where: string;
+  what: string;
+}
+
+/** Lo que la revisión ve de verdad, no lo que el paso cuenta [R75.7]. */
+export interface ReviewEvidence {
+  diff: string;
+  checks: { label: string; ok: boolean; detail: string }[];
+  toolErrors: { count: number; last: string[] };
+  stats: { created: number; modified: number; removed: number };
+  /** Hallazgos del verificador, si lo hubo [R75.15]. */
+  verification?: { met: boolean; findings: VerifyFinding[] };
+}
+
 export interface SupervisorReview {
   step: string;
+  /** Evidencia de lo hecho [R75.7]. */
+  evidence?: ReviewEvidence;
   /** Lo que pidió la persona: es el criterio [R62.2]. */
   order?: string;
   /** Para qué sirve el agente según su ficha [R62.2]. */
@@ -72,6 +91,10 @@ export interface SupervisorReview {
 export interface SupervisorVerdict {
   ok: boolean;
   reason: string;
+  /** Gravedad del problema; sin ella (motores de antes), un «no» cuenta como grave [R75.9]. */
+  severity?: Severity;
+  /** Cada problema con la evidencia que lo respalda [R75.9]. */
+  problems?: { text: string; evidence: string }[];
   summary: string;
   outOfScope?: string;
   /** Lo que el paso decidió por su cuenta, solo si lo dice o lo hace explícitamente [R72.10]. */
@@ -91,6 +114,13 @@ export interface RunVerification {
   before?: { step: string; text: string; files: string[] }[];
   /** Lo que decidió la persona durante la ejecución [R62.17]. */
   decisions?: string[];
+  /** Archivos que cambió la ejecución, con sus líneas, y las comprobaciones de la ejecución [R75.18]. */
+  files?: { path: string; added: number; removed: number }[];
+  checks?: { label: string; ok: boolean; detail: string }[];
+  /** Cómo quedó cada elemento del entregable [R75.18]. */
+  deliverableItems?: { item: string; ok: boolean; detail?: string }[];
+  /** Por paso, la gravedad y los problemas de su revisión [R75.18]. */
+  reviews?: { step: string; severity: Severity; problems: string[] }[];
 }
 
 export interface RunVerdict {
@@ -185,6 +215,8 @@ export interface AgentRequest {
   previousAttempt?: PreviousAttempt;
   /** Espacio aislado de la rama en paralelo: carpeta de trabajo y raíz de escritura del paso [R73.8]. */
   workspace?: { dir: string };
+  /** Verificador: puede ejecutar comandos pero no editar archivos [R75.14]. */
+  verify?: boolean;
 }
 
 /** Lo que un intento fallido le deja al siguiente [R71.7]. */

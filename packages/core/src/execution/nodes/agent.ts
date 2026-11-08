@@ -5,6 +5,7 @@ import { composeSplitFix, declaredFiles, describeSplitProblem, parseSplit } from
 import { UNFINISHED_OPTIONS, UNFINISHED_STOP, unfinishedDecision, unfinishedQuestion } from '../text/unfinished';
 import { newTrace } from './agent-attempt';
 import { attemptsOf, type AgentTurn } from './agent-retries';
+import { verifyStep } from './agent-checks';
 import { errorMessage, failStep, type NodeHandler, type StepContext } from './handler';
 
 /** Veces que se repite un paso que no reparte bien, antes de fallar [R59.8]. */
@@ -61,9 +62,18 @@ export const agentHandler: NodeHandler = {
         // Un paso que no terminó lo pedido no pasa de largo: decide la persona [R62.4].
         // Sin ficha se revisa con lo demás: esto no debe fallar el paso.
         const profile = step.supervisor && node.agentId ? await step.agentProfile?.(node.agentId, node.extra, step.emitter.runId).catch(() => undefined) : undefined;
+        // Comprobaciones y verificador, antes de la revisión con IA [R75.3][R75.13].
+        const final = step.finalIds.has(node.id) && path.length === 0;
+        const checked = await verifyStep(step, node, path, input, out.output, turn, round, final);
+        if (step.signal.aborted) return { status: 'cancelled' };
+        if (checked.retry) {
+          current = checked.retry;
+          continue;
+        }
         // Mientras espera a su revisión no ocupa hueco de concurrencia [R63.9].
         const supervisor = step.supervisor;
-        const missing = supervisor ? await step.limiter.whileWaiting(turn.slot, step.signal, () => supervisor.check(node.id, path, out.output!, profile?.purpose)) : undefined;
+        const reviewMode = { ...(node.aiReview ? { mode: node.aiReview } : {}), final, hasChecks: checked.hasChecks, ...(turn.scope ? { priority: turn.scope } : {}) };
+        const missing = checked.missing ?? (supervisor ? await step.limiter.whileWaiting(turn.slot, step.signal, () => supervisor.check(node.id, path, out.output!, profile?.purpose, reviewMode)) : undefined);
         if (step.signal.aborted) return { status: 'cancelled' };
         if (missing !== undefined) {
           let answer: string;

@@ -22,7 +22,7 @@ function layerRules(layer) {
 }
 
 export default tseslint.config(
-  { ignores: ['**/node_modules/**', '**/dist/**', '**/dist-preview/**', '_to_delete/**'] },
+  { ignores: ['**/node_modules/**', '**/dist/**', '**/dist-preview/**', '**/dist-eval/**', '_to_delete/**'] },
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
   {

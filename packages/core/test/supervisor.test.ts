@@ -126,13 +126,14 @@ describe('SPEC-060 · revisión con IA', () => {
     expect(alerts(events)).toEqual([]);
   });
 
-  it('[R60.13] la revisión de un paso que falla no bloquea, y lo que no llega se dice', async () => {
-    const { orch } = rig({ a: { failTimes: 1, failRetriable: false } }, () => new Promise(() => {}), 20);
+  it('[R60.13][R75.12] un paso que falla no se revisa ni bloquea el cierre', async () => {
+    let asked = 0;
+    const { orch } = rig({ a: { failTimes: 1, failRetriable: false } }, () => (asked++, new Promise(() => {})), 20);
     const r = await orch.start(chain(['a']), 'Pedido').result;
     expect(r.status).toBe('failed');
-    expect(ofType(r.events, 'supervisor.skipped')).toMatchObject([{ count: 1, reason: 'timeout' }]);
-    const types = r.events.map((e) => e.type);
-    expect(types.indexOf('supervisor.skipped')).toBeLessThan(types.indexOf('run.finished'));
+    expect(asked).toBe(0);
+    expect(ofType(r.events, 'supervisor.skipped')).toEqual([]);
+    expect(ofType(r.events, 'supervisor.note')).toMatchObject([{ nodeId: 'a', text: '' }]);
   });
 
   it('[R60.13] espera a la revisión que llega a tiempo antes de cerrar', async () => {
@@ -162,11 +163,11 @@ describe('SPEC-060 · revisión con IA', () => {
     expect(normalizeSettings({ ...defaultSettings(), supervisorReview: false, supervisorModel: 'claude-sonnet-5-5' })).toMatchObject({ supervisorReview: false, supervisorModel: 'claude-sonnet-5-5' });
   });
 
-  it('[R60.15] si falla la revisión de un paso que falló, no afecta y se dice', async () => {
+  it('[R60.15][R75.12] si la revisión no responde, el paso que falló no la necesita: su nota es la determinista', async () => {
     const { orch } = rig({ a: { failTimes: 1, failRetriable: false } }, () => Promise.reject(new Error('sin red')));
     const r = await orch.start(chain(['a']), 'Pedido').result;
     expect(r.status).toBe('failed');
-    expect(ofType(r.events, 'supervisor.skipped')).toMatchObject([{ reason: 'failed' }]);
+    expect(ofType(r.events, 'supervisor.skipped')).toEqual([]);
     expect(ofType(r.events, 'supervisor.note')).toHaveLength(1);
   });
 });

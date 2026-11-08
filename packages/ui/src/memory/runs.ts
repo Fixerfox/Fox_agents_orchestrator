@@ -1,4 +1,5 @@
 import {
+  feedbackStats,
   MockAgent,
   MockDecider,
   Orchestrator,
@@ -156,6 +157,31 @@ export function memoryRuns(s: MemoryState, options: MemoryApiOptions) {
       if (live) for (const l of listeners) l(runId, [event]);
       if (past) past.summary = { ...past.summary, status: 'succeeded', reason: text, accepted: { by, reason: text, at: ts, ...(end.reason !== undefined ? { previousReason: end.reason } : {}) } };
       return ok(true);
+    },
+    async supervisorFeedback({ runId, alertSeq, verdict, note }) {
+      // Como el almacén: se añade `supervisor.feedback` al registro [R75.21].
+      const live = runs.get(runId);
+      const past = options.pastRuns?.find((p) => p.summary.runId === runId);
+      if (!live && !past) return missing();
+      const events = live?.events ?? past!.events;
+      const alert = events.find((e) => e.type === 'supervisor.alert' && e.seq === alertSeq);
+      if (!alert || alert.type !== 'supervisor.alert') return fail('bad-request', 'Ese aviso no existe en esta ejecución');
+      const seq = events.reduce((m, e) => Math.max(m, e.seq), 0) + 1;
+      const event = { runId, seq, ts: new Date().toISOString(), type: 'supervisor.feedback', alertSeq, verdict, ...(note?.trim() ? { note: note.trim() } : {}), ...(alert.nodeId !== undefined ? { nodeId: alert.nodeId } : {}), ...(alert.nodePath ? { nodePath: alert.nodePath } : {}) } as RunEvent;
+      events.push(event);
+      if (live) for (const l of listeners) l(runId, [event]);
+      return ok(true);
+    },
+    async tryCheck(check) {
+      // En memoria no hay comandos que ejecutar: se dice qué pasaría [R75.24].
+      return ok({ checkId: check.id, label: check.label, kind: check.kind, ok: check.kind !== 'command', detail: check.kind === 'command' ? `Se ejecutaría: ${check.run}` : 'Se comprueba al ejecutar el paso', durationMs: 0 });
+    },
+    async supervisorStats(runId) {
+      const live = runs.get(runId);
+      const past = options.pastRuns?.find((p) => p.summary.runId === runId);
+      if (!live && !past) return missing();
+      const all = [...runs.values()].map((r) => r.events).concat((options.pastRuns ?? []).map((p) => p.events));
+      return ok({ run: feedbackStats([live?.events ?? past!.events]), recent: feedbackStats(all.slice(-50)) });
     },
     async dismissRun(runId) {
       const past = options.pastRuns?.find((p) => p.summary.runId === runId);

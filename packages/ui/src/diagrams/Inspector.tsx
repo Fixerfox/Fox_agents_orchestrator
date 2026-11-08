@@ -7,6 +7,7 @@ import { ExtraKnowledge, type KnowledgeCatalog } from './ExtraKnowledge';
 import type { Selection } from './Canvas';
 import { TransformPanel } from './TransformPanel';
 import { DeliverablePanel } from './DeliverablePanel';
+import { ChecksEditor } from './ChecksEditor';
 import { AgentStepFields, agentOfNode, incomingNames, type StepFiles, type StepTabId } from './StepFields';
 import { KIND_ICON } from './OrqNode';
 import type { RunEvent } from '@orquestador/core';
@@ -271,6 +272,12 @@ export function Inspector({ session, snap, selection, agents, onError, onEditAge
               disabled={snap.readOnly}
               onChange={(spec) => guard(() => session.setDeliverable(spec))}
             />
+          )}
+          {/* Comprobaciones de la ejecución entera, en la Salida del diagrama principal [R75.24]. */}
+          {node.kind === 'output' && snap.path.length === 0 && !snap.readOnly && (
+            <div className="orq-insp__card">
+              <ChecksEditor legend={t('checks.run.title')} checks={snap.diagram.checks ?? []} onChange={(c) => guard(() => session.setDiagramChecks(c))} {...(api ? { onTry: async (c) => { const r = await api.tryCheck(c); return r.ok ? r.value : undefined; } } : {})} />
+            </div>
           )}
 
           {node.kind !== 'entry' && node.kind !== 'output' && (

@@ -6,6 +6,7 @@ import { createEngineOrchestrator, snapshotLibrary, withBuiltinAgents, type RunP
 import { ProjectStore, libraryReaderOf, runRepositoryOf } from '@orquestador/store';
 import { BranchSpaceManager, cleanupBranchSpaces, workspaceFiles } from '@orquestador/workspace';
 import { tmpdir } from 'node:os';
+import { checkRunnerFor, evidenceFor } from './checks';
 
 /** Único lugar que crea los adaptadores concretos y los conecta con los puertos [R56.5]. */
 
@@ -113,7 +114,10 @@ export function restoreAttemptFiles(store: Pick<ProjectStore, 'restoreBackup' | 
 
 /** Orquestador del proyecto con el motor de Claude y el de demostración [R27.1][R56.5]. */
 export function composeOrchestrator(ctx: OrchestratorContext, query: QueryFn): Orchestrator {
-  return createEngineOrchestrator({ library: libraryOf(ctx), settings: ctx.settings, restoreFiles: restoreAttemptFiles(ctx.store, ctx.projectRoot), spaces: branchSpacesFor(ctx) }, [createClaudeEngine(claudeEnvironment(ctx), query)]);
+  return createEngineOrchestrator(
+    { library: libraryOf(ctx), settings: ctx.settings, restoreFiles: restoreAttemptFiles(ctx.store, ctx.projectRoot), spaces: branchSpacesFor(ctx), checkRunner: checkRunnerFor(ctx.store, ctx.projectRoot), evidence: evidenceFor(ctx.store, ctx.projectRoot) },
+    [createClaudeEngine(claudeEnvironment(ctx), query)],
+  );
 }
 
 /** Puertos del servicio de ejecución para un proyecto [R56.5]. */

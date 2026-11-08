@@ -1,6 +1,7 @@
+import { ChecksEditor } from './ChecksEditor';
 import { BookOpen, Bot, FileText, ListChecks, ShieldCheck, UserCheck, type LucideIcon } from 'lucide-react';
 import { useId, useState, type ReactNode } from 'react';
-import { DEFAULT_MODEL, MAX_TASK_LENGTH, MODELS, COORDINATOR_ID, coordinatorAgent, limitProblems, type DiagramNode, type ProjectPermission } from '@orquestador/core';
+import { DEFAULT_MODEL, MAX_TASK_LENGTH, MODELS, COORDINATOR_ID, VERIFY_MAX_COST_USD, coordinatorAgent, limitProblems, type AiReviewMode, type DiagramNode, type ProjectPermission } from '@orquestador/core';
 import { extraCount, stepOverrides, t, type EditorSnapshot, type NodePatch, type ProjectApi } from '@orquestador/editor';
 import { AgentAvatar, AskFirstMark, ClaudeButton, ClaudeDiff, ClaudeMenu, ClaudeStatus, PermissionPicker, permissionName, useClaudeAssist, type AssistConfig } from '../common';
 import { ExtraKnowledge, type KnowledgeCatalog } from './ExtraKnowledge';
@@ -271,6 +272,27 @@ export function stepSections({ node, snap, agents, patch, api, files, catalog, o
         ))}
         <p className="orq-hint">{t('step.limits.hint')}</p>
       </fieldset>
+      {/* Comprobaciones, revisión con IA y verificador del paso [R75.11][R75.24]. */}
+      <ChecksEditor legend={t('checks.title')} checks={node.checks ?? []} onChange={(checks) => patch({ checks })} {...(api ? { onTry: async (c) => { const r = await api.tryCheck(c); return r.ok ? r.value : undefined; } } : {})} />
+      <label className="orq-field">
+        <span>{t('step.aiReview')}</span>
+        <select aria-label={t('step.aiReview')} value={node.aiReview ?? 'always'} onChange={(e) => patch({ aiReview: e.target.value as AiReviewMode })}>
+          <option value="always">{t('step.aiReview.always')}</option>
+          <option value="final-or-checks">{t('step.aiReview.final')}</option>
+          <option value="never">{t('step.aiReview.never')}</option>
+        </select>
+      </label>
+      <label className="orq-switch">
+        <span>{t('step.verify')}</span>
+        <input type="checkbox" className="orq-toggle" checked={node.verify !== undefined} onChange={(e) => patch({ verify: e.target.checked ? {} : null })} />
+      </label>
+      {node.verify && (
+        <label className="orq-field orq-field--inline">
+          <span>{t('step.verify.budget')}</span>
+          <input type="number" min={0.05} max={50} step={0.05} aria-label={t('step.verify.budget')} value={node.verify.maxCostUsd ?? VERIFY_MAX_COST_USD} onChange={(e) => patch({ verify: { ...node.verify, maxCostUsd: Number(e.target.value) } })} />
+        </label>
+      )}
+      <p className="orq-hint">{t('step.verify.hint')}</p>
     </div>
   );
   const sections: StepSection[] = [

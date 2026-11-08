@@ -90,6 +90,14 @@ export class ProjectPaths {
   runDir(runId: string): string {
     return path.join(this.runsDir, assertSafeId(runId, 'runId'));
   }
+  /** Comandos de comprobación aprobados en el proyecto, por su hash [R75.6]. */
+  get approvedChecksFile(): string {
+    return path.join(this.orq, 'approved-checks.json');
+  }
+  /** Casos de referencia del Supervisor [R75.23]. */
+  get supervisorCasesFile(): string {
+    return path.join(this.orq, 'supervisor', 'cases.jsonl');
+  }
   /** Subcarpetas que se crean con el proyecto. */
   get all(): string[] {
     return ['diagrams', 'templates', 'agents', 'skills', 'contexts', 'runs'].map((d) => path.join(this.orq, d));

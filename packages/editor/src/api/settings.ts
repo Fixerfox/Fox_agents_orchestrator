@@ -30,7 +30,7 @@ export interface SettingsApi {
 const SETTINGS_OBJECTS = ['limits', 'unanswered'];
 const SETTINGS_FLAGS: string[] = ['isolateBranches'];
 const SETTINGS_NUMBERS: string[] = ['memoryTokens'];
-const SETTINGS_WORDS: string[] = [];
+const SETTINGS_WORDS: string[] = ['supervisorStopAt', 'supervisorVerifyModel', 'supervisorUnverified'];
 
 export function parseSettingsRequest(channel: string, payload: unknown, { bad, exact, str }: RequestCheck): unknown {
   switch (channel) {

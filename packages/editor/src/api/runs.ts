@@ -1,5 +1,5 @@
-import { deliverableProblems, isRelativeInside, readUnanswered } from '@orquestador/core';
-import type { DeliverableSpec, Diagram, Id, PendingQuestion, RunEvent, UnansweredPolicy } from '@orquestador/core';
+import { checkProblems, deliverableProblems, isRelativeInside, readUnanswered } from '@orquestador/core';
+import type { CheckResult, DeliverableSpec, Diagram, Id, PendingQuestion, RuleStats, RunEvent, StepCheck, UnansweredPolicy } from '@orquestador/core';
 import { UNHANDLED, isObject, safeId, type RequestCheck } from './check';
 import { CHANNELS } from './contract';
 import type { ApiResult } from './result';
@@ -127,6 +127,12 @@ export interface RunsApi {
   dismissRun(runId: string): Promise<ApiResult<boolean>>;
   /** «Dar por bueno» una ejecución fallida que no está en marcha [R65.6]. */
   acceptRun(req: { runId: string; by: 'user' | 'assistant'; reason: string }): Promise<ApiResult<boolean>>;
+  /** «No era un problema» o «Sí lo era» en un aviso del Supervisor [R75.21]. */
+  supervisorFeedback(req: { runId: string; alertSeq: number; verdict: 'false-alarm' | 'confirmed'; note?: string }): Promise<ApiResult<boolean>>;
+  /** Avisos por regla y cuántos se marcaron, en la ejecución y en las últimas 50 [R75.22]. */
+  supervisorStats(runId: string): Promise<ApiResult<{ run: RuleStats[]; recent: RuleStats[] }>>;
+  /** «Ejecutar ahora» una comprobación desde el lateral del paso [R75.24]. */
+  tryCheck(check: StepCheck): Promise<ApiResult<CheckResult>>;
   /** Pasos que se pueden corregir de una ejecución que no está en marcha y cuál propone el asistente [R53.12]. */
   proposeCorrection(req: { runId: string; text: string; prefer?: string }): Promise<ApiResult<CorrectionProposal>>;
   /** Vista previa de un archivo que hizo el paso `key` (`ruta/id`) en una ejecución [R54.4]. */
@@ -211,6 +217,23 @@ export function parseRunsRequest(channel: string, payload: unknown, { bad, exact
       if (!safeId(payload.runId)) throw bad('runId no válido');
       if (payload.by !== 'user' && payload.by !== 'assistant') throw bad('by no válido');
       str(payload.reason, 'reason', 2000, 1);
+      return payload;
+    }
+    case CHANNELS.supervisorFeedback: {
+      if (!isObject(payload)) throw bad('se esperaba un objeto');
+      exact(payload, ['runId', 'alertSeq', 'verdict', 'note']);
+      if (!safeId(payload.runId)) throw bad('runId no válido');
+      if (!Number.isInteger(payload.alertSeq) || (payload.alertSeq as number) < 1) throw bad('alertSeq no válido');
+      if (payload.verdict !== 'false-alarm' && payload.verdict !== 'confirmed') throw bad('verdict no válido');
+      if (payload.note !== undefined) str(payload.note, 'note', 1000);
+      return payload;
+    }
+    case CHANNELS.supervisorStats:
+      if (!safeId(payload)) throw bad('runId no válido');
+      return payload;
+    case CHANNELS.tryCheck: {
+      const problems = checkProblems([payload]);
+      if (problems.length > 0) throw bad(problems[0]!);
       return payload;
     }
     case CHANNELS.proposeCorrection: {

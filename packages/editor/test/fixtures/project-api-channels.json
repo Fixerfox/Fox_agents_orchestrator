@@ -76,12 +76,15 @@
   "stageAttachment": "input:stage",
   "startRun": "run:start",
   "subscribeRun": "run:subscribe",
+  "supervisorFeedback": "run:supervisor-feedback",
+  "supervisorStats": "run:supervisor-stats",
   "terminalKill": "terminal:kill",
   "terminalResize": "terminal:resize",
   "terminalStart": "terminal:start",
   "terminalWrite": "terminal:write",
   "testConnection": "settings:test-connection",
   "testMcp": "mcp:test",
+  "tryCheck": "run:try-check",
   "unqueue": "run:unqueue",
   "unsubscribeRun": "run:unsubscribe"
 }

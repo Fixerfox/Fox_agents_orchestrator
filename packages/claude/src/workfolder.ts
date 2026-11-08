@@ -190,6 +190,21 @@ export function withScope(scope: readonly string[] | undefined, root: string, no
   };
 }
 
+/** Motivo al escribir desde el verificador [R75.14]. */
+export const VERIFIER_DENY = 'Eres el verificador: puedes leer y ejecutar comandos, pero no editar archivos. Cuenta lo que haya que arreglar en tu informe.';
+
+/** El verificador no edita archivos; los comandos sí se ejecutan [R75.14]. */
+export function withVerifier(on: boolean | undefined, note: WritePolicyDeps['note'], inner: (tool: string, input: Record<string, unknown>) => Promise<PermissionResult>): (tool: string, input: Record<string, unknown>) => Promise<PermissionResult> {
+  if (!on) return inner;
+  return async (tool, input) => {
+    if ((WRITE_TOOLS as readonly string[]).includes(tool)) {
+      note?.({ kind: 'denied', path: pathOf(input) ?? '', reason: 'verificador' });
+      return deny(VERIFIER_DENY);
+    }
+    return inner(tool, input);
+  };
+}
+
 /** Motivo al escribir en la carpeta de trabajo desde una rama en paralelo [R73.8]. */
 export const ISOLATED_DENY =
   'Este paso trabaja en una copia aislada de la carpeta porque corre en paralelo con otros: escribe en tu carpeta actual, no en la original. Lo tuyo se junta con lo de las otras ramas al terminar.';

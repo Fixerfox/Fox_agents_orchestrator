@@ -99,26 +99,22 @@ describe('SPEC-063 · Supervisor y memoria', () => {
     expect(signals[0]!.aborted).toBe(true);
   });
 
-  it('[R63.7] al cerrar, las revisiones en segundo plano que no llegaron se cancelan', async () => {
+  it('[R63.7][R75.12] un paso que falla ya no se revisa: no queda nada en segundo plano que cancelar', async () => {
     const signals: AbortSignal[] = [];
     const hang = (_: SupervisorReview, s: AbortSignal) => (signals.push(s), new Promise<SupervisorVerdict>(() => {}));
     const { orch } = rig({ a: { failTimes: 9, failRetriable: false } }, { supervise: hang }, { settleMs: 20 });
     const r = await orch.start(chain(['a']), 'Pedido').result;
-    expect(ofType(r.events, 'supervisor.skipped')).toMatchObject([{ reason: 'timeout' }]);
-    expect(signals[0]!.aborted).toBe(true);
+    expect(signals).toHaveLength(0);
+    expect(ofType(r.events, 'supervisor.skipped')).toEqual([]);
   });
 
-  it('[R63.8] un fallo suelto no apaga la revisión; tres seguidos sí', async () => {
+  it('[R63.8][R75.12] los pasos que fallan dejan su nota determinista sin consultar a la IA', async () => {
     const failing = (ids: string[]) => Object.fromEntries(ids.map((id, i) => [id, { failTimes: 9, failRetriable: false, latencyMs: i * 25 }]));
     let calls = 0;
-    const once = rig(failing(['a', 'b']), { supervise: async () => (calls++ === 0 ? Promise.reject(new Error('red')) : OK) });
+    const once = rig(failing(['a', 'b']), { supervise: async () => (calls++, OK) });
     const r1 = await once.orch.start(fan(['a', 'b']), 'Pedido').result;
-    expect(calls).toBe(2);
-    expect(ofType(r1.events, 'supervisor.note').filter((n) => n.reviewed)).toHaveLength(1);
-    let tries = 0;
-    const always = rig(failing(['a', 'b', 'c', 'd']), { supervise: async () => (tries++, Promise.reject(new Error('red'))) });
-    await always.orch.start(fan(['a', 'b', 'c', 'd']), 'Pedido').result;
-    expect(tries).toBe(3);
+    expect(calls).toBe(0);
+    expect(ofType(r1.events, 'supervisor.note').map((n) => n.reviewed ?? false)).toEqual([false, false]);
   });
 
   it('[R63.9] mientras un paso espera a su revisión, otro puede usar su hueco', async () => {

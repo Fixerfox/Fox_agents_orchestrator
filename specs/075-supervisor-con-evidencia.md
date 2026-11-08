@@ -1,6 +1,6 @@
 # SPEC-075 · Supervisor con evidencia, gravedad y verificador
 
-**Estado:** Borrador · **Hito:** M15f · **Paquetes:** `core`, `claude`, `runtime`, `store`, `apps/desktop`, `editor`, `ui` · **Rama:** `feature/supervisor-evidencia`
+**Estado:** Implementada · **Hito:** M15f · **Paquetes:** `core`, `claude`, `runtime`, `store`, `apps/desktop`, `editor`, `ui` · **Rama:** `feature/robustez-ejecucion`
 
 ## Propósito
 El Supervisor (SPEC-060 y SPEC-062) revisa cada paso con un modelo barato y comprueba al final si se consiguió lo pedido. Funciona, pero **juzga lo que los agentes cuentan, no lo que hicieron** (auditoría del 08/11, S1–S8):
@@ -63,7 +63,7 @@ Esta spec añade al Supervisor lo que usan los equipos que evalúan agentes en p
   - que una afirmación de la salida que la evidencia no respalda no cuenta como hecha (p. ej. «añadí tests» sin ningún archivo de tests en el diff);
   - que cada problema tiene que citar su evidencia (un archivo y línea del diff, una comprobación o una acción);
   - que no premie la longitud ni el tono seguro.
-- **R75.9** [M15f] `SupervisorVerdict` pasa a ser `{ ok, severity: 'none' | 'low' | 'medium' | 'high', problems: { text, evidence }[], outOfScope?, summary, decided }`. Con `ok: false` y ningún problema con evidencia, el veredicto se trata como `severity: 'low'` y salta el aviso `unsupported-verdict` (`info`).
+- **R75.9** [M15f] `SupervisorVerdict` pasa a ser `{ ok, severity: 'none' | 'low' | 'medium' | 'high', problems: { text, evidence }[], outOfScope?, summary, decided }`. Con `ok: false` y ningún problema con evidencia, el veredicto se trata como `severity: 'low'` y salta el aviso `unsupported-verdict` (`info`). Un veredicto sin `severity` (un motor que aún no la da) cuenta como grave, como antes. El aviso `ai-review` lleva `gravity` y la evidencia citada (`evidence`).
 
 ### Cuándo para
 - **R75.10** [M15f] Ajustes › Supervisor tiene «Parar y preguntarme cuando el problema sea…»: «grave» (por defecto), «medio o grave» y «nunca, solo avisar». Si `ok` es `false` y la gravedad llega al umbral, se pregunta como en R62.4. Si no llega, solo da el aviso `ai-review` con su gravedad. Una comprobación determinista que falla cuenta siempre como grave.
@@ -71,9 +71,9 @@ Esta spec añade al Supervisor lo que usan los equipos que evalúan agentes en p
 - **R75.12** [M15f] Los pasos que fallan o se cancelan no se revisan con IA, y su entrada de memoria es la determinista (R72.10). Desaparece la revisión en segundo plano de `Supervisor.finished` (cambia R60.13 y R60.15).
 
 ### Verificador
-- **R75.13** [M15f] Un paso o un diagrama puede activar «Verificar con un agente» con un agente (por defecto «Verificador», que incluye la app), sus skills, un presupuesto (0,50 $ por defecto) y un tiempo máximo (10 min por defecto, R70.6). Corre después de las comprobaciones y antes de la revisión con IA, en la carpeta del paso.
+- **R75.13** [M15f] Un paso o un diagrama puede activar «Verificar con un agente» con un agente (por defecto «Verificador», que incluye la app), sus skills, un presupuesto (0,50 $ por defecto) y un tiempo máximo (10 min por defecto, R70.6). Corre después de las comprobaciones y antes de la revisión con IA, en la carpeta del paso (o su espacio aislado). El del diagrama vale para sus pasos finales.
 - **R75.14** [M15f] El verificador no puede editar archivos (las herramientas de escritura se deniegan) pero sí ejecutar comandos. Si un comando suyo cambia archivos (R55.1), salta el aviso `verifier-wrote` con la lista. Su gasto cuenta en el presupuesto como un paso más, y su rastro va en el registro con `kind: 'verify'`.
-- **R75.15** [M15f] El verificador termina con la sección `## Verificación`: una línea `Resultado: cumple` o `Resultado: no cumple` y un hallazgo por línea, `- [grave|media|leve] <archivo:línea o comando> — <qué>`. El motor la interpreta (`parseVerification`); los hallazgos pasan como evidencia a la revisión (R75.7) y un «no cumple» con algún hallazgo grave cuenta como grave en R75.10.
+- **R75.15** [M15f] El verificador termina con la sección `## Verificación`: una línea `Resultado: cumple` o `Resultado: no cumple` y un hallazgo por línea, `- [grave|media|leve] <archivo:línea o comando> — <qué>`. El motor la interpreta (`parseVerification`); los hallazgos pasan como evidencia a la revisión (R75.7) y un «no cumple» con algún hallazgo grave cuenta como grave en R75.10. Sin Supervisor, ese «no cumple» grave también para y pregunta. Se emite `verify.result` (`met`, `findings`); si el verificador no deja la sección o se corta, salta `unverified-step` (`info`).
 - **R75.16** [M15f] La biblioteca incluida (`builtin-library`) trae el agente «Verificador» y la skill «Verificar lo pedido». La skill dice que hay que: leer lo pedido y la tarea del paso; revisar el diff; ejecutar las comprobaciones que el proyecto documenta (README, CLAUDE.md, scripts del proyecto); probar el cambio de principio a fin cuando se pueda; informar de cada hallazgo con su evidencia en el formato de R75.15; y no arreglar nada. Se puede copiar al proyecto y editar, y se puede elegir otra skill instalada (SPEC-025).
 
 ### Comprobación final
@@ -85,10 +85,10 @@ Esta spec añade al Supervisor lo que usan los equipos que evalúan agentes en p
 ### Calibración
 - **R75.21** [M15f] Cada aviso tiene «No era un problema» y «Sí lo era». Al pulsar uno se emite `supervisor.feedback` (`alertSeq`, `verdict: 'false-alarm' | 'confirmed'`, `note?`). También vale con la ejecución terminada, como `run.accepted` (R65.5). Un aviso marcado como falso deja de contar como abierto (R72) y sale atenuado.
 - **R75.22** [M15f] La pestaña «Supervisor» enseña, por regla, cuántos avisos hubo, cuántos se marcaron falsos y cuántos acertados, en esta ejecución y en las últimas 50 del proyecto.
-- **R75.23** [M15f] Cada aviso marcado se guarda como caso de referencia en `.orquestador/supervisor/cases.jsonl`: la regla, lo que recibió la revisión (recortado y sin secretos), su veredicto y lo que dijo la persona. `npm run supervisor:eval` vuelve a pasar esos casos por el prompt actual con un modelo real y da cuántos coinciden con la persona. No forma parte de `npm run check`.
+- **R75.23** [M15f] Cada aviso marcado se guarda como caso de referencia en `.orquestador/supervisor/cases.jsonl`: la regla, lo que recibió la revisión (recortado y sin secretos), su veredicto y lo que dijo la persona. `npm run supervisor:eval -- <carpeta del proyecto>` vuelve a pasar esos casos por el prompt actual con un modelo real y da cuántos coinciden con la persona. No forma parte de `npm run check`.
 
 ### Interfaz
-- **R75.24** [M15f] El lateral del paso tiene la sección «Comprobaciones», para añadirlas, ordenarlas y probarlas con «Ejecutar ahora», y «Verificar con un agente». El lateral del diagrama tiene sus comprobaciones de la ejecución.
+- **R75.24** [M15f] El lateral del paso tiene la sección «Comprobaciones», para añadirlas, ordenarlas y probarlas con «Ejecutar ahora», «Revisar con IA» y «Verificar con un agente» con su presupuesto. Las comprobaciones de la ejecución se editan en el lateral de la Salida del diagrama principal, junto al entregable. «Ejecutar ahora» lo lanza la persona, así que el comando queda aprobado.
 - **R75.25** [M15f] En la conversación del paso, las comprobaciones salen como una fila «3 de 4 comprobaciones bien», que se despliega con la salida de cada una. En la pestaña «Supervisor», cada aviso de la revisión enseña su evidencia (el trozo del diff o la comprobación citada).
 
 ## Escenarios

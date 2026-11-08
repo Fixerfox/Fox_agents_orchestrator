@@ -8,3 +8,5 @@ export * from './preview-path';
 export * from './coordinator';
 export * from './text';
 export * from './limits';
+export * from './checks';
+export * from './diff';

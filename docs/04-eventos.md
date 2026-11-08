@@ -29,7 +29,7 @@ interface EventBase { runId: Id; seq: number; ts: string; type: string; nodePath
 | `file.produced` | `nodeId, path, change?: 'created' \| 'modified'` | Un agente crea o modifica un archivo; se emite al terminar la herramienta que lo escribió, también si luego el paso falla (SPEC-045) |
 | `git.branch` | `nodeId, branch, via: 'head' \| 'command' \| 'mcp' \| 'ran', created?` | El paso creó una rama o actuó en ella (SPEC-058) |
 | `git.action` | `nodeId, branch, action: 'commit' \| 'push' \| 'pr' \| 'merge' \| 'delete' \| 'switch', url?` | El paso hizo eso en esa rama; `url` es la de la PR (SPEC-058) |
-| `supervisor.alert` | `nodeId?, rule, severity, detail` | El Supervisor detecta algo o bloquea una acción (SPEC-060) |
+| `supervisor.alert` | `nodeId?, rule, severity, detail, gravity?, evidence?` | El Supervisor detecta algo o bloquea una acción (SPEC-060); `gravity` y `evidence`, la gravedad y la evidencia de la revisión con IA (SPEC-075) |
 | `agent.usage` (`source?`) | `source: 'supervisor' \| 'judge' \| 'decision'` | Gasto de una pieza interna: suma al total, no al paso (SPEC-060, SPEC-034). `decision` (router, condiciones, evaluador de bucles) también cuenta en el presupuesto (SPEC-063) |
 | `supervisor.started` | `review, model?` | El Supervisor empieza a vigilar la ejecución (SPEC-060) |
 | `supervisor.reviewing` | `nodeId` | Empieza a revisar un paso con IA (SPEC-060) |
@@ -39,6 +39,8 @@ interface EventBase { runId: Id; seq: number; ts: string; type: string; nodePath
 | `workspace.conflict` | `nodeIds, files, regionId?, branchNodeIds?, savedTo?` | Dos ramas cambiaron las mismas líneas; se pregunta a la persona (SPEC-073) |
 | `workspace.resolved` | `regionId, nodeIds, files, choice: 'target' \| 'branch' \| 'agent'` | El conflicto quedó resuelto (SPEC-073) |
 | `workspace.discarded` | `regionId, branchNodeIds, files` | Una rama que falló no se fusiona; lo cambiado queda en `discarded/` (SPEC-073) |
+| `check.result` | `nodeId, checkId, label, kind, ok, detail, durationMs` | Resultado de una comprobación determinista del paso o de la ejecución (SPEC-075) |
+| `verify.result` | `nodeId, met, findings[{severity, where, what}]` | Lo que encontró el agente verificador (SPEC-075) |
 | `memory.note` | `nodeId, text` | La nota «Notas para los siguientes pasos» que dejó un agente, ya separada de su salida (SPEC-072) |
 | `supervisor.feedback` | `alertSeq, verdict: 'false-alarm' \| 'confirmed', note?, nodeId?` | La persona dice si un aviso era cierto; un falso aviso sale de «Avisos abiertos» de la memoria (SPEC-072, SPEC-075) |
 | `supervisor.skipped` | `count, reason: 'timeout' \| 'failed'` | Revisiones que no se pudieron hacer (SPEC-060) |

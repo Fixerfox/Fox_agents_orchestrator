@@ -2396,3 +2396,16 @@ button.orq-node__alerts:hover { text-decoration: underline; }
 .orq-memcard__files { margin: 0; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .orq-memcard__files code { font-family: var(--mono); font-size: 11px; color: var(--text2); background: var(--raised); border-radius: 6px; padding: 2px 7px; }
 .orq-memcards__all { align-self: flex-start; font-size: 12px; color: var(--accent-text); }
+
+/* SPEC-075 · Supervisor con evidencia */
+.orq-supalert.is-dismissed { opacity: 0.55; }
+.orq-gravity.is-high { color: var(--tone-amber); border-color: currentColor; }
+.orq-supalert__evidence { margin: 6px 0; padding-left: 18px; font-size: 12px; }
+.orq-supalert__feedback { display: flex; gap: 8px; margin-top: 6px; }
+.orq-supstats table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.orq-supstats th, .orq-supstats td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--line); }
+.orq-checks__list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.orq-checks__item { border: 1px solid var(--line); border-radius: 8px; padding: 8px; display: grid; gap: 6px; }
+.orq-checks__actions, .orq-checks__add { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.orq-t--checks.is-bad summary { color: var(--tone-amber); }
+.orq-t--checks pre { white-space: pre-wrap; max-height: 200px; overflow: auto; font-size: 11px; }

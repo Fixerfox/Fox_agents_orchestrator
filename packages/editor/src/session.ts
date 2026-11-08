@@ -1,4 +1,5 @@
-import { type Diagram, type Id, type KnowledgeExtra, type DeliverableSpec, type ReviewPort } from '@orquestador/core';
+import { type Diagram, type Id, type KnowledgeExtra, type DeliverableSpec, type ReviewPort, type StepCheck } from '@orquestador/core';
+import { setDiagramChecks } from './ops-step';
 import { EditorError, type EditorErrorCode } from './errors';
 import { History } from './history';
 import { t } from './i18n';
@@ -155,6 +156,12 @@ export class EditorSession {
   /** Conocimiento para todos los agentes del diagrama (un paso de deshacer) [R33.1]. */
   setDiagramExtra(extra: KnowledgeExtra | undefined): void {
     this.commit(setDiagramExtra(this.history.present, extra));
+  }
+
+  /** Comprobaciones de la ejecución (un paso de deshacer) [R75.24]. */
+  setDiagramChecks(checks: StepCheck[]): void {
+    const next = setDiagramChecks(this.history.present, checks);
+    if (next !== this.history.present) this.commit(next);
   }
 
   /** Entregable de la ejecución (un paso de deshacer) [R46.12]. */

@@ -1,4 +1,4 @@
-import { DEFAULT_MODEL, DEFAULT_PERMISSION, type FieldProblem, LIMITS, MODELS, PROJECT_PERMISSIONS, type PermissionLevel, type ProjectPermission, type StepLimits, type UnansweredPolicy, limitProblems, readUnanswered } from '../shared';
+import { DEFAULT_MODEL, DEFAULT_PERMISSION, type FieldProblem, LIMITS, MODELS, PROJECT_PERMISSIONS, STOP_AT, type StopAt, type PermissionLevel, type ProjectPermission, type StepLimits, type UnansweredPolicy, limitProblems, readUnanswered } from '../shared';
 
 /** v2: el nivel de permisos pasa a «Sin preguntar nunca» al migrar [R51.1]. */
 export const SETTINGS_SCHEMA_VERSION = 2;
@@ -29,6 +29,12 @@ export interface AppSettings {
   supervisorModel?: string;
   /** Lo que solo puede comprobar una persona: avisar (por defecto) o hacer fallar la ejecución [R65.2]. */
   supervisorHumanChecks?: HumanChecks;
+  /** Desde qué gravedad para y pregunta la revisión; por defecto, «grave» [R75.10]. */
+  supervisorStopAt?: StopAt;
+  /** Modelo de la comprobación final; por defecto, uno más capaz que el de cada paso [R75.19]. */
+  supervisorVerifyModel?: string;
+  /** Si no se puede comprobar el resultado: avisar (por defecto) o hacer fallar [R75.20]. */
+  supervisorUnverified?: HumanChecks;
   /** «Límites de tiempo»: inactividad y herramienta en curso por defecto [R70.21]. */
   limits?: Pick<StepLimits, 'idleMinutes' | 'toolMinutes'>;
   /** Qué hacer por defecto con una pregunta que nadie responde [R70.21]. */
@@ -58,6 +64,11 @@ export const JUDGE_MODEL = 'claude-haiku-5-5';
 export const supervisorReviews = (settings: Pick<AppSettings, 'supervisorReview'>): boolean => settings.supervisorReview !== false;
 
 export const supervisorModel = (settings: Pick<AppSettings, 'supervisorModel'>): string => settings.supervisorModel ?? SUPERVISOR_MODEL;
+/** Modelo de la comprobación final por defecto [R75.19]. */
+export const SUPERVISOR_VERIFY_MODEL = 'claude-sonnet-5-5';
+export const supervisorVerifyModel = (settings: Pick<AppSettings, 'supervisorVerifyModel'>): string => settings.supervisorVerifyModel ?? SUPERVISOR_VERIFY_MODEL;
+export const supervisorStopAt = (settings: Pick<AppSettings, 'supervisorStopAt'>): StopAt => settings.supervisorStopAt ?? 'high';
+export const supervisorUnverified = (settings: Pick<AppSettings, 'supervisorUnverified'>): HumanChecks => settings.supervisorUnverified ?? 'warn';
 
 /** Qué hace la comprobación final con lo que solo puede comprobar una persona [R65.2]. */
 export const supervisorHumanChecks = (settings: Pick<AppSettings, 'supervisorHumanChecks'>): HumanChecks => settings.supervisorHumanChecks ?? 'warn';
@@ -99,6 +110,9 @@ export function validateSettings(s: unknown): FieldProblem[] {
   if (s.supervisorReview !== undefined && typeof s.supervisorReview !== 'boolean') out.push({ field: 'supervisorReview', message: 'La revisión del Supervisor tiene que estar activa o no' });
   if (s.supervisorModel !== undefined && !known(s.supervisorModel)) out.push({ field: 'supervisorModel', message: 'Elige un modelo de la lista' });
   if (s.supervisorHumanChecks !== undefined && !(HUMAN_CHECKS as readonly unknown[]).includes(s.supervisorHumanChecks)) out.push({ field: 'supervisorHumanChecks', message: 'Elige «Avisar» o «Hacer fallar la ejecución»' });
+  if (s.supervisorStopAt !== undefined && !(STOP_AT as readonly unknown[]).includes(s.supervisorStopAt)) out.push({ field: 'supervisorStopAt', message: 'Elige cuándo para la revisión' });
+  if (s.supervisorVerifyModel !== undefined && !known(s.supervisorVerifyModel)) out.push({ field: 'supervisorVerifyModel', message: 'Elige un modelo de la lista' });
+  if (s.supervisorUnverified !== undefined && !(HUMAN_CHECKS as readonly unknown[]).includes(s.supervisorUnverified)) out.push({ field: 'supervisorUnverified', message: 'Elige «Avisar» o «Hacer fallar la ejecución»' });
   out.push(...limitProblems(s.limits));
   if (s.unanswered !== undefined && !readUnanswered(s.unanswered)) out.push({ field: 'unanswered', message: 'Elige qué hacer si nadie responde' });
   if (s.memoryTokens !== undefined && !memoryTokensOk(s.memoryTokens)) out.push({ field: 'memoryTokens', message: `El tope de la memoria va de ${MEMORY_TOKENS_RANGE[0]} a ${MEMORY_TOKENS_RANGE[1]} tokens` });
@@ -119,6 +133,9 @@ export function normalizeSettings(raw: unknown): AppSettings {
   if (typeof raw.isolateBranches === 'boolean') out.isolateBranches = raw.isolateBranches;
   if (known(raw.supervisorModel)) out.supervisorModel = raw.supervisorModel as string;
   if ((HUMAN_CHECKS as readonly unknown[]).includes(raw.supervisorHumanChecks)) out.supervisorHumanChecks = raw.supervisorHumanChecks as HumanChecks;
+  if ((STOP_AT as readonly unknown[]).includes(raw.supervisorStopAt)) out.supervisorStopAt = raw.supervisorStopAt as StopAt;
+  if (known(raw.supervisorVerifyModel)) out.supervisorVerifyModel = raw.supervisorVerifyModel as string;
+  if ((HUMAN_CHECKS as readonly unknown[]).includes(raw.supervisorUnverified)) out.supervisorUnverified = raw.supervisorUnverified as HumanChecks;
   // Ajustes anteriores a R47.8: «Modificar sin preguntar» pasa a automático y «preguntar todos los comandos», a preguntar.
   if ((PROJECT_PERMISSIONS as readonly unknown[]).includes(raw.permissions)) out.permissions = raw.permissions as ProjectPermission;
   else if (raw.askCommands === true) out.permissions = 'ask';

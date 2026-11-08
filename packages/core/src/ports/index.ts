@@ -4,3 +4,4 @@ export type * from './library-reader';
 export type * from './path-policy';
 export type * from './workspace-files';
 export type * from './branch-spaces';
+export type * from './checks';

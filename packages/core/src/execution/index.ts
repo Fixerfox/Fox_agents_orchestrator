@@ -28,3 +28,8 @@ export { CONFLICT_AGENT, CONFLICT_HALT, CONFLICT_PREVIEW_KEY, CONFLICT_STOP, kee
 export { mergeTask } from './run/merge-agent';
 export type * from './branch-spaces';
 export { normalStepKey, replayPlan, stepKey, stepKeysOf, type ReplayDecision, type ReplayPlan } from './replay-plan';
+export type * from './checks-port';
+export { caseAgrees, feedbackStats, supervisorCase, type FeedbackVerdict, type RuleStats, type SupervisorCase } from './feedback';
+export { CHECK_DETAIL_CHARS, CHECK_RUN, CHECK_SKIP, UNAPPROVED, checkApprovalQuestion, describeFailedChecks, mergeChecks, runChecks } from './run/checks';
+export { VERIFY_HEADING, parseVerification, verifyTask } from './run/verifier';
+export { EVIDENCE_DIFF_CHARS } from './run/supervisor';

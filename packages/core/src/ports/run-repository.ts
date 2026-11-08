@@ -72,6 +72,10 @@ export interface RunRepository {
   snapshotStep(args: { runId: string; workRoot: string; key: string; files: readonly string[]; blocked: (rel: string) => boolean }): Promise<unknown>;
   /** Ruta absoluta de la copia de un archivo de un paso, si existe [R54.4]. */
   findPreview(runId: string, key: string, rel: string): Promise<string | undefined>;
+  /** Añade lo que dijo la persona de un aviso a una ejecución terminada [R75.21]. */
+  addFeedback?(runId: string, body: { alertSeq: number; verdict: 'false-alarm' | 'confirmed'; note?: string; nodeId?: string }): Promise<void>;
+  /** Guarda un caso de referencia del Supervisor [R75.23]. */
+  addSupervisorCase?(c: unknown): Promise<void>;
   /** Ruta absoluta de una versión guardada de un conflicto (`<rama>/rama|destino/<ruta>`), si existe [R73.16]. */
   findConflict?(runId: string, rel: string): Promise<string | undefined>;
   /** Carpeta de los resultados de una ejecución (R20.6). */

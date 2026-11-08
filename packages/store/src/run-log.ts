@@ -306,6 +306,19 @@ export async function acceptRun(runDir: string, acceptance: RunAcceptance, now: 
   return true;
 }
 
+/** Lo que dijo la persona de un aviso en una ejecución ya terminada [R75.21]. */
+export async function addFeedback(runDir: string, body: { alertSeq: number; verdict: 'false-alarm' | 'confirmed'; note?: string; nodeId?: string }, now: Date = new Date()): Promise<void> {
+  const meta = await readRunMeta(runDir);
+  await appendEvent(runDir, meta.runId, { type: 'supervisor.feedback', ...body }, now.toISOString());
+  atomicWriteSync(path.join(runDir, 'meta.json'), `${JSON.stringify({ ...meta, eventCount: meta.eventCount + 1 }, null, 2)}\n`);
+}
+
+/** Un caso de referencia más en `supervisor/cases.jsonl` [R75.23]. */
+export async function appendSupervisorCase(file: string, c: unknown): Promise<void> {
+  await fs.mkdir(path.dirname(file), { recursive: true });
+  await fs.appendFile(file, `${JSON.stringify(c)}\n`);
+}
+
 export const DISMISS_REASON = 'Se interrumpió y la cancelaste';
 
 /**

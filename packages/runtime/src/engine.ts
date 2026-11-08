@@ -1,4 +1,4 @@
-import { AgentError, DEFAULT_REVIEW_CRITERIA, Orchestrator, effectivePermission, isolatesBranches, type BranchSpaces, supervisorHumanChecks, supervisorModel, supervisorReviews, type AgentEngine, type AgentProfile, type AppSettings, type Decider, type Id, type KnowledgeExtra, type LibraryReader, type RunOptions } from '@orquestador/core';
+import { AgentError, DEFAULT_REVIEW_CRITERIA, Orchestrator, effectivePermission, isolatesBranches, supervisorStopAt, supervisorUnverified, type BranchSpaces, type CheckRunner, type EvidenceSource, supervisorHumanChecks, supervisorModel, supervisorReviews, type AgentEngine, type AgentProfile, type AppSettings, type Decider, type Id, type KnowledgeExtra, type LibraryReader, type RunOptions } from '@orquestador/core';
 import { createDemoParts } from './demo';
 
 /** Lo que el orquestador necesita saber del proyecto abierto y de Ajustes, siempre al día [R27.1]. */
@@ -10,6 +10,9 @@ export interface EngineContext {
   restoreFiles?(runId: Id, files: { path: string; change?: 'created' | 'modified' }[], dir?: string): Promise<{ restored: string[]; removed: string[]; failed: { path: string; reason: string }[] }>;
   /** Espacios de las ramas en paralelo de una ejecución [R73.2]. */
   spaces?(runId: Id): BranchSpaces;
+  /** Comprobaciones deterministas y evidencia para la revisión [R75.4][R75.7]. */
+  checkRunner?: CheckRunner;
+  evidence?: EvidenceSource;
 }
 
 /** Ficha de un agente con lo enchufado a su paso, para quien reparte [R59.18]. */
@@ -79,7 +82,7 @@ export function createEngineOrchestrator(ctx: EngineContext, engines: readonly A
   // Un subdiagrama es otro diagrama del proyecto en su última versión guardada [R33.7], o la de la copia de la
   // ejecución [R52.1].
   // El Supervisor va siempre; revisa con IA si está activa y el motor sabe hacerlo [R60.12][R60.14].
-  const supervisor = { review: () => supervisorReviews(ctx.settings()), model: () => supervisorModel(ctx.settings()), humanChecks: () => supervisorHumanChecks(ctx.settings()) };
+  const supervisor = { review: () => supervisorReviews(ctx.settings()), model: () => supervisorModel(ctx.settings()), humanChecks: () => supervisorHumanChecks(ctx.settings()), stopAt: () => supervisorStopAt(ctx.settings()), unverified: () => supervisorUnverified(ctx.settings()) };
   return new Orchestrator({
     getAdapter: () => pick().adapter,
     // Fuera de una ejecución (proponer una corrección) vale el motor de Ajustes en cada momento.
@@ -96,6 +99,12 @@ export function createEngineOrchestrator(ctx: EngineContext, engines: readonly A
     ...(ctx.restoreFiles ? { restoreFiles: (runId: Id, files: { path: string; change?: 'created' | 'modified' }[], dir?: string) => ctx.restoreFiles!(runId, files, dir) } : {}),
     // Las ramas en paralelo, aisladas si Ajustes lo dice (activo por defecto) [R73.2].
     ...(ctx.spaces ? { spaces: (runId: Id) => (isolatesBranches(ctx.settings()) ? ctx.spaces!(runId) : undefined) } : {}),
+    // Comprobaciones: las de la ficha del agente se suman a las del paso [R75.2].
+    checks: {
+      ...(ctx.checkRunner ? { runner: ctx.checkRunner } : {}),
+      ...(ctx.evidence ? { evidence: ctx.evidence } : {}),
+      agentChecks: async (id, runId) => (await ctx.library.agents(runId)).find((a) => a.id === id)?.checks,
+    },
     // Un agente de solo lectura no necesita espacio [R73.2].
     canWrite: async (id, runId) => {
       const agent = (await ctx.library.agents(runId)).find((a) => a.id === id);

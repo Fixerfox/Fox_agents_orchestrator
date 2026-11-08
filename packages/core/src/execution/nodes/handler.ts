@@ -1,5 +1,6 @@
 import type { DeliverableSpec, Diagram, DiagramNode, Edge, ReturnInfo } from '../../diagrams';
-import type { Id, KnowledgeExtra, Payload, StepLimits } from '../../shared';
+import type { Id, KnowledgeExtra, Payload, StepCheck, StepLimits } from '../../shared';
+import type { CheckRunner } from '../checks-port';
 import type { AgentAdapter, AgentProfile, AgentSnapshot, Decider, FileChange, RestoreResult, TransformUsage } from '../adapter';
 import type { BudgetTracker } from '../run/budget-tracker';
 import type { ConcurrencyLimiter } from '../run/concurrency-limiter';
@@ -72,6 +73,10 @@ export interface RunServices {
   failRun(reason: string): void;
   /** Devuelve al punto de partida archivos de un intento fallido, si la app sabe hacerlo [R71.10]. */
   restoreFiles?(files: { path: string; change?: FileChange }[], dir?: string): Promise<RestoreResult>;
+  /** Ejecuta las comprobaciones que lanzan procesos o miran el disco [R75.4]. */
+  checkRunner?: CheckRunner;
+  /** Comprobaciones de la ficha de un agente [R75.2]. */
+  agentChecks?(agentId: Id): Promise<StepCheck[] | undefined>;
   /** Espacios de las ramas en paralelo, si la app las aísla [R73.2]. */
   spaces?: BranchSpaces;
   /** ¿Puede escribir este agente? Una rama solo de lectura no se aísla [R73.2]. */
