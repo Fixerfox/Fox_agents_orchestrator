@@ -35,7 +35,12 @@ export interface AppSettings {
   unanswered?: UnansweredPolicy;
   /** Tope de la memoria de la ejecución, en tokens [R72.15]. */
   memoryTokens?: number;
+  /** Cada rama en paralelo trabaja en su propio espacio y se junta al terminar; activo por defecto [R73.2]. */
+  isolateBranches?: boolean;
 }
+
+/** ¿Se aíslan las ramas en paralelo? Sí, salvo que se apague [R73.2]. */
+export const isolatesBranches = (settings: Pick<AppSettings, 'isolateBranches'>): boolean => settings.isolateBranches !== false;
 
 /** Rango del tope de la memoria [R72.15]. */
 export const MEMORY_TOKENS_RANGE = [500, 8000] as const;
@@ -90,6 +95,7 @@ export function validateSettings(s: unknown): FieldProblem[] {
   }
   if (s.permissions !== undefined && !(PROJECT_PERMISSIONS as readonly unknown[]).includes(s.permissions)) out.push({ field: 'permissions', message: 'Elige un nivel de permisos de la lista' });
   if (s.claudeConfig !== undefined && typeof s.claudeConfig !== 'boolean') out.push({ field: 'claudeConfig', message: '«Cargar la configuración de Claude Code» no es válido' });
+  if (s.isolateBranches !== undefined && typeof s.isolateBranches !== 'boolean') out.push({ field: 'isolateBranches', message: '«Aislar las ramas en paralelo» no es válido' });
   if (s.supervisorReview !== undefined && typeof s.supervisorReview !== 'boolean') out.push({ field: 'supervisorReview', message: 'La revisión del Supervisor tiene que estar activa o no' });
   if (s.supervisorModel !== undefined && !known(s.supervisorModel)) out.push({ field: 'supervisorModel', message: 'Elige un modelo de la lista' });
   if (s.supervisorHumanChecks !== undefined && !(HUMAN_CHECKS as readonly unknown[]).includes(s.supervisorHumanChecks)) out.push({ field: 'supervisorHumanChecks', message: 'Elige «Avisar» o «Hacer fallar la ejecución»' });
@@ -110,6 +116,7 @@ export function normalizeSettings(raw: unknown): AppSettings {
   if (Number.isInteger(raw.maxParallel) && (raw.maxParallel as number) >= 1 && (raw.maxParallel as number) <= LIMITS.maxParallel) out.maxParallel = raw.maxParallel as number;
   if (Number.isInteger(raw.defaultMaxTokens) && (raw.defaultMaxTokens as number) > 0) out.defaultMaxTokens = raw.defaultMaxTokens as number;
   if (typeof raw.supervisorReview === 'boolean') out.supervisorReview = raw.supervisorReview;
+  if (typeof raw.isolateBranches === 'boolean') out.isolateBranches = raw.isolateBranches;
   if (known(raw.supervisorModel)) out.supervisorModel = raw.supervisorModel as string;
   if ((HUMAN_CHECKS as readonly unknown[]).includes(raw.supervisorHumanChecks)) out.supervisorHumanChecks = raw.supervisorHumanChecks as HumanChecks;
   // Ajustes anteriores a R47.8: «Modificar sin preguntar» pasa a automático y «preguntar todos los comandos», a preguntar.

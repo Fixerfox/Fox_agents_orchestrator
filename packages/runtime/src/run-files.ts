@@ -1,6 +1,6 @@
 import { promises as fs } from 'node:fs';
 import { extname } from 'node:path';
-import { encodeStepKey, type PathPolicy, type RunEvent, type RunRepository, type WorkspaceFiles } from '@orquestador/core';
+import { CONFLICT_PREVIEW_KEY, encodeStepKey, type PathPolicy, type RunEvent, type RunRepository, type WorkspaceFiles } from '@orquestador/core';
 import { RunError } from './errors';
 import type { RunHistory } from './run-history';
 import type { LiveRuns } from './run-types';
@@ -45,6 +45,8 @@ export class RunFiles {
     private readonly policy: PathPolicy,
     private readonly files: WorkspaceFiles,
     private readonly history: RunHistory,
+    /** Carpeta de la rama aislada en la que trabaja un paso en marcha [R73.19]. */
+    private readonly stepDir?: (runId: string, key: string) => string | undefined,
   ) {}
 
   /** Ruta real de `rel` dentro de `root`, sin salir de ella ni por enlaces; `undefined` si no [R54.4]. */
@@ -60,10 +62,10 @@ export class RunFiles {
 
   /** Copia lo que hizo un paso; un fallo no afecta a la ejecución [R54.3]. */
   snapshotStep(runId: string, key: string, files: string[]): Promise<unknown> {
-    return this.runs
-      .workRoot()
-      .then((workRoot) => this.runs.snapshotStep({ runId, workRoot, key, files, blocked: (rel) => this.policy.isSensitive(rel) }))
-      .catch(() => undefined);
+    const take = (workRoot: string) => this.runs.snapshotStep({ runId, workRoot, key, files, blocked: (rel) => this.policy.isSensitive(rel) });
+    // En una rama aislada, lo hecho está en su espacio; si se fusionó mientras tanto, en la carpeta [R73.19].
+    const space = this.stepDir?.(runId, key);
+    return (space ? take(space).then(() => (this.stepDir?.(runId, key) ? undefined : this.runs.workRoot().then(take))) : this.runs.workRoot().then(take)).catch(() => undefined);
   }
 
   /**
@@ -100,6 +102,11 @@ export class RunFiles {
   async locatePreview(runId: string, key: string, rel: string): Promise<{ abs: string; source: 'run' | 'previous' | 'live'; from: string } | undefined> {
     if (!this.policy.isPreviewable(rel)) throw new RunError('bad-request', 'Ese archivo no se puede previsualizar');
     if (!(await this.history.list()).some((m) => m.runId === runId)) throw new RunError('not-found', 'No existe esa ejecución');
+    // Las dos versiones de un conflicto, guardadas en la ejecución [R73.16].
+    if (key === CONFLICT_PREVIEW_KEY) {
+      const found = await this.runs.findConflict?.(runId, rel);
+      return found ? { abs: found, source: 'run', from: runId } : undefined;
+    }
     let abs: string | undefined;
     let from = runId;
     for (const id of await this.history.lineage(runId)) {
@@ -112,7 +119,7 @@ export class RunFiles {
     if (abs) return { abs, source: from === runId ? 'run' : 'previous', from };
     const events = this.live.find(runId)?.handle.bus.history() ?? (await this.runs.readEvents(runId).catch(() => [] as RunEvent[]));
     if (!events.some((e) => e.type === 'file.produced' && e.path.replace(/\\/g, '/') === rel)) return undefined;
-    const real = await this.realInside(await this.runs.workRoot(), rel);
+    const real = await this.realInside(this.stepDir?.(runId, key) ?? (await this.runs.workRoot()), rel);
     if (!real || !(await fs.stat(real).then((st) => st.isFile()).catch(() => false))) return undefined;
     return { abs: real, source: 'live', from: runId };
   }

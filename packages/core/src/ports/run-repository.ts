@@ -69,6 +69,8 @@ export interface RunRepository {
   snapshotStep(args: { runId: string; workRoot: string; key: string; files: readonly string[]; blocked: (rel: string) => boolean }): Promise<unknown>;
   /** Ruta absoluta de la copia de un archivo de un paso, si existe [R54.4]. */
   findPreview(runId: string, key: string, rel: string): Promise<string | undefined>;
+  /** Ruta absoluta de una versión guardada de un conflicto (`<rama>/rama|destino/<ruta>`), si existe [R73.16]. */
+  findConflict?(runId: string, rel: string): Promise<string | undefined>;
   /** Carpeta de los resultados de una ejecución (R20.6). */
   outputFolder(runId: string): string;
   /** Carpeta en la que trabajan los agentes [R48.5]. */

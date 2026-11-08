@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, Brain, Clock, Eye, Folder, Gauge, KeyRound, Palette, ShieldCheck, Sparkles, type LucideIcon } from 'lucide-react';
-import { MEMORY_TOKENS, DEFAULT_IDLE_MINUTES, DEFAULT_TOOL_MINUTES, DEFAULT_UNANSWERED, MODELS, UNANSWERED_ACTIONS, loadsClaudeConfig, projectPermission, type AppSettings, type AuthMode, type Engine, type ProjectPermission, supervisorHumanChecks, supervisorModel, supervisorReviews } from '@orquestador/core';
+import { MEMORY_TOKENS, isolatesBranches, DEFAULT_IDLE_MINUTES, DEFAULT_TOOL_MINUTES, DEFAULT_UNANSWERED, MODELS, UNANSWERED_ACTIONS, loadsClaudeConfig, projectPermission, type AppSettings, type AuthMode, type Engine, type ProjectPermission, supervisorHumanChecks, supervisorModel, supervisorReviews } from '@orquestador/core';
 import { PermissionPicker, permissionName } from '../common';
 import { PROJECT_LEVELS, permissionMatrix, t, type ConnectionResult, type MessageKey, type PermAnswer, type ProjectApi, type SettingsView, type WorkFolderView } from '@orquestador/editor';
 import { fieldErrors } from '../common';
@@ -80,6 +80,7 @@ export function SettingsDialog({ api, onClose, onSaved }: Props) {
       ...(draft.limits ? { limits: draft.limits } : {}),
       ...(draft.unanswered ? { unanswered: draft.unanswered } : {}),
       ...(draft.memoryTokens !== undefined ? { memoryTokens: draft.memoryTokens } : {}),
+      ...(draft.isolateBranches !== undefined ? { isolateBranches: draft.isolateBranches } : {}),
     };
     const res = await api.saveSettings(body);
     if (!res.ok) {
@@ -308,6 +309,9 @@ export function SettingsDialog({ api, onClose, onSaved }: Props) {
           </Row>
           <Row id="set-tokens" label={t('settings.tokens')} error={errors['defaultMaxTokens']}>
             <input id="set-tokens" type="number" min={1} value={tokens} onChange={(e) => ((touched.current = true), setTokens(e.target.value), setStatus(t('settings.saving')))} />
+          </Row>
+          <Row id="set-isolate" label={t('settings.isolate')} hint={t('settings.isolate.hint')}>
+            <input id="set-isolate" type="checkbox" className="orq-toggle" checked={isolatesBranches(draft)} onChange={(e) => set({ isolateBranches: e.target.checked })} />
           </Row>
         </div>
       ),

@@ -3,7 +3,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import type { AgentQuestion } from '@orquestador/core';
 import type { PermissionLevel } from '@orquestador/core';
-import { allowCommandForRun, classifyCommand, grantKey, sensitiveCommand } from './commands';
+import { ISOLATED_GIT_DENY, allowCommandForRun, classifyCommand, grantKey, sensitiveCommand, writesGit } from './commands';
 import { AUTO_TOOLS } from './connection';
 import type { CanUseTool, PermissionResult, PreToolUseHook } from './sdk-types';
 
@@ -184,6 +184,38 @@ export function withScope(scope: readonly string[] | undefined, root: string, no
         const reason = `fuera de los archivos de este paso (${scope.join(', ')})`;
         note?.({ kind: 'denied', path: rel, reason });
         return deny(`El Supervisor ha bloqueado esta escritura: ${rel} está ${reason}. Sigue con lo tuyo, y si de verdad hace falta, dilo en tu respuesta.`);
+      }
+    }
+    return inner(tool, input);
+  };
+}
+
+/** Motivo al escribir en la carpeta de trabajo desde una rama en paralelo [R73.8]. */
+export const ISOLATED_DENY =
+  'Este paso trabaja en una copia aislada de la carpeta porque corre en paralelo con otros: escribe en tu carpeta actual, no en la original. Lo tuyo se junta con lo de las otras ramas al terminar.';
+
+/**
+ * Rama en paralelo [R73.8][R73.9]: nunca se escribe en la carpeta original (también con «Sin preguntar nunca») ni se
+ * cambia git. Lo demás, como siempre.
+ */
+export function withIsolation(original: string | undefined, note: WritePolicyDeps['note'], inner: (tool: string, input: Record<string, unknown>) => Promise<PermissionResult>, root: string): (tool: string, input: Record<string, unknown>) => Promise<PermissionResult> {
+  if (original === undefined) return inner;
+  return async (tool, input) => {
+    const target = (WRITE_TOOLS as readonly string[]).includes(tool) ? pathOf(input) : undefined;
+    if (target !== undefined && sameOrInside(path.resolve(root, target), original)) {
+      note?.({ kind: 'denied', path: target, reason: 'carpeta original de una rama en paralelo' });
+      return deny(ISOLATED_DENY);
+    }
+    if (tool === 'Bash' && typeof input['command'] === 'string') {
+      const command = input['command'] as string;
+      if (writesGit(command)) {
+        note?.({ kind: 'denied', path: command, reason: ISOLATED_GIT_DENY });
+        return deny(ISOLATED_GIT_DENY);
+      }
+      // Un comando que nombra la carpeta original y no solo lee también rompería el aislamiento.
+      if (command.includes(original) && !(await classifyCommand(command, original, original, { readOnly: true })).safe) {
+        note?.({ kind: 'denied', path: command, reason: 'carpeta original de una rama en paralelo' });
+        return deny(ISOLATED_DENY);
       }
     }
     return inner(tool, input);

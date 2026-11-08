@@ -101,6 +101,7 @@ export class QuestionBroker {
           ...(question.confirm ? { confirm: question.confirm } : {}),
           ...(question.kind ? { kind: question.kind } : {}),
           ...(question.review ? { review: question.review } : {}),
+          ...(question.conflict ? { conflict: question.conflict } : {}),
         },
         path,
       );

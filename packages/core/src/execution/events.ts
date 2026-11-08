@@ -1,6 +1,6 @@
 import type { DeliverableSpec, TransformFormat } from '../diagrams';
 import { type Id, type KnowledgeExtra, type KnowledgeKind, type Payload, redactSecrets } from '../shared';
-import type { AgentErrorKind, AgentSnapshot, AnsweredQuestion, FileChange, FileVia, KnowledgeVia, PreviousAttempt, QuestionKind, ReviewQuestion } from './adapter';
+import type { AgentErrorKind, AgentSnapshot, AnsweredQuestion, ConflictQuestion, FileChange, FileVia, KnowledgeVia, PreviousAttempt, QuestionKind, ReviewQuestion } from './adapter';
 import type { DeliverableItemResult, DeliverableLinks } from './deliverable';
 import type { NodeStatus, RunStatus } from './run-types';
 import type { SplitProblem } from './text/split';
@@ -37,6 +37,10 @@ export type EventBody =
       memoryStats?: MemoryStats;
       /** Archivos a los que se limita [R60.16]. */
       scope?: string[];
+      /** Paso interno: un agente que junta los archivos en conflicto [R73.15]. */
+      kind?: 'merge';
+      /** El paso trabaja en el espacio aislado de su rama (sin la ruta) [R73.8]. */
+      isolated?: boolean;
       /** Aviso del entregable que recibe este paso [R46.4]. */
       deliverable?: { role: 'final' | 'goal'; text: string };
       /** Lo añadido por el diagrama y por el paso, para saber de dónde vino cada cosa [R33.4]. */
@@ -76,7 +80,7 @@ export type EventBody =
   | { type: 'knowledge.used'; nodeId: Id; attempt: number; kind: KnowledgeKind; id: Id; via: KnowledgeVia; required: boolean }
   /** Obligatorio que el agente no usó en un intento [R36.13]. */
   | { type: 'knowledge.unmet'; nodeId: Id; attempt: number; kind: KnowledgeKind; id: Id }
-  | { type: 'agent.question'; nodeId: Id; questionId: string; text: string; options?: string[]; /** Confirmación del paso [R43.5]. */ confirm?: { round: number }; /** [R45.3] */ kind?: QuestionKind; /** Revisión humana [R53.3] */ review?: ReviewQuestion }
+  | { type: 'agent.question'; nodeId: Id; questionId: string; text: string; options?: string[]; /** Confirmación del paso [R43.5]. */ confirm?: { round: number }; /** [R45.3] */ kind?: QuestionKind; /** Revisión humana [R53.3] */ review?: ReviewQuestion; /** Conflicto al juntar ramas [R73.14] */ conflict?: ConflictQuestion }
   /** Respuesta a una confirmación: aprobada o con cambios pedidos [R43.6][R43.7]. */
   | { type: 'confirm.decided'; nodeId: Id; round: number; verdict: 'approved' | 'changes'; text?: string }
   | { type: 'agent.answer'; nodeId: Id; questionId: string; text: string; /** Nadie respondió y se tomó la respuesta segura [R70.15]. */ auto?: true }
@@ -121,8 +125,15 @@ export type EventBody =
   | { type: 'supervisor.reviewing'; nodeId: Id }
   /** Revisiones que no se pudieron hacer [R60.13][R60.15]. */
   | { type: 'supervisor.skipped'; count: number; reason: 'timeout' | 'failed' }
-  | { type: 'workspace.merged'; nodeId: Id; files: string[] }
-  | { type: 'workspace.conflict'; nodeIds: Id[]; files: string[] }
+  /** Una rama en paralelo empieza a trabajar en su propio espacio [R73.7]; la ruta nunca sale en el evento. */
+  | { type: 'workspace.opened'; regionId: Id; branchNodeIds: Id[]; strategy: 'git' | 'copy'; warning?: string }
+  /** Lo de una rama llegó al destino; `nodeId`, el nodo que las junta [R73.13]. */
+  | { type: 'workspace.merged'; nodeId: Id; files: string[]; regionId?: Id; branchNodeIds?: Id[]; mergedByLines?: string[] }
+  | { type: 'workspace.conflict'; nodeIds: Id[]; files: string[]; regionId?: Id; branchNodeIds?: Id[]; savedTo?: string }
+  /** La persona (o un agente) resolvió un conflicto [R73.14][R73.15]. */
+  | { type: 'workspace.resolved'; regionId: Id; nodeIds: Id[]; files: string[]; choice: 'target' | 'branch' | 'agent' }
+  /** Una rama que falló o se canceló no se fusiona; lo cambiado queda aparte [R73.17]. */
+  | { type: 'workspace.discarded'; regionId: Id; branchNodeIds: Id[]; files: string[] }
   | { type: 'iteration.snapshot'; loopId: Id; n: number; path: string }
   | {
       type: 'route.decided';

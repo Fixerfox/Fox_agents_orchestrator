@@ -7,7 +7,7 @@ import { ASSISTANT_EVENTS_CHANNEL, CHANNELS, OPEN_RUN_CHANNEL, RUN_EVENTS_CHANNE
 import { sdkCreateAppServer, sdkQuery } from '@orquestador/claude';
 import { ApiKeyVault, McpSecretVault, RecentStore, SettingsStore } from '@orquestador/store';
 import { Background } from './background';
-import { composeOrchestrator } from './composition';
+import { cleanupSpaces, composeOrchestrator } from './composition';
 import { DesktopHandlers } from './handlers';
 import { TerminalService, type SpawnPty } from './terminal';
 import { parseWindowTone, secureWebContents, titleBarOverlay, windowOptions, TITLEBAR, WINDOW_TONE_CHANNEL } from './window';
@@ -71,7 +71,8 @@ const handlers = new DesktopHandlers({
     if (err) throw new Error(err);
   },
   claudeQuery: sdkQuery,
-  createOrchestrator: (ctx) => composeOrchestrator(ctx, sdkQuery),
+  // Los espacios de las ramas en paralelo, en los datos de la app [R73.6].
+  createOrchestrator: (ctx) => composeOrchestrator({ ...ctx, spacesRoot: join(dataDir(), 'spaces') }, sdkQuery),
   preinstallSpecKit: true,
   settings: new SettingsStore(join(dataDir(), 'config')),
   recents: new RecentStore(join(dataDir(), 'config')),
@@ -200,6 +201,8 @@ app.whenReady().then(() => {
     return abs ? net.fetch(pathToFileURL(abs).toString()) : new Response('No encontrado', { status: 404 });
   });
   createWindow();
+  // Espacios de ramas que quedaron de un cierre inesperado [R73.18].
+  void new RecentStore(join(dataDir(), 'config')).list().then((recent) => cleanupSpaces(join(dataDir(), 'spaces'), recent.map((r) => r.root)));
   // La bandeja es para Windows y Linux, los sistemas de la app.
   if (process.platform !== 'darwin') background.start();
   app.on('activate', () => {

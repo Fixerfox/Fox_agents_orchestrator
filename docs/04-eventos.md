@@ -34,6 +34,11 @@ interface EventBase { runId: Id; seq: number; ts: string; type: string; nodePath
 | `supervisor.started` | `review, model?` | El Supervisor empieza a vigilar la ejecución (SPEC-060) |
 | `supervisor.reviewing` | `nodeId` | Empieza a revisar un paso con IA (SPEC-060) |
 | `supervisor.note` | `nodeId, text, files, reviewed?, decided?` | Entrada de la memoria de la ejecución (SPEC-060); `decided`, hasta 3 decisiones que el paso tomó por su cuenta (SPEC-072) |
+| `workspace.opened` | `regionId, branchNodeIds, strategy: 'git' \| 'copy', warning?` | Una rama en paralelo empieza a trabajar en su propio espacio; sin la ruta (SPEC-073) |
+| `workspace.merged` | `nodeId, files, regionId?, branchNodeIds?, mergedByLines?` | Lo de una rama llegó al destino; `nodeId`, lo que junta las ramas (SPEC-013, SPEC-073) |
+| `workspace.conflict` | `nodeIds, files, regionId?, branchNodeIds?, savedTo?` | Dos ramas cambiaron las mismas líneas; se pregunta a la persona (SPEC-073) |
+| `workspace.resolved` | `regionId, nodeIds, files, choice: 'target' \| 'branch' \| 'agent'` | El conflicto quedó resuelto (SPEC-073) |
+| `workspace.discarded` | `regionId, branchNodeIds, files` | Una rama que falló no se fusiona; lo cambiado queda en `discarded/` (SPEC-073) |
 | `memory.note` | `nodeId, text` | La nota «Notas para los siguientes pasos» que dejó un agente, ya separada de su salida (SPEC-072) |
 | `supervisor.feedback` | `alertSeq, verdict: 'false-alarm' \| 'confirmed', note?, nodeId?` | La persona dice si un aviso era cierto; un falso aviso sale de «Avisos abiertos» de la memoria (SPEC-072, SPEC-075) |
 | `supervisor.skipped` | `count, reason: 'timeout' \| 'failed'` | Revisiones que no se pudieron hacer (SPEC-060) |
@@ -42,8 +47,6 @@ interface EventBase { runId: Id; seq: number; ts: string; type: string; nodePath
 | `node.timeout` | `nodeId, attempt, kind: idle\|tool\|total\|loop, minutes, tool?` | El motor cortó el intento por inactividad, por su duración o por repetir la misma acción (SPEC-070) |
 | `files.restored` | `nodeId, attempt, restored, removed, failed` | Lo que tocó un intento fallido, devuelto al punto de partida antes de reintentar (SPEC-071) |
 | `question.reminder` | `nodeId, questionId, text, minutes` | Recordatorio de una pregunta que sigue sin respuesta (SPEC-070) |
-| `workspace.merged` | `nodeId, files` | Cambios de un agente fusionados en el proyecto |
-| `workspace.conflict` | `nodeIds, files` | Conflicto entre agentes paralelos; requiere atención |
 | `iteration.snapshot` | `loopId, n, path` | Instantánea de resultados de una vuelta de bucle |
 | `subdiagram.started` | `nodeId, templateId, version` | Se entra en un nodo compuesto |
 | `subdiagram.finished` | `nodeId, status` | Se sale del nodo compuesto con su resultado |

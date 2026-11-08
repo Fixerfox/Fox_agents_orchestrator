@@ -377,3 +377,39 @@ export function sensitiveCommand(command: string, root: string, cwd: string = ro
   }
   return null;
 }
+
+/** Subcomandos de git que cambian el historial, las ramas o el remoto [R73.9]. */
+const GIT_WRITES = new Set(['commit', 'checkout', 'switch', 'merge', 'rebase', 'reset', 'stash', 'push', 'pull', 'tag', 'cherry-pick', 'revert', 'am', 'apply', 'restore', 'worktree', 'clean', 'rm', 'mv', 'add']);
+/** Opciones globales de git que llevan un valor detrás. */
+const GIT_GLOBAL_WITH_VALUE = new Set(['-C', '-c', '--git-dir', '--work-tree', '--namespace']);
+const WRAPPERS = new Set(['sudo', 'env', 'time', 'nice', 'command', 'nohup', 'xargs']);
+
+/**
+ * ¿Escribe en git este comando? Busca `git` en cada tramo (también tras `;`, `|`, `&&` o en `$(...)`), salta sus
+ * opciones globales y mira el subcomando; `branch` solo cuenta si crea, borra o mueve [R73.9].
+ */
+export function writesGit(command: string): boolean {
+  const pieces = command.split(/&&|\|\||[;|&\n`]|\$\(|\)/);
+  for (const piece of pieces) {
+    const words = tokenize(piece.trim()) ?? piece.trim().split(/\s+/);
+    // El programa del tramo: tras las variables (A=1) y los envoltorios (sudo, env, time…).
+    let i = 0;
+    while (i < words.length && (/^[A-Za-z_][A-Za-z0-9_]*=/.test(words[i]!) || WRAPPERS.has(programOf(words[i]!)))) i++;
+    {
+      if (i >= words.length || programOf(words[i]!) !== 'git') continue;
+      let j = i + 1;
+      while (j < words.length && words[j]!.startsWith('-')) j += GIT_GLOBAL_WITH_VALUE.has(words[j]!) ? 2 : 1;
+      const sub = words[j];
+      if (!sub) continue;
+      if (GIT_WRITES.has(sub)) return true;
+      if (sub === 'branch') {
+        const rest = words.slice(j + 1);
+        if (rest.some((a) => GIT_BRANCH_CHANGE.has(a) || a.startsWith('--set-upstream') || !a.startsWith('-'))) return true;
+      }
+    }
+  }
+  return false;
+}
+
+/** Motivo al denegar git en una rama en paralelo [R73.9]. */
+export const ISOLATED_GIT_DENY = 'En una rama en paralelo no se cambia git: el commit se hace después de juntar las ramas.';

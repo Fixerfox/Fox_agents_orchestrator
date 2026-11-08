@@ -40,7 +40,7 @@ async function restore(step: StepContext, node: DiagramNode, path: Id[], turn: A
   let result: RestoreResult = { restored: [], removed: [], failed };
   if (asked.length > 0) {
     try {
-      const r = await step.restoreFiles(asked);
+      const r = await step.restoreFiles(asked, step.space?.dir);
       result = { restored: r.restored, removed: r.removed, failed: [...failed, ...r.failed] };
     } catch (err) {
       result = { restored: [], removed: [], failed: [...failed, ...asked.map((a) => ({ path: a.path, reason: errorMessage(err) }))] };

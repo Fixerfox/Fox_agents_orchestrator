@@ -1,9 +1,10 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { AlertTriangle, Check, ChevronsRight, Loader2, Maximize2, MessageCircleQuestion, X as XIcon } from 'lucide-react';
-import { MODELS, isApproval, type RunEvent } from '@orquestador/core';
+import { MODELS, isApproval, type QuestionKind, type RunEvent } from '@orquestador/core';
 import { pathKey } from '@orquestador/core';
 import { conversationBlocks, filesSinceReview, questionGroup, stepFiles, stepOverview, t, toolTarget, transcriptItems, type LiveView, type MessageKey, type TranscriptItem } from '@orquestador/editor';
 import { Markdown } from '../common';
+import { ConflictCard } from './ConflictCard';
 import { StepFilesBlock } from './RunFiles';
 
 interface Props {
@@ -184,7 +185,7 @@ export function ReviewGateCard({ item, onAnswer, closed = false, files = [], onP
 }
 
 /** Fichero por el que pide permiso para modificar, si la pregunta es de ese tipo [R45.9]. */
-export function permissionTarget(item: { text: string; ask?: 'question' | 'permission' | 'gate' | 'unfinished' }): string | undefined {
+export function permissionTarget(item: { text: string; ask?: QuestionKind | undefined }): string | undefined {
   if (questionGroup({ text: item.text, ...(item.ask ? { kind: item.ask } : {}) }) !== 'permission') return undefined;
   return /^¿Puedo modificar (.+)\?$/.exec(item.text.trim())?.[1];
 }
@@ -193,6 +194,7 @@ export function Question({ item, onAnswer, closed = false, onOpenFile, reviewFil
   const [text, setText] = useState('');
   if (item.review) return <ReviewGateCard item={item} onAnswer={onAnswer} closed={closed} {...(reviewFiles ? { files: reviewFiles } : {})} {...(onPreview ? { onPreview } : {})} {...(renderThumb ? { renderThumb } : {})} />;
   if (item.confirm) return <ConfirmCard item={item} onAnswer={onAnswer} closed={closed} />;
+  if (item.conflict) return <ConflictCard item={item} onAnswer={onAnswer} closed={closed} onPreview={onPreview} />;
   const target = item.answer === undefined && !closed ? permissionTarget(item) : undefined;
   return (
     <li className="orq-chat orq-chat--question">

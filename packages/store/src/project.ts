@@ -332,8 +332,8 @@ export class ProjectStore {
     return files.readRunFile(this, runId, rel, opts);
   }
 
-  restoreBackup(runId: Id, rel: string): Promise<boolean> {
-    return files.restoreBackup(this, runId, rel);
+  restoreBackup(runId: Id, rel: string, dir?: string): Promise<boolean> {
+    return files.restoreBackup(this, runId, rel, dir);
   }
 
 

@@ -113,6 +113,16 @@ export interface AgentQuestion {
   review?: ReviewQuestion;
   /** La respuesta segura, que se elige sola si la política lo permite [R70.13]. */
   fallback?: string;
+  /** Conflicto al juntar ramas: archivos y dónde están las dos versiones, para verlas [R73.14][R73.16]. */
+  conflict?: ConflictQuestion;
+}
+
+/** Datos de una pregunta de conflicto [R73.14]. */
+export interface ConflictQuestion {
+  files: string[];
+  /** `<rama>` dentro de `conflicts/`: las versiones están en `<rama>/rama/<ruta>` y `<rama>/destino/<ruta>`. */
+  savedTo?: string;
+  branches: [string, string];
 }
 
 /** Datos de una pregunta de revisión humana [R53.3][R53.5]. */
@@ -134,7 +144,7 @@ export interface BlameCandidate {
   output?: Payload;
 }
 
-export type QuestionKind = 'question' | 'permission' | 'gate' | 'unfinished';
+export type QuestionKind = 'question' | 'permission' | 'gate' | 'unfinished' | 'conflict';
 
 export interface AnsweredQuestion {
   question: string;
@@ -173,6 +183,8 @@ export interface AgentRequest {
   previousAnswers: AnsweredQuestion[];
   /** Lo que el intento inmediatamente anterior dejó: error, acciones y archivos [R71.7][R71.8]. */
   previousAttempt?: PreviousAttempt;
+  /** Espacio aislado de la rama en paralelo: carpeta de trabajo y raíz de escritura del paso [R73.8]. */
+  workspace?: { dir: string };
 }
 
 /** Lo que un intento fallido le deja al siguiente [R71.7]. */

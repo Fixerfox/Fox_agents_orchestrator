@@ -1,4 +1,4 @@
-import { validateDiagram, type Diagram, type Id, type ValidationIssue } from '@orquestador/core';
+import { parallelRegions, validateDiagram, type Diagram, type Id, type ValidationIssue } from '@orquestador/core';
 import { getLevel } from './ops';
 import { t, type MessageKey } from './i18n';
 
@@ -15,7 +15,7 @@ export interface LocalizedProblem {
 }
 
 /** Problemas normales mientras se monta un diagrama: avisos, no errores [R32.10]. */
-export const WARNING_CODES: ReadonlySet<string> = new Set(['unreachable', 'router-no-outgoing', 'review-no-approved', 'extra-without-task']);
+export const WARNING_CODES: ReadonlySet<string> = new Set(['unreachable', 'router-no-outgoing', 'review-no-approved', 'extra-without-task', 'shared-fan']);
 
 /**
  * Pasos con skills, contextos o MCP añadidos pero sin tarea [R36.15]. Es un aviso del editor y no de la validación
@@ -30,6 +30,13 @@ export function extraWithoutTask(level: Diagram, path: Id[] = []): ValidationIss
     }
     if (n.kind === 'loop' && n.loop) out.push(...extraWithoutTask(n.loop.body, [...path, n.id]));
   }
+  return out;
+}
+
+/** Abanicos cuyas ramas comparten carpeta porque el aislamiento está apagado [R73.21]. */
+export function sharedFans(level: Diagram, path: Id[] = []): ValidationIssue[] {
+  const out: ValidationIssue[] = parallelRegions(level).map((r) => ({ code: 'shared-fan', message: 'Estas ramas comparten carpeta', nodeId: r.id, path }));
+  for (const n of level.nodes) if (n.kind === 'loop' && n.loop) out.push(...sharedFans(n.loop.body, [...path, n.id]));
   return out;
 }
 
@@ -68,9 +75,9 @@ function describe(root: Diagram, issue: ValidationIssue): { message: string; whe
 }
 
 /** Valida todo el diagrama y reparte los problemas entre los nodos del nivel que se está viendo. */
-export function computeProblems(root: Diagram, path: readonly Id[]): ProblemsView {
+export function computeProblems(root: Diagram, path: readonly Id[], opts: { sharedFans?: boolean } = {}): ProblemsView {
   const core = validateDiagram(root);
-  const issues = [...core, ...extraWithoutTask(root)];
+  const issues = [...core, ...extraWithoutTask(root), ...(opts.sharedFans ? sharedFans(root) : [])];
   const all: LocalizedProblem[] = [];
   const byNode: Record<Id, string[]> = {};
   const nodeErrors = new Set<Id>();

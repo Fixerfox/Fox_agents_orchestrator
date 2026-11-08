@@ -2136,6 +2136,18 @@ export const es = {
   'settings.memory.tokens.hint': 'Lo que recibe cada paso de lo que va de ejecución. Más memoria cuesta más en cada paso; si se pasa, se recortan primero las partes menos importantes.',
   'mem.block.branch': 'Rama de git',
   'mem.block.files': 'Archivos',
+  'settings.isolate': 'Aislar las ramas en paralelo',
+  'settings.isolate.hint': 'Cada rama trabaja en su propia copia de la carpeta y se junta con las demás al terminar. Si dos cambian las mismas líneas, te pregunta.',
+  'sup.rule.isolation-failed': 'No se pudo aislar la rama',
+  'sup.rule.isolation-failed.why': 'La rama trabaja en la carpeta compartida: si otra toca los mismos archivos, se pueden pisar.',
+  'conflict.title': 'Conflicto al juntar las ramas',
+  'conflict.intro': '«{a}» y «{b}» cambiaron las mismas líneas de estos archivos. El paso que las junta espera a que elijas.',
+  'conflict.view': 'Ver la de {branch}',
+  'conflict.hint': 'Si eliges que lo junte un agente, une los dos cambios sin perder nada y vuelve a preguntarte si queda algo.',
+  'node.iso.isolated': 'aislada',
+  'node.iso.merged': 'fusionada',
+  'node.iso.conflict': 'conflicto',
+  'problem.shared-fan': '«{node}»: estas ramas comparten carpeta: si tocan los mismos archivos, se pisan',
 } as const;
 
 export type MessageKey = keyof typeof es;

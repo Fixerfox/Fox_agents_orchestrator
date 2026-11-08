@@ -1,6 +1,6 @@
 import { branchesOf, type RunBranches } from './branches';
 import type { KnowledgeState } from './knowledge';
-import { describePreviousAttempt, pathKey, type Id, type NodeStatus, type Payload, type ReviewQuestion, type RunEvent, type RunStatus, type QuestionKind } from '@orquestador/core';
+import { describePreviousAttempt, pathKey, type Id, type NodeStatus, type Payload, type ReviewQuestion, type RunEvent, type RunStatus, type QuestionKind, type ConflictQuestion } from '@orquestador/core';
 
 export interface PendingItem {
   questionId: string;
@@ -67,6 +67,8 @@ export interface LiveView {
   alerts: Record<string, string[]>;
   /** Pasos sin señales de vida (minutos) o cortados por el motor y a punto de reintentarse [R70.20]. */
   health: Record<string, StepHealth>;
+  /** Ramas en paralelo: «aislada» en sus pasos y, al juntarse, «fusionada» o «conflicto» en lo que las junta [R73.20]. */
+  isolation: Record<string, 'isolated' | 'merged' | 'conflict'>;
   needsAttention: boolean;
 }
 
@@ -96,6 +98,7 @@ export const EMPTY_LIVE: LiveView = {
   gitLinks: {},
   alerts: {},
   health: {},
+  isolation: {},
   needsAttention: false,
 };
 
@@ -104,7 +107,7 @@ const textOf = (p: Payload | undefined): string | undefined => (p ? p.text : und
 /** Estado visible de una ejecución, reconstruido solo con sus eventos (vivo o replay). */
 export function deriveLive(events: readonly RunEvent[]): LiveView {
   if (events.length === 0) return EMPTY_LIVE;
-  const v: LiveView = { ...EMPTY_LIVE, knowledge: {}, status: 'running', nodeStatus: {}, edges: new Set(), loops: {}, reviews: {}, exhausted: [], usage: { inputTokens: 0, outputTokens: 0, costUsd: 0 }, pending: [], produced: [], alerts: {}, health: {} };
+  const v: LiveView = { ...EMPTY_LIVE, knowledge: {}, status: 'running', nodeStatus: {}, edges: new Set(), loops: {}, reviews: {}, exhausted: [], usage: { inputTokens: 0, outputTokens: 0, costUsd: 0 }, pending: [], produced: [], alerts: {}, health: {}, isolation: {} };
   const open = new Map<string, PendingItem>();
   // Orden en que empezó cada paso y se recorrió cada conexión, para reiniciar la vuelta al volver atrás [R38.18].
   const startedAt = new Map<string, number>();
@@ -209,8 +212,19 @@ export function deriveLive(events: readonly RunEvent[]): LiveView {
       case 'file.produced':
         v.produced.push({ nodeId: e.nodeId, path: e.path, nodePath: [...np] });
         break;
+      case 'workspace.opened':
+        for (const id of e.branchNodeIds) v.isolation[pathKey(np, id)] = 'isolated';
+        break;
+      case 'workspace.merged':
+        if (e.regionId !== undefined && v.isolation[pathKey(np, e.nodeId)] !== 'conflict') v.isolation[pathKey(np, e.nodeId)] = 'merged';
+        break;
       case 'workspace.conflict':
         v.needsAttention = true;
+        for (const id of e.nodeIds) v.isolation[pathKey(np, id)] = 'conflict';
+        break;
+      case 'workspace.resolved':
+        for (const id of e.nodeIds) v.isolation[pathKey(np, id)] = 'merged';
+        v.needsAttention = false;
         break;
       case 'supervisor.alert':
         if (e.nodeId !== undefined) {
@@ -269,7 +283,7 @@ export type TranscriptItem =
   | { kind: 'pass'; n: number; by?: Id; reason?: string }
   | { kind: 'text'; text: string }
   | { kind: 'tool'; tool: string; input?: unknown; ok?: boolean; output?: string }
-  | { kind: 'question'; questionId: string; text: string; options?: string[]; answer?: string; /** Confirmación del paso [R43.9]. */ confirm?: { round: number }; /** Tipo de pregunta [R45.3]. */ ask?: QuestionKind; /** Revisión humana [R53.15]. */ review?: ReviewQuestion }
+  | { kind: 'question'; questionId: string; text: string; options?: string[]; answer?: string; /** Confirmación del paso [R43.9]. */ confirm?: { round: number }; /** Tipo de pregunta [R45.3]. */ ask?: QuestionKind; /** Revisión humana [R53.15]. */ review?: ReviewQuestion; /** Conflicto al juntar ramas [R73.16]. */ conflict?: ConflictQuestion }
   /** Nota que el paso dejó a los siguientes [R72.24]. */
   | { kind: 'note'; text: string }
   | { kind: 'retry'; attempt: number; max: number; message: string; /** Por qué [R71.15]. */ cause?: 'error' | 'timeout' | 'loop' }
@@ -331,7 +345,7 @@ export function transcriptItems(events: readonly RunEvent[], nodeId: Id, nodePat
         break;
       }
       case 'agent.question':
-        items.push({ kind: 'question', questionId: e.questionId, text: e.text, ...(e.options ? { options: e.options } : {}), ...(e.confirm ? { confirm: e.confirm } : {}), ...(e.kind ? { ask: e.kind } : {}), ...(e.review ? { review: e.review } : {}) });
+        items.push({ kind: 'question', questionId: e.questionId, text: e.text, ...(e.options ? { options: e.options } : {}), ...(e.confirm ? { confirm: e.confirm } : {}), ...(e.kind ? { ask: e.kind } : {}), ...(e.review ? { review: e.review } : {}), ...(e.conflict ? { conflict: e.conflict } : {}) });
         break;
       case 'agent.answer': {
         const q = items.find((i) => i.kind === 'question' && i.questionId === e.questionId);

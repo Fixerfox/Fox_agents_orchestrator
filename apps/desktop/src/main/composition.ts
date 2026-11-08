@@ -4,7 +4,8 @@ import { claudePathPolicy, createClaudeEngine, type ClaudeEnvironment, type Quer
 import type { AppSettings, LibraryReader, Orchestrator } from '@orquestador/core';
 import { createEngineOrchestrator, snapshotLibrary, withBuiltinAgents, type RunPorts, type RunSnapshots } from '@orquestador/runtime';
 import { ProjectStore, libraryReaderOf, runRepositoryOf } from '@orquestador/store';
-import { workspaceFiles } from '@orquestador/workspace';
+import { BranchSpaceManager, cleanupBranchSpaces, workspaceFiles } from '@orquestador/workspace';
+import { tmpdir } from 'node:os';
 
 /** Único lugar que crea los adaptadores concretos y los conecta con los puertos [R56.5]. */
 
@@ -18,6 +19,31 @@ export interface OrchestratorContext {
   mcpSecrets?(id: string, scope?: 'project' | 'app'): Promise<Record<string, string>>;
   /** Copias de las ejecuciones en marcha: sus pasos leen de ahí y no del disco [R52.1]. */
   snapshots?: RunSnapshots;
+  /** Carpeta de los espacios de las ramas en paralelo, fuera de la de trabajo (datos de la app) [R73.6]. */
+  spacesRoot?: string;
+}
+
+/** Espacios abiertos de cada ejecución en marcha, para la vista previa [R73.19]. */
+const liveSpaces = new Map<string, BranchSpaceManager>();
+
+/** Carpeta en la que trabaja ahora un paso de una rama aislada [R73.19]. */
+export const stepSpaceDir = (runId: string, key: string): string | undefined => liveSpaces.get(runId)?.dirForStep(key);
+
+/** Espacios de las ramas en paralelo de una ejecución; se olvidan al cerrarlos todos [R73.2][R73.18]. */
+export function branchSpacesFor(ctx: Pick<OrchestratorContext, 'store' | 'projectRoot' | 'spacesRoot'>) {
+  return (runId: string): BranchSpaceManager => {
+    const m = new BranchSpaceManager({ workRoot: async () => (await ctx.store.getWorkFolder()) ?? ctx.projectRoot, runDir: ctx.store.paths.runDir(runId), spacesRoot: ctx.spacesRoot ?? path.join(tmpdir(), 'orquestador-spaces') });
+    liveSpaces.set(runId, m);
+    const closeAll = m.closeAll.bind(m);
+    m.closeAll = async () => {
+      try {
+        await closeAll();
+      } finally {
+        liveSpaces.delete(runId);
+      }
+    };
+    return m;
+  };
 }
 
 export const createProject = (root: string, init: { name: string }): Promise<ProjectStore> => ProjectStore.create(root, init);
@@ -59,11 +85,12 @@ export function claudeEnvironment(ctx: OrchestratorContext): ClaudeEnvironment {
  * (R31.6) y lo creado se borra. Nunca sale de la carpeta de trabajo.
  */
 export function restoreAttemptFiles(store: Pick<ProjectStore, 'restoreBackup' | 'getWorkFolder'>, projectRoot: string) {
-  return async (runId: string, files: { path: string; change?: 'created' | 'modified' }[]) => {
+  return async (runId: string, files: { path: string; change?: 'created' | 'modified' }[], dir?: string) => {
     const restored: string[] = [];
     const removed: string[] = [];
     const failed: { path: string; reason: string }[] = [];
-    const root = path.resolve((await store.getWorkFolder()) ?? projectRoot);
+    // En una rama aislada se devuelve en su espacio [R73.8].
+    const root = path.resolve(dir ?? (await store.getWorkFolder()) ?? projectRoot);
     for (const f of files) {
       const abs = path.resolve(root, ...f.path.split('/'));
       if (abs !== root && !abs.startsWith(root + path.sep)) {
@@ -74,7 +101,7 @@ export function restoreAttemptFiles(store: Pick<ProjectStore, 'restoreBackup' | 
         if (f.change === 'created') {
           await fsp.rm(abs, { force: true });
           removed.push(f.path);
-        } else if (await store.restoreBackup(runId, f.path)) restored.push(f.path);
+        } else if (await store.restoreBackup(runId, f.path, dir)) restored.push(f.path);
         else failed.push({ path: f.path, reason: 'no hay copia' });
       } catch (e) {
         failed.push({ path: f.path, reason: e instanceof Error ? e.message : String(e) });
@@ -86,13 +113,16 @@ export function restoreAttemptFiles(store: Pick<ProjectStore, 'restoreBackup' | 
 
 /** Orquestador del proyecto con el motor de Claude y el de demostración [R27.1][R56.5]. */
 export function composeOrchestrator(ctx: OrchestratorContext, query: QueryFn): Orchestrator {
-  return createEngineOrchestrator({ library: libraryOf(ctx), settings: ctx.settings, restoreFiles: restoreAttemptFiles(ctx.store, ctx.projectRoot) }, [createClaudeEngine(claudeEnvironment(ctx), query)]);
+  return createEngineOrchestrator({ library: libraryOf(ctx), settings: ctx.settings, restoreFiles: restoreAttemptFiles(ctx.store, ctx.projectRoot), spaces: branchSpacesFor(ctx) }, [createClaudeEngine(claudeEnvironment(ctx), query)]);
 }
 
 /** Puertos del servicio de ejecución para un proyecto [R56.5]. */
 export function composeRunPorts(store: ProjectStore): RunPorts {
-  return { runs: runRepositoryOf(store), library: libraryReaderOf(store), policy: claudePathPolicy, files: workspaceFiles };
+  return { runs: runRepositoryOf(store), library: libraryReaderOf(store), policy: claudePathPolicy, files: workspaceFiles, stepDir: stepSpaceDir };
 }
 
 /** Biblioteca del proyecto sin copias, para listar trabajos [R52.4]. */
 export const composeLibrary = (store: ProjectStore): LibraryReader => libraryReaderOf(store);
+
+/** Al arrancar la app: borra los espacios de un cierre inesperado y lo que git recuerda de ellos [R73.18]. */
+export const cleanupSpaces = (spacesRoot: string, roots: readonly string[]): Promise<number> => cleanupBranchSpaces(spacesRoot, roots).catch(() => 0);

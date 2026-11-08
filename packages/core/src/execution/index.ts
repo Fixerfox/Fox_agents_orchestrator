@@ -24,3 +24,6 @@ export { selectFor, visibleTo, type LevelDiagrams, type MemoryReader } from './m
 export { MEMORY_BLOCKS, MEMORY_TOKENS, estimateTokens, renderMemory, type MemoryBlock, type MemoryStats, type RenderOptions } from './memory/memory-render';
 export { NOTE_HEADING, NOTE_MAX, NOTE_RULE, splitNote } from './memory/notes';
 export { MEMORY_FILE_VERSION, diagramLabelOf, memoryFiles } from './memory/memory-file';
+export { CONFLICT_AGENT, CONFLICT_HALT, CONFLICT_PREVIEW_KEY, CONFLICT_STOP, keepVersionOf } from './run/isolation';
+export { mergeTask } from './run/merge-agent';
+export type * from './branch-spaces';

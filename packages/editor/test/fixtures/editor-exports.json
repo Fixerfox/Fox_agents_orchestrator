@@ -222,6 +222,7 @@
   "setDiagramExtra",
   "setRequired",
   "settleLive",
+  "sharedFans",
   "specKitDiagram",
   "stepFiles",
   "stepOverrides",

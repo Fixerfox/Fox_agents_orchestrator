@@ -90,7 +90,7 @@ export class EditorSession {
       canUndo: !this.locked && this.history.canUndo,
       canRedo: !this.locked && this.history.canRedo,
       dirty: this.history.dirty,
-      problems: computeProblems(diagram, this.path),
+      problems: computeProblems(diagram, this.path, { sharedFans: this.shared }),
       readOnly: this.locked,
     };
     return this.cached;
@@ -98,6 +98,16 @@ export class EditorSession {
 
   private changed(): void {
     this.path = validPath(this.history.present, this.path);
+    this.version++;
+    for (const l of [...this.listeners]) l();
+  }
+
+  private shared = false;
+
+  /** Con el aislamiento apagado, los abanicos avisan de que sus ramas comparten carpeta [R73.21]. */
+  setSharedFans(on: boolean): void {
+    if (this.shared === on) return;
+    this.shared = on;
     this.version++;
     for (const l of [...this.listeners]) l();
   }

@@ -2028,6 +2028,11 @@ button.orq-story__line:hover { background: var(--raised); }
 @media (max-width: 900px) { .orq-agentf2 { flex-direction: column; } .orq-agentf2__nav { width: auto; flex-direction: row; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--line); } }
 
 /* Ramas de git [R58.8][R58.10][R58.12] */
+.orq-node__iso { display: inline-block; margin-top: 6px; padding: 0 6px; border-radius: 999px; font: 500 11px/16px var(--mono); border: 1px solid var(--line); color: var(--muted); }
+.orq-node__iso.is-merged { color: var(--accent-text); border-color: currentColor; }
+.orq-node__iso.is-conflict { color: var(--tone-amber); border-color: currentColor; }
+.orq-conflict__files { margin: 6px 0; padding-left: 18px; }
+.orq-conflict__views { display: inline-flex; gap: 10px; margin-left: 8px; }
 .orq-node__git { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; color: var(--accent-text); font: 500 11px/16px var(--mono); }
 .orq-prlink { display: inline-flex; align-items: center; gap: 4px; color: var(--accent-text); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; pointer-events: all; cursor: pointer; }
 .orq-node__git > span { display: inline-flex; align-items: center; gap: 3px; }

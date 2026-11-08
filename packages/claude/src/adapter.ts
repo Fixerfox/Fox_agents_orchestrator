@@ -9,7 +9,7 @@ import { buildSystemPrompt, buildUserPrompt, claudeCodePrompt } from './prompt';
 import type { PermissionResult, QueryFn } from './sdk-types';
 import { createMcpPolicy, sdkMcpConfig, type ResolvedMcp } from './mcp';
 import { KnowledgeTracker, describeKnowledge, planKnowledge } from './knowledge';
-import { agentTools, createWritePolicy, withScope, guardedPolicy, summarizeFolder, type WritePolicyDeps } from './workfolder';
+import { agentTools, createWritePolicy, withIsolation, withScope, guardedPolicy, summarizeFolder, type WritePolicyDeps } from './workfolder';
 import { CommandWatch } from './changes';
 import { classifyCommand } from './commands';
 
@@ -77,7 +77,10 @@ export class ClaudeAdapter implements AgentAdapter {
     if (signal.aborted) return;
     signal.addEventListener('abort', abort, { once: true });
     const mapper = new MessageMapper(apiKey);
-    const folder = await this.env.workFolder?.();
+    const chosen = await this.env.workFolder?.();
+    // En una rama en paralelo, el paso trabaja en su espacio y la carpeta original queda fuera [R73.8].
+    const original = request.workspace ? (chosen ?? this.env.projectRoot) : undefined;
+    const folder = request.workspace?.dir ?? chosen;
     const summary = folder ? await summarizeFolder(folder) : undefined;
     let finished = false;
     const root = folder ?? this.env.projectRoot;
@@ -86,8 +89,8 @@ export class ClaudeAdapter implements AgentAdapter {
     const sent = new Set<string>();
     // Lo que cambian los comandos (un script que genera páginas, un build…) también se registra [R55.1].
     const watch = new CommandWatch(root);
-    // Qué rama de git crea o toca el agente [R58.2].
-    const branches = new BranchTracker(root);
+    // Qué rama de git crea o toca el agente [R58.2]; desde un espacio aislado, nada [R73.10].
+    const branches = request.workspace ? silentBranches : new BranchTracker(root);
     /** El agente ha preguntado y tiene respuesta en este intento [R39.4]. */
     let asked = false;
     /** Acciones frenadas, para el Supervisor [R60.16]. */
@@ -111,7 +114,7 @@ export class ClaudeAdapter implements AgentAdapter {
           root,
           withMcp(
             mcpPolicy,
-            withScope(request.scope, root, note, createWritePolicy({
+            withIsolation(original, note, withScope(request.scope, root, note, createWritePolicy({
             root,
             level,
             appDirs: [...new Set([path.join(root, '.orquestador'), path.join(this.env.projectRoot, '.orquestador')])],
@@ -123,7 +126,7 @@ export class ClaudeAdapter implements AgentAdapter {
             onAsked: () => {
               asked = true;
             },
-          })),
+          })), root),
           ),
         ),
       );
@@ -250,6 +253,14 @@ const watchCommands =
     if (!(await classifyCommand(command, root, root, { readOnly: true })).safe) await watch.opening(id);
     return r;
   };
+
+/** Seguimiento de ramas que no registra nada (rama en paralelo) [R73.10]. */
+const silentBranches: Pick<BranchTracker, 'start' | 'called' | 'settled' | 'finished'> = {
+  start: async () => undefined,
+  called: () => undefined,
+  settled: async function* () {},
+  finished: async function* () {},
+};
 
 /** Segundos que el SDK espera al gancho de permisos: un día [R50.4]. */
 export const HOOK_TIMEOUT_S = 24 * 60 * 60;

@@ -2,7 +2,7 @@ import path from 'node:path';
 import type { LibraryReader, RunRepository } from '@orquestador/core';
 import type { ProjectStore } from './project';
 import { MAX_INPUT_FILES } from './project-files';
-import { findPreview, snapshotStep } from './previews';
+import { findConflict, findPreview, snapshotStep } from './previews';
 import { acceptRun, dismissInterruptedRun, listRuns, markCorrectedBy, markResumedBy, readRunDiagram, readRunLog, startLoggedRun } from './run-log';
 
 /** El proyecto como `RunRepository` [R56.5]. */
@@ -20,6 +20,7 @@ export function runRepositoryOf(store: ProjectStore): RunRepository {
     acceptRun: (runId, acceptance) => acceptRun(dir(runId), acceptance),
     snapshotStep: ({ runId, ...args }) => snapshotStep({ runDir: dir(runId), ...args }),
     findPreview: (runId, key, rel) => findPreview(dir(runId), key, rel),
+    findConflict: (runId, rel) => findConflict(dir(runId), rel),
     outputFolder: (runId) => path.join(dir(runId), 'output'),
     workRoot: async () => (await store.getWorkFolder()) ?? store.paths.root,
     inputFiles: (rels) => store.inputFiles(rels),

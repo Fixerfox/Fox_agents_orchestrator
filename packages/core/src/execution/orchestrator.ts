@@ -21,6 +21,8 @@ import { RunAbort } from './run/run-abort';
 import { RunEmitter } from './run/run-emitter';
 import { Supervisor } from './run/supervisor';
 import { RunMemoryService } from './run/memory-service';
+import { LevelIsolation } from './run/isolation';
+import type { BranchSpaces, SpaceRef } from './branch-spaces';
 import type { NodeStatus, RunOptions, RunStatus } from './run-types';
 import { mergeInputs } from './text/merge-inputs';
 import { splitInputs } from './text/split';
@@ -55,7 +57,11 @@ export interface OrchestratorDeps {
   /** Aleatorio de las esperas con jitter [R71.3]. */
   random?(): number;
   /** Devuelve al punto de partida lo que tocó un intento fallido [R71.10]. */
-  restoreFiles?(runId: Id, files: { path: string; change?: FileChange }[]): Promise<RestoreResult>;
+  restoreFiles?(runId: Id, files: { path: string; change?: FileChange }[], dir?: string): Promise<RestoreResult>;
+  /** Espacios para aislar las ramas en paralelo de esta ejecución; sin él, comparten carpeta [R73.2]. */
+  spaces?(runId: Id): BranchSpaces | undefined;
+  /** ¿Puede escribir el agente? Por defecto, sí [R73.2]. */
+  canWrite?(agentId: Id, runId: Id): boolean | Promise<boolean>;
 }
 
 export interface RunResult {
@@ -119,6 +125,7 @@ export class Orchestrator {
     if (supervisor) bus.subscribe((e) => supervisor.observe(e));
     // La memoria va con el Supervisor (como antes) o sola si se pide [R72.3].
     const memory = watch || this.deps.memory ? new RunMemoryService(emitter, labels, new Map(), () => this.deps.memory?.tokens?.()) : undefined;
+    const spaces = this.deps.spaces?.(runId);
     const services: RunServices = {
       signal: stop.signal,
       emitter,
@@ -127,6 +134,12 @@ export class Orchestrator {
       budget,
       ...(supervisor ? { supervisor } : {}),
       ...(memory ? { memory } : {}),
+      ...(spaces ? { spaces } : {}),
+      ...(this.deps.canWrite ? { canWrite: async (agentId: Id) => this.deps.canWrite!(agentId, runId) } : {}),
+      halt: (reason) => {
+        failReason = reason;
+        stop.abort('cancelled', reason);
+      },
       questions,
       retry: new RetryPolicy(options.retry, this.deps.sleep, this.deps.random),
       cache: new ResumeCache(options),
@@ -146,9 +159,9 @@ export class Orchestrator {
         failReason = reason;
       },
       timers,
-      ...(this.deps.restoreFiles ? { restoreFiles: (files: { path: string; change?: FileChange }[]) => this.deps.restoreFiles!(runId, files) } : {}),
+      ...(this.deps.restoreFiles ? { restoreFiles: (files: { path: string; change?: FileChange }[], dir?: string) => this.deps.restoreFiles!(runId, files, dir) } : {}),
       limitsFor: async (node) => mergeLimits(node.limits, node.agentId ? await Promise.resolve(this.deps.agentLimits?.(node.agentId, runId)).catch(() => undefined) : undefined, options.limits),
-      execute: (d, input, path, depth, stack) => executeDiagram(services, this.nodes, d, input, path, depth, stack),
+      execute: (d, input, path, depth, stack, space) => executeDiagram(services, this.nodes, d, input, path, depth, stack, space),
     };
     const input: Payload = typeof order === 'string' ? { text: order, files: [] } : order;
 
@@ -161,6 +174,8 @@ export class Orchestrator {
         emitter.emit({ type: 'error', message: errorMessage(err), retriable: false });
         outcome = { status: 'failed' };
       }
+      // Ningún espacio sobrevive a la ejecución [R73.18].
+      await spaces?.closeAll().catch(() => undefined);
       let status: RunStatus = outcome.status;
       let reason: string | undefined;
       if (stop.reason === 'cancelled') {
@@ -218,7 +233,7 @@ export class Orchestrator {
 }
 
 /** Planifica un diagrama: qué paso está listo, espera a sus entradas, las combina y reparte su resultado [R56.14]. */
-async function executeDiagram(run: RunServices, nodes: NodeRegistry, diagram: Diagram, input: Payload, path: Id[], depth: number, stack: Id[]): Promise<DiagramOutcome> {
+async function executeDiagram(run: RunServices, nodes: NodeRegistry, diagram: Diagram, input: Payload, path: Id[], depth: number, stack: Id[], levelSpace?: SpaceRef): Promise<DiagramOutcome> {
   const { emitter, signal } = run;
   const missing = nodes.missingIn(diagram);
   if (missing !== undefined) {
@@ -252,11 +267,13 @@ async function executeDiagram(run: RunServices, nodes: NodeRegistry, diagram: Di
   // Primera entrada de cada paso en este nivel: la «entrada original» de un retorno elegido al vuelo [R53.6].
   const firstInput = new Map<Id, Payload>();
   const level: ReviewLevel = { diagram, lastOutput, forward: forwardEdges(diagram, returns) };
+  // Las ramas en paralelo, cada una en su espacio, si la app las aísla [R73.2].
+  const iso = LevelIsolation.for(run, diagram, path, levelSpace);
 
   const edgeState = new Map<Id, 'delivered' | 'dead'>();
   const edgePayload = new Map<Id, Payload>();
   const status = new Map<Id, NodeStatus>(diagram.nodes.map((n) => [n.id, 'idle']));
-  const running = new Map<Id, Promise<void>>();
+  const running = new Map<string, Promise<void>>();
   let anyFailed = false;
   let output: Payload | undefined;
 
@@ -328,7 +345,7 @@ async function executeDiagram(run: RunServices, nodes: NodeRegistry, diagram: Di
   };
 
   /** Lo que ve el paso; se arma al ejecutarlo porque la vuelta de una revisión cambia entre pasadas. */
-  const stepOf = (node: DiagramNode): StepContext => ({
+  const stepOf = (node: DiagramNode, space: SpaceRef | undefined): StepContext => ({
     ...run,
     // Las decisiones del paso, con tiempo máximo y reintentos [R70.12][R71.13].
     decider: guardDecider(run.decider, { emitter, retry: run.retry, timers: run.timers, signal, timeoutMs: run.decisionTimeoutMs, attempts: run.retry.decisionAttempts }, node.id, path),
@@ -339,9 +356,10 @@ async function executeDiagram(run: RunServices, nodes: NodeRegistry, diagram: Di
     round: (rounds.get(node.id)?.round ?? 0) + 1,
     back: returnOf.get(node.id),
     level,
+    ...(space ? { space } : {}),
   });
 
-  const runNode = (node: DiagramNode, nodeInput: Payload): Promise<Outcome> => {
+  const runNode = async (node: DiagramNode, nodeInput: Payload): Promise<Outcome> => {
     // Reanudar: lo que ya terminó bien en la anterior no se repite, la primera vez que se llega a ello [R41.1].
     const reused = path.length === 0 && REUSABLE.has(node.kind) ? run.cache.takeReused(node.id) : undefined;
     // Lo reutilizado se reparte otra vez; si ya no cumple el formato, el paso se ejecuta de nuevo [R59.9].
@@ -355,9 +373,10 @@ async function executeDiagram(run: RunServices, nodes: NodeRegistry, diagram: Di
         else emitter.emit(body, past.nodePath ?? []);
       }
       run.supervisor?.reused(node.id, reused);
-      return Promise.resolve({ status: 'succeeded', output: reused });
+      return { status: 'succeeded', output: reused };
     }
-    return nodes.find(node.kind)!.run(stepOf(node), node, nodeInput, path);
+    const space = iso ? await iso.spaceFor(node.id) : levelSpace;
+    return nodes.find(node.kind)!.run(stepOf(node, space), node, nodeInput, path);
   };
 
   const start = (node: DiagramNode, given: Payload) => {
@@ -398,6 +417,8 @@ async function executeDiagram(run: RunServices, nodes: NodeRegistry, diagram: Di
       break;
     }
     let progressed = false;
+    // Las ramas que han terminado se fusionan antes de que arranque lo que las junta [R73.11].
+    for (const { key, task } of iso?.settle(status) ?? []) running.set(key, task.finally(() => running.delete(key)));
     for (const node of diagram.nodes) {
       if (status.get(node.id) !== 'idle') continue;
       const again = override.get(node.id);
@@ -414,6 +435,7 @@ async function executeDiagram(run: RunServices, nodes: NodeRegistry, diagram: Di
       }
       const inc = incoming.get(node.id) ?? [];
       if (!inc.every((e) => edgeState.has(e.id))) continue;
+      if (iso && inc.some((e) => iso.blocks(e.from, node.id))) continue;
       const delivered = inc.filter((e) => edgeState.get(e.id) === 'delivered');
       progressed = true;
       if (delivered.length === 0) {
@@ -428,6 +450,7 @@ async function executeDiagram(run: RunServices, nodes: NodeRegistry, diagram: Di
     else if (!progressed) break;
   }
 
+  await iso?.finish();
   if (signal.aborted) return { status: 'cancelled' };
   if (anyFailed) return { status: 'failed', ...(output ? { output } : {}) };
   if (!output) {

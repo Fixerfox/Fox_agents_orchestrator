@@ -31,7 +31,7 @@ export class RunService {
   ) {
     const live = new LiveRuns();
     this.history = new RunHistory(live, ports.runs, ports.library);
-    this.files = new RunFiles(live, ports.runs, ports.policy, ports.files, this.history);
+    this.files = new RunFiles(live, ports.runs, ports.policy, ports.files, this.history, ports.stepDir ? (runId, key) => ports.stepDir!(runId, key) : undefined);
     this.launcher = new RunLauncher(ports.runs, ports.library, defaults, snapshots);
     this.queue = new RunQueue(live, ports.runs, orchestrator, snapshots, (runId, key, files) => this.files.snapshotStep(runId, key, files));
     this.control = new RunControl(live);

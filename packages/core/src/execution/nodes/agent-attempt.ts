@@ -87,6 +87,7 @@ export async function attemptAgent(step: StepContext, node: DiagramNode, input: 
       ...(snapshot ? { snapshot } : {}),
       ...(answered.length > 0 ? { previousAnswers: [...answered] } : {}),
       ...(turn.previous ? { previousAttempt: turn.previous } : {}),
+      ...(step.space ? { isolated: true } : {}),
     },
     path,
   );
@@ -140,7 +141,7 @@ export async function attemptAgent(step: StepContext, node: DiagramNode, input: 
         watchdog.resume();
       }
     });
-  const request = { nodeId: node.id, agentId, runId: step.emitter.runId, input, ...(task ? { task } : {}), ...(node.model ? { model: node.model } : {}), ...(node.confirm ? { confirm: true } : {}), ...(split ? { split } : {}), ...(turn.memory ? { memory: turn.memory } : {}), ...(turn.scope ? { scope: turn.scope } : {}), ...(deliverable ? { deliverable } : {}), ...(hasExtra ? { extra } : {}), ...(missing.length > 0 ? { missing } : {}), attempt, ask, previousAnswers: [...answered], ...(turn.previous ? { previousAttempt: turn.previous } : {}) };
+  const request = { nodeId: node.id, agentId, runId: step.emitter.runId, input, ...(task ? { task } : {}), ...(node.model ? { model: node.model } : {}), ...(node.confirm ? { confirm: true } : {}), ...(split ? { split } : {}), ...(turn.memory ? { memory: turn.memory } : {}), ...(turn.scope ? { scope: turn.scope } : {}), ...(deliverable ? { deliverable } : {}), ...(hasExtra ? { extra } : {}), ...(missing.length > 0 ? { missing } : {}), attempt, ask, previousAnswers: [...answered], ...(turn.previous ? { previousAttempt: turn.previous } : {}), ...(step.space ? { workspace: { dir: step.space.dir } } : {}) };
 
   // Misma acción seguida sin cambiar archivos [R70.10][R70.11].
   let lastSig = '';

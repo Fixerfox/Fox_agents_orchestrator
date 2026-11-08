@@ -13,7 +13,7 @@ export const subdiagramHandler: NodeHandler = {
 
     const template = await step.resolveTemplate(templateId, version, emitter.runId);
     emitter.emit({ type: 'subdiagram.started', nodeId: node.id, templateId, version }, path);
-    const r = await step.execute(template, input, [...path, node.id], depth + 1, [...stack, templateId]);
+    const r = await step.execute(template, input, [...path, node.id], depth + 1, [...stack, templateId], step.space);
     emitter.emit({ type: 'subdiagram.finished', nodeId: node.id, status: r.status }, path);
     return { status: r.status, ...(r.output ? { output: r.output } : {}) };
   },

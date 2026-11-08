@@ -8,6 +8,8 @@ export interface RunPorts {
   library: LibraryReader;
   policy: PathPolicy;
   files: WorkspaceFiles;
+  /** Carpeta en la que trabaja ahora un paso de una rama aislada, si la hay [R73.19]. */
+  stepDir?(runId: string, key: string): string | undefined;
 }
 
 export interface StartRunInput {
