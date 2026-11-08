@@ -2348,6 +2348,9 @@ export const es = {
   'qmodal.ask': 'Pedir cambios',
   'qmodal.send.changes': 'Enviar cambios',
   'qmodal.approve.hint': 'La ejecución sigue con lo que ha hecho',
+  'crash.details': 'Detalles',
+  'crash.copy': 'Copiar detalles',
+  'crash.copied': 'Copiado',
 } as const;
 
 export type MessageKey = keyof typeof es;

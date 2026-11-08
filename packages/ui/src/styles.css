@@ -2502,3 +2502,7 @@ button.orq-node__alerts:hover { text-decoration: underline; }
 .orq-qmodal__approve { display: inline-flex; align-items: center; gap: 6px; padding-inline: 22px; min-height: 38px; font-weight: 600; }
 @media (max-width: 860px) { .orq-qmodal.has-facts .orq-qmodal__main { grid-template-columns: minmax(0, 1fr); } .orq-qmodal__facts { border-left: 0; border-top: 1px solid var(--line); } }
 
+.orq-crash__details { max-width: 100%; }
+.orq-crash__details summary { cursor: pointer; color: var(--text2); }
+.orq-crash__details pre { max-height: 40vh; overflow: auto; font-size: 11px; line-height: 15px; white-space: pre-wrap; }
+.orq-crash__actions { display: flex; gap: 8px; }

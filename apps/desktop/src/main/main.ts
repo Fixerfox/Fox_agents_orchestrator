@@ -6,6 +6,7 @@ import { execFile, spawn } from 'node:child_process';
 import { ASSISTANT_EVENTS_CHANNEL, CHANNELS, OPEN_RUN_CHANNEL, RUN_EVENTS_CHANNEL, TERMINAL_EVENTS_CHANNEL } from '@orquestador/editor';
 import { sdkCreateAppServer, sdkQuery } from '@orquestador/claude';
 import { ApiKeyVault, McpSecretVault, RecentStore, SettingsStore } from '@orquestador/store';
+import { crashLine } from './crash';
 import { Background } from './background';
 import { cleanupSpaces, composeOrchestrator } from './composition';
 import { DesktopHandlers } from './handlers';
@@ -186,6 +187,11 @@ function createWindow(): void {
     if (details.reason !== 'clean-exit' && !win.isDestroyed()) win.reload();
   });
   win.on('unresponsive', () => noteCrash('la interfaz no responde'));
+  // Un error al pintar también se apunta, con su traza [R19.12].
+  win.webContents.on('console-message', (...args: unknown[]) => {
+    const message = crashLine(args);
+    if (message) noteCrash(message);
+  });
   // Sin menú del sistema (File, Edit…) en Windows y Linux [R19.8].
   if (process.platform !== 'darwin') win.removeMenu();
   void win.loadURL(indexUrl);

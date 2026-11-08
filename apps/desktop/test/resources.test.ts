@@ -20,3 +20,12 @@ describe('SPEC-077 · en la app de escritorio', () => {
     expect(appResources.agents.busy).toBe(0);
   });
 });
+
+describe('SPEC-019 · errores de la interfaz', () => {
+  it('[R19.12] la línea del aviso de error se apunta; los demás mensajes de la consola, no', async () => {
+    const { crashLine } = await import('../src/main/crash');
+    expect(crashLine([{ message: '[orquestador:interfaz] TypeError: c is not a function\n    at Xy (renderer.js:1:2)' }])).toContain('c is not a function');
+    expect(crashLine([{}, 3, '[orquestador:interfaz] Error: x'])).toBe('[orquestador:interfaz] Error: x');
+    expect(crashLine([{ message: 'Warning: algo' }])).toBeUndefined();
+  });
+});
