@@ -38,3 +38,10 @@ export async function stepTab(name: 'Tarea' | 'Agente' | 'Conocimiento' | 'Permi
   await userEvent.click(side.getByRole('tab', { name: new RegExp(`^${name}`) }));
   return side;
 }
+
+/** Abre una sección de Ajustes desde su índice («Claude», «Permisos de los agentes»…) [R67.1]. */
+export async function settingsSection(name: string) {
+  const page = within(screen.getByRole('region', { name: 'Ajustes' }));
+  await userEvent.click(within(page.getByRole('navigation', { name: 'Ajustes' })).getByRole('button', { name: new RegExp(`^${name}`) }));
+  return page;
+}

@@ -6,7 +6,7 @@ import userEvent from '@testing-library/user-event';
 import { defaultSettings } from '@orquestador/core';
 import { createDiagram } from '@orquestador/editor';
 import { App } from '../src/App';
-import { openSettingsPage } from './nav';
+import { openSettingsPage, settingsSection } from './nav';
 import { createMemoryApi } from '../src/memoryApi';
 
 async function mount(permissions: 'ask' | 'auto' | 'full' = 'ask') {
@@ -21,8 +21,9 @@ describe('SPEC-031 · reglas de los agentes en Ajustes', () => {
   it('[R31.14] Ajustes muestra «Reglas de los agentes» con todas las reglas y el límite de los comandos', async () => {
     await mount();
     const s = await openSettingsPage();
-    expect(await s.findByRole('heading', { name: 'Reglas de los agentes' })).toBeTruthy();
-    expect(within(s.getByRole('navigation', { name: 'Ajustes' })).getByRole('link', { name: 'Reglas de los agentes' })).toBeTruthy();
+    // las reglas viven con los permisos [R67.4]
+    await settingsSection('Permisos de los agentes');
+    expect(s.getByRole('heading', { name: 'Así trabajan con este nivel' })).toBeTruthy();
     const rules = within(s.getByRole('list', { name: 'Reglas de los agentes' })).getAllByRole('listitem').map((li) => li.textContent ?? '');
     expect(rules).toHaveLength(8);
     for (const start of ['Leer:', 'Crear:', 'Modificar: te preguntan', 'Comandos: los sencillos', 'Por agente:', 'Fuera de la carpeta:', 'Explicar lo que tocan:', 'Registro:']) {
@@ -35,6 +36,7 @@ describe('SPEC-031 · reglas de los agentes en Ajustes', () => {
   it('[R31.14] con el nivel «Automático», la regla de modificar lo dice', async () => {
     await mount('auto');
     const s = await openSettingsPage();
+    await settingsSection('Permisos de los agentes');
     const list = within(await s.findByRole('list', { name: 'Reglas de los agentes' }));
     expect(list.getByText(/^Modificar: cambian archivos existentes sin preguntar/)).toBeTruthy();
     expect(list.queryByText(/^Modificar: te preguntan/)).toBeNull();
@@ -45,6 +47,7 @@ describe('SPEC-047 · reglas según el nivel', () => {
   it('[R47.7] la regla de comandos cambia con el nivel: los sencillos, lo delicado o nada', async () => {
     await mount('auto');
     const s = await openSettingsPage();
+    await settingsSection('Permisos de los agentes');
     const list = within(await s.findByRole('list', { name: 'Reglas de los agentes' }));
     expect(list.getByText(/^Comandos: no preguntan, salvo para borrar, salir de la carpeta del proyecto o publicar fuera/)).toBeTruthy();
     await userEvent.click(within(s.getByRole('group', { name: 'Permisos de los agentes' })).getByRole('radio', { name: /^Sin preguntar nunca/ }));
@@ -70,6 +73,7 @@ describe('SPEC-050 · Claude Code en Ajustes', () => {
   it('[R50.10] con «Sin preguntar nunca», la regla de fuera de la carpeta lo dice y siguen siendo 8 reglas', async () => {
     await mount('full');
     const s = await openSettingsPage();
+    await settingsSection('Permisos de los agentes');
     const list = within(await s.findByRole('list', { name: 'Reglas de los agentes' }));
     expect(list.getByText(/^Fuera de la carpeta: con «Sin preguntar nunca» escriben donde haga falta, como Claude Code, salvo en \.orquestador/)).toBeTruthy();
     expect(list.getAllByRole('listitem')).toHaveLength(8);

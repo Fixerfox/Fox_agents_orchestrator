@@ -56,8 +56,8 @@ describe('SPEC-063 · interfaz', () => {
     render(<App api={createMemoryApi([])} confirm={() => true} />);
     await userEvent.click(screen.getByRole('button', { name: 'Ajustes' }));
     const page = within(await screen.findByRole('region', { name: 'Ajustes' }));
-    const link = page.getByRole('link', { name: 'Supervisor' });
-    expect(link.getAttribute('href')).toBe('#sec-supervisor');
+    const index = within(await page.findByRole('navigation', { name: 'Ajustes' }));
+    expect(await index.findByRole('button', { name: /^Supervisor/ })).toBeTruthy();
   });
 
   it('[R63.25] la tarjeta no repite el nombre del agente si es el del paso', () => {

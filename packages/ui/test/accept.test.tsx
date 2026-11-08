@@ -10,6 +10,7 @@ import { alwaysConfirms, runAssistantTool, type AssistantHost } from '../src/ass
 import { RunDoneBanner } from '../src/runs/RunDoneBanner';
 import { RunsScreen } from '../src/runs/RunsScreen';
 import { createMemoryApi } from '../src/memoryApi';
+import { settingsSection } from './nav';
 import type { RunsIndex } from '../src/runs/useRunsIndex';
 
 const D: Diagram = {
@@ -103,6 +104,8 @@ describe('SPEC-065 · en la interfaz', () => {
     render(<App api={api} confirm={() => true} />);
     await userEvent.click(screen.getByRole('button', { name: 'Ajustes' }));
     const page = within(await screen.findByRole('region', { name: 'Ajustes' }));
+    await page.findByRole('heading', { name: 'Claude' });
+    await settingsSection('Supervisor');
     const select = page.getByLabelText('Lo que solo puede comprobar una persona') as HTMLSelectElement;
     expect(select.value).toBe('warn');
     expect([...select.options].map((o) => o.textContent)).toEqual(['Avisar', 'Hacer fallar la ejecución']);

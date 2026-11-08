@@ -24,3 +24,4 @@ export * from './supervisor-view';
 export * from './edge-inspect';
 export * from './run-audit';
 export * from './step-config';
+export * from './permissions-view';
