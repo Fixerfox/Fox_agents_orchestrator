@@ -120,7 +120,7 @@ export function NodeDialog({ events, live, nodeId, nodePath, label, onAnswer, on
                     case 'pass':
                       return <PassHeader key={i} item={it} labelOf={labelOf} />;
                     case 'retry':
-                      return <li key={i}>{t('transcript.retry', { attempt: it.attempt, max: it.max, message: it.message })}</li>;
+                      return <li key={i}>{`${t(it.cause === 'timeout' ? 'transcript.retry.timeout' : it.cause === 'loop' ? 'transcript.retry.loop' : 'transcript.retry.error', { next: it.attempt + 1 })} — ${t('transcript.retry.detail', { attempt: it.attempt, message: it.message })}`}</li>;
                     case 'error':
                       return (
                         <li key={i} className="orq-t--error">

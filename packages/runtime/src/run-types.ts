@@ -1,4 +1,4 @@
-import type { DeliverableSpec, Diagram, LibraryReader, Payload, PathPolicy, RunHandle, RunOptions, RunRepository, WorkspaceFiles } from '@orquestador/core';
+import type { DeliverableSpec, Diagram, LibraryReader, Payload, PathPolicy, RunHandle, RunOptions, RunRepository, WorkspaceFiles, UnansweredPolicy } from '@orquestador/core';
 import { RunError } from './errors';
 import type { LibrarySnapshot } from './snapshot';
 
@@ -23,6 +23,8 @@ export interface StartRunInput {
   attachments?: string[];
   /** Si ya hay otra de este diagrama: a la vez (por defecto) o en cola [R52.3]. */
   whenBusy?: 'parallel' | 'queue';
+  /** Qué hacer si nadie responde; sustituye al de Ajustes [R70.19]. */
+  unanswered?: UnansweredPolicy;
 }
 
 /** Una ejecución lista para arrancar. */

@@ -1,4 +1,4 @@
-import { type Id, type KnowledgeExtra, MAX_EXTRA_ITEMS, MODELS, isCoordinator } from '../shared';
+import { type Id, type KnowledgeExtra, MAX_EXTRA_ITEMS, MODELS, isCoordinator, limitProblems } from '../shared';
 import { deliverableProblems } from './deliverable-spec';
 import { correctionCandidates, returnEdges, segmentShapeOk, splitBranchIds } from './graph';
 import { CURRENT_SCHEMA_VERSION, type Diagram, type DiagramNode, type Edge, MAX_REVIEW_ROUNDS, MAX_TASK_LENGTH, REVIEW_PORTS } from './model';
@@ -79,6 +79,11 @@ export function validateDiagram(diagram: Diagram, path: Id[] = []): ValidationIs
     }
     // Confirmar antes de terminar: solo en agentes [R43.2].
     if (node.confirm !== undefined && node.kind !== 'agent') add('node-confirm-not-agent', `${node.label ?? node.id}: solo los pasos de agente confirman antes de terminar`, node.id);
+    // Límites y reintentos solo en pasos de agente, y con valores válidos [R70.7][R71.10].
+    if ((node.limits !== undefined || node.onRetry !== undefined) && node.kind !== 'agent') add('node-limits-not-agent', `${node.label ?? node.id}: solo los pasos de agente tienen límites de tiempo y reintentos`, node.id);
+    const badLimit = limitProblems(node.limits)[0];
+    if (badLimit) add('node-limits-invalid', `${node.label ?? node.id}: ${badLimit.message}`, node.id);
+    if (node.onRetry !== undefined && node.onRetry !== 'keep' && node.onRetry !== 'restore') add('node-limits-invalid', `${node.label ?? node.id}: «Al reintentar» no es válido`, node.id);
     // Un Coordinador necesita al menos dos ramas [R59.3].
     if (isCoordinator(node) && splitBranchIds(diagram, node.id).length < 2) add('node-split-needs-two', `${node.label ?? node.id}: para repartir hacen falta al menos 2 ramas`, node.id);
   }

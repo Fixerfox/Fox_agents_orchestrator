@@ -1,3 +1,5 @@
+import { promises as fsp } from 'node:fs';
+import path from 'node:path';
 import { claudePathPolicy, createClaudeEngine, type ClaudeEnvironment, type QueryFn } from '@orquestador/claude';
 import type { AppSettings, LibraryReader, Orchestrator } from '@orquestador/core';
 import { createEngineOrchestrator, snapshotLibrary, withBuiltinAgents, type RunPorts, type RunSnapshots } from '@orquestador/runtime';
@@ -52,9 +54,39 @@ export function claudeEnvironment(ctx: OrchestratorContext): ClaudeEnvironment {
   };
 }
 
+/**
+ * Devuelve al punto de partida lo que tocó un intento fallido [R71.10]: lo modificado desde la copia de la ejecución
+ * (R31.6) y lo creado se borra. Nunca sale de la carpeta de trabajo.
+ */
+export function restoreAttemptFiles(store: Pick<ProjectStore, 'restoreBackup' | 'getWorkFolder'>, projectRoot: string) {
+  return async (runId: string, files: { path: string; change?: 'created' | 'modified' }[]) => {
+    const restored: string[] = [];
+    const removed: string[] = [];
+    const failed: { path: string; reason: string }[] = [];
+    const root = path.resolve((await store.getWorkFolder()) ?? projectRoot);
+    for (const f of files) {
+      const abs = path.resolve(root, ...f.path.split('/'));
+      if (abs !== root && !abs.startsWith(root + path.sep)) {
+        failed.push({ path: f.path, reason: 'fuera de la carpeta de trabajo' });
+        continue;
+      }
+      try {
+        if (f.change === 'created') {
+          await fsp.rm(abs, { force: true });
+          removed.push(f.path);
+        } else if (await store.restoreBackup(runId, f.path)) restored.push(f.path);
+        else failed.push({ path: f.path, reason: 'no hay copia' });
+      } catch (e) {
+        failed.push({ path: f.path, reason: e instanceof Error ? e.message : String(e) });
+      }
+    }
+    return { restored, removed, failed };
+  };
+}
+
 /** Orquestador del proyecto con el motor de Claude y el de demostración [R27.1][R56.5]. */
 export function composeOrchestrator(ctx: OrchestratorContext, query: QueryFn): Orchestrator {
-  return createEngineOrchestrator({ library: libraryOf(ctx), settings: ctx.settings }, [createClaudeEngine(claudeEnvironment(ctx), query)]);
+  return createEngineOrchestrator({ library: libraryOf(ctx), settings: ctx.settings, restoreFiles: restoreAttemptFiles(ctx.store, ctx.projectRoot) }, [createClaudeEngine(claudeEnvironment(ctx), query)]);
 }
 
 /** Puertos del servicio de ejecución para un proyecto [R56.5]. */

@@ -17,7 +17,7 @@ const cut = (text: string): string => {
 };
 
 /** Quién pregunta: el paso, o el subdiagrama que lo contiene si está dentro de uno. */
-function whoAsks(event: Extract<RunEvent, { type: 'agent.question' }>, diagram: Diagram): string {
+function whoAsks(event: Extract<RunEvent, { type: 'agent.question' | 'question.reminder' }>, diagram: Diagram): string {
   const id = event.nodePath?.[0] ?? event.nodeId;
   const node = diagram.nodes.find((n) => n.id === id);
   return node?.label ?? (node?.kind === 'agent' ? node.agentId : undefined) ?? 'Un agente';
@@ -36,6 +36,10 @@ function questionTitle(event: Extract<RunEvent, { type: 'agent.question' }>, who
 export function noticeFor(event: RunEvent, diagram: Diagram): Notice | undefined {
   if (event.type === 'agent.question') {
     return { title: questionTitle(event, whoAsks(event, diagram)), body: cut(event.text) || 'Abre la ejecución para responder', runId: event.runId, live: true };
+  }
+  // Una pregunta que sigue sin respuesta, una vez [R70.16].
+  if (event.type === 'question.reminder') {
+    return { title: `${whoAsks(event, diagram)} sigue esperando tu respuesta (${event.minutes} min)`, body: cut(event.text) || 'Abre la ejecución para responder', runId: event.runId, live: true };
   }
   if (event.type !== 'run.finished' || event.status === 'cancelled') return undefined;
   const title = event.status === 'succeeded' ? 'Ejecución terminada' : event.reason === 'budget_exceeded' ? 'Ejecución sin presupuesto' : event.reason?.startsWith(REQUIREMENTS_UNMET) ? 'Ejecución incompleta' : 'La ejecución ha fallado';

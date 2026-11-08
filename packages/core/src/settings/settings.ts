@@ -1,4 +1,4 @@
-import { DEFAULT_MODEL, DEFAULT_PERMISSION, type FieldProblem, LIMITS, MODELS, PROJECT_PERMISSIONS, type PermissionLevel, type ProjectPermission } from '../shared';
+import { DEFAULT_MODEL, DEFAULT_PERMISSION, type FieldProblem, LIMITS, MODELS, PROJECT_PERMISSIONS, type PermissionLevel, type ProjectPermission, type StepLimits, type UnansweredPolicy, limitProblems, readUnanswered } from '../shared';
 
 /** v2: el nivel de permisos pasa a «Sin preguntar nunca» al migrar [R51.1]. */
 export const SETTINGS_SCHEMA_VERSION = 2;
@@ -29,6 +29,10 @@ export interface AppSettings {
   supervisorModel?: string;
   /** Lo que solo puede comprobar una persona: avisar (por defecto) o hacer fallar la ejecución [R65.2]. */
   supervisorHumanChecks?: HumanChecks;
+  /** «Límites de tiempo»: inactividad y herramienta en curso por defecto [R70.21]. */
+  limits?: Pick<StepLimits, 'idleMinutes' | 'toolMinutes'>;
+  /** Qué hacer por defecto con una pregunta que nadie responde [R70.21]. */
+  unanswered?: UnansweredPolicy;
 }
 
 export const HUMAN_CHECKS = ['warn', 'fail'] as const;
@@ -83,6 +87,8 @@ export function validateSettings(s: unknown): FieldProblem[] {
   if (s.supervisorReview !== undefined && typeof s.supervisorReview !== 'boolean') out.push({ field: 'supervisorReview', message: 'La revisión del Supervisor tiene que estar activa o no' });
   if (s.supervisorModel !== undefined && !known(s.supervisorModel)) out.push({ field: 'supervisorModel', message: 'Elige un modelo de la lista' });
   if (s.supervisorHumanChecks !== undefined && !(HUMAN_CHECKS as readonly unknown[]).includes(s.supervisorHumanChecks)) out.push({ field: 'supervisorHumanChecks', message: 'Elige «Avisar» o «Hacer fallar la ejecución»' });
+  out.push(...limitProblems(s.limits));
+  if (s.unanswered !== undefined && !readUnanswered(s.unanswered)) out.push({ field: 'unanswered', message: 'Elige qué hacer si nadie responde' });
   return out;
 }
 
@@ -104,5 +110,14 @@ export function normalizeSettings(raw: unknown): AppSettings {
   else if (raw.askCommands === true) out.permissions = 'ask';
   else if (raw.autoWrite === true) out.permissions = 'auto';
   if (typeof raw.claudeConfig === 'boolean') out.claudeConfig = raw.claudeConfig;
+  if (isObject(raw.limits) && limitProblems(raw.limits).length === 0) {
+    const l = raw.limits as StepLimits;
+    const limits: NonNullable<AppSettings['limits']> = {};
+    if (l.idleMinutes !== undefined) limits.idleMinutes = l.idleMinutes;
+    if (l.toolMinutes !== undefined) limits.toolMinutes = l.toolMinutes;
+    if (Object.keys(limits).length > 0) out.limits = limits;
+  }
+  const unanswered = readUnanswered(raw.unanswered);
+  if (unanswered) out.unanswered = unanswered;
   return out;
 }

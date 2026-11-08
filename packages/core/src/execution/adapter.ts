@@ -109,6 +109,8 @@ export interface AgentQuestion {
   kind?: QuestionKind;
   /** Pregunta de una revisión humana: qué cambiar o a qué paso volver [R53.3][R53.5]. */
   review?: ReviewQuestion;
+  /** La respuesta segura, que se elige sola si la política lo permite [R70.13]. */
+  fallback?: string;
 }
 
 /** Datos de una pregunta de revisión humana [R53.3][R53.5]. */
@@ -167,6 +169,25 @@ export interface AgentRequest {
   ask(question: AgentQuestion): Promise<string>;
   /** Preguntas ya respondidas en intentos anteriores del mismo nodo. */
   previousAnswers: AnsweredQuestion[];
+  /** Lo que el intento inmediatamente anterior dejó: error, acciones y archivos [R71.7][R71.8]. */
+  previousAttempt?: PreviousAttempt;
+}
+
+/** Lo que un intento fallido le deja al siguiente [R71.7]. */
+export interface PreviousAttempt {
+  attempt: number;
+  kind: AgentErrorKind;
+  message: string;
+  ended: 'error' | 'timeout' | 'loop' | 'unmet' | 'interrupted';
+  actions: string[];
+  files: { path: string; change?: FileChange; via?: FileVia; restored?: boolean }[];
+}
+
+/** Lo que se pudo devolver al punto de partida [R71.10]. */
+export interface RestoreResult {
+  restored: string[];
+  removed: string[];
+  failed: { path: string; reason: string }[];
 }
 
 /** Contrato que implementa cada motor de agentes (Claude Agent SDK, simulado, ...). */
@@ -174,18 +195,33 @@ export interface AgentAdapter {
   run(request: AgentRequest, signal: AbortSignal): AsyncIterable<AgentStreamEvent>;
 }
 
-/** Error de un adapter. `retriable` indica si el orquestador puede reintentar. */
+/** Tipo de un error del motor: decide si se reintenta y con qué cuenta [R71.1]. */
+export type AgentErrorKind = 'rate_limit' | 'overloaded' | 'transient' | 'timeout' | 'unmet' | 'fatal';
+
+/** Error de un adapter. `retriable` indica si el orquestador puede reintentar; `kind`, de qué tipo es [R71.1]. */
 export class AgentError extends Error {
+  readonly kind: AgentErrorKind;
+  readonly retriable: boolean;
+  /** Lo que pidió esperar el proveedor, si lo dijo (`retry-after`) [R71.2]. */
+  readonly retryAfterMs: number | undefined;
+
   constructor(
     message: string,
-    readonly retriable = false,
+    retriable = false,
     /** Obligatorios sin usar que provocaron el error [R36.11]. */
     readonly missed: KnowledgeRef[] = [],
+    opts: { kind?: AgentErrorKind; retryAfterMs?: number } = {},
   ) {
     super(message);
     this.name = 'AgentError';
+    this.kind = opts.kind ?? (missed.length > 0 ? 'unmet' : retriable ? 'transient' : 'fatal');
+    this.retriable = opts.kind ? opts.kind !== 'fatal' : retriable;
+    this.retryAfterMs = opts.retryAfterMs;
   }
 }
+
+/** ¿Es un límite de uso del proveedor? Tiene su propia cuenta de intentos [R71.5]. */
+export const isLimitError = (err: unknown): boolean => err instanceof AgentError && (err.kind === 'rate_limit' || err.kind === 'overloaded');
 
 export interface RouteCandidate {
   edgeId: Id;

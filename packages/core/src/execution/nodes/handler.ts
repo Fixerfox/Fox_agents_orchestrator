@@ -1,6 +1,6 @@
 import type { DeliverableSpec, Diagram, DiagramNode, Edge, ReturnInfo } from '../../diagrams';
-import type { Id, KnowledgeExtra, Payload } from '../../shared';
-import type { AgentAdapter, AgentProfile, AgentSnapshot, Decider, TransformUsage } from '../adapter';
+import type { Id, KnowledgeExtra, Payload, StepLimits } from '../../shared';
+import type { AgentAdapter, AgentProfile, AgentSnapshot, Decider, FileChange, RestoreResult, TransformUsage } from '../adapter';
 import type { BudgetTracker } from '../run/budget-tracker';
 import type { ConcurrencyLimiter } from '../run/concurrency-limiter';
 import type { PauseGate } from '../run/pause-gate';
@@ -9,6 +9,7 @@ import type { ResumeCache } from '../run/resume-cache';
 import type { RetryPolicy } from '../run/retry-policy';
 import type { RunEmitter } from '../run/run-emitter';
 import type { Supervisor } from '../run/supervisor';
+import type { Timers } from '../run/timers';
 
 /** Cómo acaba un paso. */
 export interface Outcome {
@@ -54,6 +55,8 @@ export interface RunServices {
   agentProfile?(agentId: Id, extra: KnowledgeExtra | undefined, runId: Id): Promise<AgentProfile | undefined>;
   resolveTemplate?(templateId: Id, version: number | 'latest', runId?: Id): Promise<Diagram> | Diagram;
   maxDepth: number;
+  /** Tiempo máximo de cada decisión [R70.12]. */
+  decisionTimeoutMs: number;
   /** Diagrama principal (etiquetas y entrada para componer el entregable). */
   root: Diagram;
   /** Conocimiento del diagrama raíz, que reciben todos sus agentes [R33.3]. */
@@ -63,6 +66,12 @@ export interface RunServices {
   finalIds: ReadonlySet<Id>;
   /** Motivo con el que falla la ejecución cuando lo da un paso (p. ej. el entregable) [R46.8]. */
   failRun(reason: string): void;
+  /** Devuelve al punto de partida archivos de un intento fallido, si la app sabe hacerlo [R71.10]. */
+  restoreFiles?(files: { path: string; change?: FileChange }[]): Promise<RestoreResult>;
+  /** Reloj de la ejecución, inyectable [R70.9]. */
+  timers: Timers;
+  /** Límites efectivos de un paso: los suyos, los de su agente y los de la ejecución [R70.7]. */
+  limitsFor(node: DiagramNode): Promise<StepLimits>;
   /** Ejecuta un diagrama anidado (cuerpo de bucle o subdiagrama). */
   execute(diagram: Diagram, input: Payload, path: Id[], depth: number, stack: Id[]): Promise<DiagramOutcome>;
 }

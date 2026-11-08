@@ -1,6 +1,6 @@
 # SPEC-071 · Reintentos con contexto
 
-**Estado:** Borrador · **Hito:** M15b · **Paquetes:** `core`, `claude`, `runtime`, `editor`, `ui` · **Rama:** `feature/reintentos`
+**Estado:** Implementada (M15b) · **Hito:** M15b · **Paquetes:** `core`, `claude`, `runtime`, `editor`, `ui` · **Rama:** `feature/reintentos`
 
 ## Propósito
 La auditoría del 08/11 (hallazgos P4, P5 y P7) encontró que reintentar es hoy **volver a empezar a ciegas**:
@@ -38,10 +38,10 @@ Esta spec es también la **capa 1 de la memoria** (la del intento): lo que un in
 ### Clasificación y espera
 - **R71.1** [M15b] `AgentError` tiene `kind: 'rate_limit' | 'overloaded' | 'transient' | 'timeout' | 'unmet' | 'fatal'` y `retryAfterMs?`. `retriable` se deriva del tipo: todos salvo `fatal`.
 - **R71.2** [M15b] El adaptador de Claude asigna el tipo desde el código del SDK (`rate_limit`, `server_error`, `overloaded_error`, `authentication_failed`, `billing_error`, `invalid_request`) y desde el estado HTTP; lee `retry-after` cuando viene. La expresión regular de `errors.ts` solo se usa si no hay ni código ni estado.
-- **R71.3** [M15b] La espera tras el intento `n` es un valor aleatorio entre `0` y `min(maxDelayMs, baseDelayMs · 2^(n−1))` (jitter completo). `maxDelayMs` es 60 s por defecto. El generador aleatorio se inyecta para los tests.
+- **R71.3** [M15b] La espera tras el intento `n` es un valor aleatorio entre `0` y `min(maxDelayMs, baseDelayMs · 2^(n−1))` (jitter completo). `maxDelayMs` es 60 s por defecto. El generador aleatorio se inyecta para los tests. El jitter lo activa la app (`retry.jitter`, en `runDefaultsFrom`); un `Orchestrator` sin él espera lo de siempre, para que las grabaciones de SPEC-056 no cambien.
 - **R71.4** [M15b] Con `retryAfterMs`, la espera es `max(retryAfterMs, la de R71.3)`, con un tope de 10 minutos.
 - **R71.5** [M15b] Los errores `rate_limit` y `overloaded` tienen su propia cuenta de intentos (`retry.limitAttempts`, 5 por defecto), separada de `maxAttempts`. Un paso puede acumular ambas.
-- **R71.6** [M15b] `node.retrying` añade `kind` (el tipo del error) y `cause: 'error' | 'timeout' | 'loop'` (los dos últimos vienen de SPEC-070).
+- **R71.6** [M15b] `node.retrying` añade `kind` (el tipo del error) y `cause: 'error' | 'timeout' | 'loop'` (los dos últimos vienen de SPEC-070). Solo se escriben cuando dicen algo: sin `kind` es un error temporal normal y sin `cause` es un error, como hasta ahora.
 
 ### Lo que recibe el siguiente intento
 - **R71.7** [M15b] Tras un intento fallido, el motor arma `previousAttempt`: número, tipo y mensaje del error; cómo acabó (`error`, `timeout`, `loop`, `unmet` o `interrupted`, este último al reanudar, R74.5); sus 10 últimas acciones; y los archivos que tocó con su cambio (`created`, `modified`, `deleted`), con si se restauraron (R71.10).
@@ -50,12 +50,12 @@ Esta spec es también la **capa 1 de la memoria** (la del intento): lo que un in
 
 ### Volver al punto de partida
 - **R71.10** [M15b] Un paso puede tener `onRetry: 'keep' | 'restore'` (`keep` por defecto). Con `restore`, antes del siguiente intento se restauran desde la copia de R31.6 los archivos que el intento fallido modificó o borró, y se borran los que creó. Emite `files.restored` (`nodeId`, `attempt`, `restored`, `removed`, `failed`).
-- **R71.11** [M15b] Restaurar nunca toca archivos que el intento no tocó, ni archivos que otro paso cambió después (se compara el hash con el que dejó el intento). Los que no se pueden restaurar van en `failed` y el siguiente intento los recibe como «tocados, sin restaurar».
+- **R71.11** [M15b] Restaurar nunca toca archivos que el intento no tocó. Solo se restaura lo que este intento tocó por primera vez en la ejecución y ningún otro paso tocó después (se mira en los `file.produced`): la copia de R31.6 es de antes de la ejecución, así que lo ya cambiado antes del intento no se puede devolver a su punto de partida. Lo que no se restaura va en `failed` con su motivo y el siguiente intento lo recibe como «tocado, sin restaurar».
 - **R71.12** [M15b] Los archivos que cambiaron comandos de Bash (R55.1, `via: 'command'`) no tienen copia: con `restore` se listan en `failed` con el motivo «cambiado por un comando».
 
 ### Decisiones
 - **R71.13** [M15b] `route`, `condition`, `conditions`, `judge`, `judgeReview`, `blame` y `transform` se llaman a través de la `RetryPolicy` con `decisionAttempts` (3 por defecto) y la espera de R71.3–R71.5. Cada reintento emite `node.retrying` del nodo que decide.
-- **R71.14** [M15b] El uso de cada intento de decisión cuenta en el presupuesto aunque el intento falle, si el motor lo conoce (R63.15).
+- **R71.14** [M15b] El uso del intento de decisión que acaba bien cuenta en el presupuesto, una sola vez (R63.15). El de un intento que falla no lo da el motor y no cuenta.
 
 ### Interfaz
 - **R71.15** [M15b] La conversación del paso enseña cada reintento como un separador: «Intento 2 · el anterior se cortó por inactividad» con el error desplegable y lo que se le pasó al nuevo intento.
@@ -70,6 +70,7 @@ Esta spec es también la **capa 1 de la memoria** (la del intento): lo que un in
 ## Cambia
 - **R7.5:** la espera pasa a ser con jitter y tope (R71.3); hay cuenta aparte para límites de uso (R71.5).
 - **R27.6:** qué es reintentable se decide por tipo (R71.1–R71.2).
+- **R56.6:** la grabación `lineal` de SPEC-056 tiene un reintento, así que su segundo `agent.request` lleva ahora `previousAttempt` (R71.8). Es la única que cambia.
 
 ## Fuera de alcance
 - Reanudar la sesión del SDK (`resume`) en vez de abrir una nueva, y `rewindFiles`. Ahorrarían contexto, pero hay que probar con el SDK real cómo se comportan tras un corte. Se valorará en una spec aparte.

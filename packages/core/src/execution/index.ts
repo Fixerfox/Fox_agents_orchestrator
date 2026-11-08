@@ -13,3 +13,9 @@ export { REQUIREMENTS_UNMET, UNFINISHED_CONTINUE, UNFINISHED_OPTIONS, UNFINISHED
 export { explainTouchedFiles } from './text/touched-files';
 export { applyRules, branchMemoryLine, newBranchMemory, newRuleState, rememberBranch, type BranchMemory, type RuleState, type SupervisorAlert } from './run/supervisor-rules';
 export { checkSplit, composeSplitFix, declaredFiles, describeSplitProblem, parseSplit, splitInputs, splitRule, withinDeclared, type SplitBranch, type SplitPart, type SplitProblem, type SplitResult } from './text/split';
+export { describePreviousAttempt, PREVIOUS_ATTEMPT_CHARS } from './nodes/agent-retries';
+export { DECISION_TIMEOUT_MS, guardDecider } from './run/guarded-decider';
+export { realTimers, MINUTE_MS, type Timers } from './run/timers';
+export { LOOP_CUT, LOOP_WARN, StepWatchdog, toolSignature } from './run/watchdog';
+export { QuestionBroker, REMINDER_MINUTES, unansweredPolicy } from './run/question-broker';
+export { RetryPolicy, type RetryConfig } from './run/retry-policy';

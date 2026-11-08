@@ -217,7 +217,7 @@ describe('SPEC-047 · política según el nivel', () => {
     }
     expect(asked).toHaveLength(0);
     expect(await canUse('Bash', { command: 'git push origin main' })).toMatchObject({ behavior: 'deny' });
-    expect(asked[0]).toEqual({ text: '¿Puedo ejecutar este comando? (publica fuera del equipo)\ngit push origin main', options: [ALLOW_ONCE, DENY], kind: 'permission' });
+    expect(asked[0]).toEqual({ text: '¿Puedo ejecutar este comando? (publica fuera del equipo)\ngit push origin main', options: [ALLOW_ONCE, DENY], kind: 'permission', fallback: DENY });
     expect(await canUse('Bash', { command: 'rm -rf dist' })).toMatchObject({ behavior: 'allow' });
     expect(asked[1]!.text).toContain('(borra o descarta cambios)');
   });

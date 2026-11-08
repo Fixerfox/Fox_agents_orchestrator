@@ -156,7 +156,7 @@ export class ClaudeAdapter implements AgentAdapter {
       };
       await branches.start();
       for (const u of tracker.inlined()) yield { type: 'knowledge', kind: u.item.kind, id: u.item.id, via: u.via, required: true };
-      for await (const msg of this.query({ prompt: buildUserPrompt(request.input, request.previousAnswers, request.task, missed.map((i) => `«${i.name}»`)), options })) {
+      for await (const msg of this.query({ prompt: buildUserPrompt(request.input, request.previousAnswers, request.task, missed.map((i) => `«${i.name}»`), request.previousAttempt), options })) {
         if (signal.aborted) return;
         for (const ev of mapper.map(msg)) {
           if (ev.type === 'tool_call') {
@@ -171,7 +171,7 @@ export class ClaudeAdapter implements AgentAdapter {
             }
             // Terminó sin consultar: la app pregunta por él antes de seguir [R39.4].
             if (agent.askFirst && !asked) {
-              const answer = (await request.ask({ text: askFirstGate(agent.name), options: [ASK_FIRST_OK, ASK_FIRST_REDO], kind: 'gate' })).trim();
+              const answer = (await request.ask({ text: askFirstGate(agent.name), options: [ASK_FIRST_OK, ASK_FIRST_REDO], kind: 'gate', fallback: ASK_FIRST_REDO })).trim();
               if (answer !== ASK_FIRST_OK) throw new AgentError(answer === ASK_FIRST_REDO || answer === '' ? 'El usuario pide que lo rehaga consultándole antes.' : `El usuario pide que lo rehaga: ${answer}`, true);
             }
             finished = true;

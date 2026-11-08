@@ -1,6 +1,7 @@
 import type { RunEvent } from './events';
+import type { RetryConfig } from './run/retry-policy';
 import type { DeliverableSpec } from '../diagrams';
-import type { Payload } from '../shared';
+import type { Payload, StepLimits, UnansweredPolicy } from '../shared';
 
 export type NodeStatus =
   | 'idle'
@@ -20,10 +21,19 @@ export interface RunOptions {
   maxConcurrency?: number;
   /** Profundidad máxima de anidación (bucles y subdiagramas). Por defecto 8. */
   maxDepth?: number;
-  /** Tiempo máximo esperando la respuesta del usuario a una pregunta de un agente. Sin límite por defecto. */
+  /**
+   * Antiguo tiempo máximo de una pregunta; equivale a `unanswered` con `action: 'fail'` [R70.18].
+   * @deprecated usa `unanswered`.
+   */
   questionTimeoutMs?: number;
+  /** Qué hacer con una pregunta que nadie responde; por defecto, esperar [R70.14]. */
+  unanswered?: UnansweredPolicy;
+  /** Límites de los pasos de agente de esta ejecución (los de Ajustes); el paso y la ficha mandan [R70.7]. */
+  limits?: StepLimits;
+  /** Tiempo máximo de cada decisión (router, juez, transformar…); 120 s por defecto [R70.12]. */
+  decisionTimeoutMs?: number;
   /** Reintentos ante errores temporales: intentos totales y espera inicial (se duplica en cada intento). */
-  retry?: { maxAttempts: number; baseDelayMs: number };
+  retry?: RetryConfig;
   /** Reanudar: salidas de pasos del nivel principal que no se vuelven a ejecutar, y de qué ejecución vienen [R41.1]. */
   reuse?: {
     fromRunId: string;

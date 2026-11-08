@@ -3,12 +3,13 @@ import { pathKey } from '../replay';
 import type { RunEvent } from '../events';
 import type { RunOptions } from '../run-types';
 import { declaredFiles, withinDeclared } from '../text/split';
+import { LOOP_WARN, toolSignature } from './watchdog';
 
 /** Lo que detecta una regla [R60.1]. */
 export interface SupervisorAlert {
   nodeId: Id;
   path: readonly Id[];
-  rule: 'undeclared-file' | 'empty-output' | 'unexpected-branch' | 'retry-loop' | 'budget-burn';
+  rule: 'undeclared-file' | 'empty-output' | 'unexpected-branch' | 'retry-loop' | 'budget-burn' | 'tool-loop';
   detail: string;
 }
 
@@ -21,9 +22,11 @@ export interface RuleState {
   spent: Map<string, { tokens: number; costUsd: number }>;
   /** Último reintento de cada paso, para saber si se agotaron al terminar [R63.4]. */
   retries: Map<string, { attempt: number; max: number; message: string }>;
+  /** Última herramienta de cada paso y cuántas veces seguidas se repitió [R70.10]. */
+  loops: Map<string, { sig: string; count: number }>;
 }
 
-export const newRuleState = (): RuleState => ({ declared: new Map(), agents: new Set(), rejected: new Map(), spent: new Map(), retries: new Map() });
+export const newRuleState = (): RuleState => ({ declared: new Map(), agents: new Set(), rejected: new Map(), spent: new Map(), retries: new Map(), loops: new Map() });
 
 /** Veces que un Coordinador puede rechazar su reparto: la primera y sus 2 repeticiones [R59.8]. */
 const MAX_REJECTIONS = 3;
@@ -40,8 +43,19 @@ export function applyRules(state: RuleState, e: RunEvent, budget: RunOptions['bu
     }
     case 'agent.request':
       state.agents.add(pathKey(path, e.nodeId));
+      state.loops.delete(pathKey(path, e.nodeId));
       return [];
+    case 'tool.called': {
+      // La misma herramienta con la misma entrada, seguida y sin cambiar archivos [R70.10].
+      const key = pathKey(path, e.nodeId);
+      const sig = toolSignature(e.tool, e.input);
+      const prev = state.loops.get(key);
+      const count = prev?.sig === sig ? prev.count + 1 : 1;
+      state.loops.set(key, { sig, count });
+      return count === LOOP_WARN ? alert(e.nodeId, 'tool-loop', `Repitió ${LOOP_WARN} veces seguidas ${e.tool} con la misma entrada, sin cambiar ningún archivo.`) : [];
+    }
     case 'file.produced': {
+      state.loops.delete(pathKey(path, e.nodeId));
       const declared = state.declared.get(pathKey(path, e.nodeId));
       return declared && !withinDeclared(e.path, declared) ? alert(e.nodeId, 'undeclared-file', `Tocó ${e.path}, que no estaba entre sus archivos (${declared.join(', ')}).`) : [];
     }

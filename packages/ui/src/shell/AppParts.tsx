@@ -77,7 +77,7 @@ export function AppDialogs({ app }: { app: AppModel }) {
   const { api, snap, launcher, runsIndex, session, sel, lib, designer, guard, openLibrary, project, config: conf } = app;
   return (
     <>
-      <LaunchDialog api={api} launcher={launcher} runsIndex={runsIndex} engine={conf.engine} currentDiagramId={snap.diagram.id} defaultMaxTokens={conf.settings?.defaultMaxTokens} onEngine={(e) => void conf.setEngine(e)} />
+      <LaunchDialog api={api} launcher={launcher} runsIndex={runsIndex} engine={conf.engine} currentDiagramId={snap.diagram.id} defaultMaxTokens={conf.settings?.defaultMaxTokens} defaultUnanswered={conf.settings?.unanswered} onEngine={(e) => void conf.setEngine(e)} />
       <DesignerDialogs session={session} snap={snap} sel={sel} lib={lib} designer={designer} projectOpen={project !== undefined} guard={guard} openLibrary={openLibrary} />
     </>
   );

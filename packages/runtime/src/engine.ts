@@ -1,4 +1,4 @@
-import { AgentError, DEFAULT_REVIEW_CRITERIA, Orchestrator, supervisorHumanChecks, supervisorModel, supervisorReviews, type AgentEngine, type AgentProfile, type AppSettings, type Decider, type Id, type KnowledgeExtra, type LibraryReader } from '@orquestador/core';
+import { AgentError, DEFAULT_REVIEW_CRITERIA, Orchestrator, supervisorHumanChecks, supervisorModel, supervisorReviews, type AgentEngine, type AgentProfile, type AppSettings, type Decider, type Id, type KnowledgeExtra, type LibraryReader, type RunOptions } from '@orquestador/core';
 import { createDemoParts } from './demo';
 
 /** Lo que el orquestador necesita saber del proyecto abierto y de Ajustes, siempre al día [R27.1]. */
@@ -6,6 +6,8 @@ export interface EngineContext {
   /** Biblioteca del proyecto, con las copias de las ejecuciones en marcha si las hay [R52.1]. */
   library: LibraryReader;
   settings(): AppSettings;
+  /** Devuelve al punto de partida lo que tocó un intento fallido [R71.10]. */
+  restoreFiles?(runId: Id, files: { path: string; change?: 'created' | 'modified' }[]): Promise<{ restored: string[]; removed: string[]; failed: { path: string; reason: string }[] }>;
 }
 
 /** Ficha de un agente con lo enchufado a su paso, para quien reparte [R59.18]. */
@@ -87,6 +89,19 @@ export function createEngineOrchestrator(ctx: EngineContext, engines: readonly A
     },
     supervisor,
     agentProfile: (id, extra, runId) => profileOf(ctx.library, id, extra, runId),
+    ...(ctx.restoreFiles ? { restoreFiles: (runId: Id, files: { path: string; change?: 'created' | 'modified' }[]) => ctx.restoreFiles!(runId, files) } : {}),
+    // Los límites de la ficha del agente [R70.7].
+    agentLimits: async (id, runId) => (await ctx.library.agents(runId)).find((a) => a.id === id)?.limits,
     resolveTemplate: (id, _version, runId) => ctx.library.diagram(id, runId),
   });
+}
+
+/** Opciones de cada ejecución que salen de Ajustes: paralelo, jitter, límites de tiempo y preguntas [R23.6][R70.7][R70.21][R71.3]. */
+export function runDefaultsFrom(settings: AppSettings): RunOptions {
+  return {
+    maxConcurrency: settings.maxParallel,
+    retry: { maxAttempts: 3, baseDelayMs: 1000, jitter: true },
+    ...(settings.limits ? { limits: { ...settings.limits } } : {}),
+    ...(settings.unanswered ? { unanswered: { ...settings.unanswered } } : {}),
+  };
 }

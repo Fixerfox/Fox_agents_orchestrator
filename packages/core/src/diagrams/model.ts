@@ -1,4 +1,4 @@
-import type { Id, KnowledgeExtra } from '../shared';
+import type { Id, KnowledgeExtra, StepLimits } from '../shared';
 
 export const CURRENT_SCHEMA_VERSION = 1;
 
@@ -89,6 +89,10 @@ export interface DiagramNode {
   model?: string;
   /** Solo en nodos `agent`: al terminar, espera a que el usuario apruebe o pida cambios [R43.2]. */
   confirm?: boolean;
+  /** Solo en nodos `agent`: latido, duración y presupuesto propios [R70.7][R77.9]. */
+  limits?: StepLimits;
+  /** Solo en nodos `agent`: qué hacer con lo que dejó un intento fallido; por defecto, conservarlo [R71.10]. */
+  onRetry?: 'keep' | 'restore';
   router?: RouterConfig;
   loop?: LoopConfig;
   review?: ReviewConfig;

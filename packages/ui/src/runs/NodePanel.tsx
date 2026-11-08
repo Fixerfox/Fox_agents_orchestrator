@@ -261,6 +261,7 @@ export function NodePanel({ events, live, nodeId, nodePath, label, onAnswer, onE
   const block = <StepFilesBlock files={files} state={state} onOpen={onOpenFile} />;
   const tone = stepTone(status);
   const metrics = stepMetrics(view);
+  const health = closed ? undefined : live.health?.[key];
   return (
     <section className="orq-nodepanel" aria-label={t('transcript.title', { name: label })}>
       <div className="orq-nodepanel__head">
@@ -283,6 +284,12 @@ export function NodePanel({ events, live, nodeId, nodePath, label, onAnswer, onE
             <StepIcon tone={tone} />
             {t(`node.status.${status}` as MessageKey)}
           </p>
+          {/* Sin señales de vida, o cortado y a punto de reintentarse [R70.20]. */}
+          {health && (
+            <p className="orq-stepstate__health" role="status">
+              {health.cut ? t(`step.health.cut.${health.cut}` as MessageKey) : t('step.health.stalled', { n: health.stalledMinutes ?? 0 })}
+            </p>
+          )}
           {metrics.length > 0 && (
             <p className="orq-stepstate__metrics">
               {metrics.map((m) => (
@@ -339,6 +346,12 @@ export function NodePanel({ events, live, nodeId, nodePath, label, onAnswer, onE
                           <pre>{it.memory}</pre>
                         </details>
                       )}
+                      {it.previous && (
+                        <details className="orq-t__memory">
+                          <summary>{t('transcript.previous')}</summary>
+                          <pre>{it.previous}</pre>
+                        </details>
+                      )}
                     </details>
                   </li>
                 );
@@ -360,9 +373,15 @@ export function NodePanel({ events, live, nodeId, nodePath, label, onAnswer, onE
               case 'question':
                 return <Question key={it.questionId} item={it} onAnswer={onAnswer} closed={closed} onOpenFile={onOpenFile} {...(it.review?.phase === 'feedback' ? { reviewFiles: filesSinceReview(events, nodeId, nodePath, it.questionId) } : {})} {...(onPreview ? { onPreview } : {})} {...(renderThumb ? { renderThumb } : {})} />;
               case 'retry':
+                // Separador del reintento: por qué se repite y, desplegado, el error [R71.15].
                 return (
                   <li key={i} className="orq-t orq-t--retry">
-                    {t('transcript.retry', { attempt: it.attempt, max: it.max, message: it.message })}
+                    <details className="orq-t__fold">
+                      <summary>
+                        <strong>{t(it.cause === 'timeout' ? 'transcript.retry.timeout' : it.cause === 'loop' ? 'transcript.retry.loop' : 'transcript.retry.error', { next: it.attempt + 1 })}</strong>
+                      </summary>
+                      <p>{t('transcript.retry.detail', { attempt: it.attempt, message: it.message })}</p>
+                    </details>
                   </li>
                 );
               case 'pass':

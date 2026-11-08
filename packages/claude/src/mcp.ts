@@ -31,7 +31,7 @@ const DENY = 'Denegar';
  * Permiso de las herramientas MCP (`mcp__<servidor>__<herramienta>`): los servidores de confianza no preguntan; los
  * demás preguntan en el chat del nodo y «Permitir en esta ejecución» vale para todo ese servidor [R30.4].
  */
-export function createMcpPolicy(list: readonly ResolvedMcp[], ask: (q: { text: string; options: string[]; kind?: 'permission' }) => Promise<string>, opts: { noAsk?: boolean } = {}) {
+export function createMcpPolicy(list: readonly ResolvedMcp[], ask: (q: { text: string; options: string[]; kind?: 'permission'; fallback?: string }) => Promise<string>, opts: { noAsk?: boolean } = {}) {
   const byKey = new Map(list.filter((m) => m.def.enabled).map((m) => [mcpKey(m.def), m.def]));
   const allowed = new Set<string>();
   return async (tool: string, input: Record<string, unknown>): Promise<PermissionResult | undefined> => {
@@ -41,7 +41,7 @@ export function createMcpPolicy(list: readonly ResolvedMcp[], ask: (q: { text: s
     if (!def) return { behavior: 'deny', message: `El servidor MCP ${m[1]} no está asignado a este agente.` };
     // Con «Sin preguntar nunca» tampoco preguntan los que no son de confianza [R51.2].
     if (def.trusted || opts.noAsk || allowed.has(m[1]!)) return { behavior: 'allow', updatedInput: input };
-    const answer = (await ask({ text: `¿Puede usar «${m[2]}» del servidor MCP «${def.name}»?`, options: [ALLOW_ONCE, ALLOW_RUN, DENY], kind: 'permission' })).trim();
+    const answer = (await ask({ text: `¿Puede usar «${m[2]}» del servidor MCP «${def.name}»?`, options: [ALLOW_ONCE, ALLOW_RUN, DENY], kind: 'permission', fallback: DENY })).trim();
     if (answer === ALLOW_ONCE) return { behavior: 'allow', updatedInput: input };
     if (answer === ALLOW_RUN) {
       allowed.add(m[1]!);

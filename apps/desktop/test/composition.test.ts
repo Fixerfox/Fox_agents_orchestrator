@@ -289,3 +289,41 @@ describe('SPEC-056 · composición de la aplicación', () => {
     expect(policy.isPreviewable('web/index.html')).toBe(true);
   });
 });
+
+describe('SPEC-071 · volver al punto de partida', () => {
+  it('[R71.10] [R71.11] restaura lo modificado desde la copia, borra lo creado y nunca sale de la carpeta', async () => {
+    const { mkdtemp, writeFile, readFile, rm } = await import('node:fs/promises');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const { existsSync } = await import('node:fs');
+    const { restoreAttemptFiles } = await import('../src/main/composition');
+    const dir = await mkdtemp(join(tmpdir(), 'orq-restore-'));
+    try {
+      await writeFile(join(dir, 'nuevo.ts'), 'creado');
+      await writeFile(join(dir, 'viejo.ts'), 'cambiado');
+      const restoredFrom: string[] = [];
+      const store = {
+        getWorkFolder: async () => dir,
+        restoreBackup: async (_run: string, rel: string) => {
+          restoredFrom.push(rel);
+          if (rel !== 'viejo.ts') return false;
+          await writeFile(join(dir, rel), 'original');
+          return true;
+        },
+      };
+      const r = await restoreAttemptFiles(store as never, dir)('run-1', [
+        { path: 'nuevo.ts', change: 'created' },
+        { path: 'viejo.ts', change: 'modified' },
+        { path: 'sin-copia.ts', change: 'modified' },
+        { path: '../fuera.ts', change: 'created' },
+      ]);
+      expect(r.removed).toEqual(['nuevo.ts']);
+      expect(r.restored).toEqual(['viejo.ts']);
+      expect(r.failed).toEqual([{ path: 'sin-copia.ts', reason: 'no hay copia' }, { path: '../fuera.ts', reason: 'fuera de la carpeta de trabajo' }]);
+      expect(existsSync(join(dir, 'nuevo.ts'))).toBe(false);
+      expect(await readFile(join(dir, 'viejo.ts'), 'utf8')).toBe('original');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+});

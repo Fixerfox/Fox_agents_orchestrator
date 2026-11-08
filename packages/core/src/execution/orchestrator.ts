@@ -1,6 +1,6 @@
 import { finalSteps, forwardEdges, returnEdges, splitBranchIds, validateDiagram, type Diagram, type DiagramNode, type Edge, type ReturnInfo } from '../diagrams';
-import { isCoordinator, type Id, type KnowledgeExtra, type Payload } from '../shared';
-import type { AgentAdapter, AgentProfile, AgentSnapshot, Decider } from './adapter';
+import { isCoordinator, mergeLimits, type Id, type KnowledgeExtra, type Payload, type StepLimits } from '../shared';
+import type { AgentAdapter, AgentProfile, AgentSnapshot, Decider, FileChange, RestoreResult } from './adapter';
 import { proposeCorrectionWith } from './corrections';
 import { EventBus, type RunEvent } from './events';
 import { pathKey } from './replay';
@@ -12,9 +12,11 @@ import { composeCorrectionInput } from './resume';
 import { BudgetTracker } from './run/budget-tracker';
 import { ConcurrencyLimiter } from './run/concurrency-limiter';
 import { PauseGate } from './run/pause-gate';
-import { QuestionBroker, type PendingQuestion } from './run/question-broker';
+import { QuestionBroker, unansweredPolicy, type PendingQuestion } from './run/question-broker';
+import { realTimers, type Timers } from './run/timers';
 import { ResumeCache } from './run/resume-cache';
 import { RetryPolicy } from './run/retry-policy';
+import { DECISION_TIMEOUT_MS, guardDecider } from './run/guarded-decider';
 import { RunAbort } from './run/run-abort';
 import { RunEmitter } from './run/run-emitter';
 import { Supervisor } from './run/supervisor';
@@ -43,6 +45,14 @@ export interface OrchestratorDeps {
    * con IA. Sin él se usan `getAdapter` y `decider` tal cual [R63.13].
    */
   forRun?(): { getAdapter(agentId: Id): AgentAdapter; decider: Decider; review?(): boolean };
+  /** Temporizadores y reloj; por defecto, los del sistema [R70.9]. */
+  timers?: Timers;
+  /** Límites de la ficha de un agente [R70.7]. */
+  agentLimits?(agentId: Id, runId: Id): StepLimits | undefined | Promise<StepLimits | undefined>;
+  /** Aleatorio de las esperas con jitter [R71.3]. */
+  random?(): number;
+  /** Devuelve al punto de partida lo que tocó un intento fallido [R71.10]. */
+  restoreFiles?(runId: Id, files: { path: string; change?: FileChange }[]): Promise<RestoreResult>;
 }
 
 export interface RunResult {
@@ -88,7 +98,8 @@ export class Orchestrator {
     const stop = new RunAbort();
     const emitter = new RunEmitter(bus);
     const gate = new PauseGate();
-    const questions = new QuestionBroker(emitter, stop.signal, options.questionTimeoutMs);
+    const timers = this.deps.timers ?? realTimers;
+    const questions = new QuestionBroker(emitter, stop.signal, unansweredPolicy(options), timers);
     const budget = new BudgetTracker(options.budget, emitter, stop);
     const deliverable = options.deliverable === null ? undefined : (options.deliverable ?? diagram.deliverable);
     // El motor queda fijado para toda la ejecución [R63.13].
@@ -111,7 +122,7 @@ export class Orchestrator {
       budget,
       ...(supervisor ? { supervisor } : {}),
       questions,
-      retry: new RetryPolicy(options.retry, this.deps.sleep),
+      retry: new RetryPolicy(options.retry, this.deps.sleep, this.deps.random),
       cache: new ResumeCache(options),
       decider: engine.decider,
       getAdapter: (agentId) => engine.getAdapter(agentId),
@@ -120,6 +131,7 @@ export class Orchestrator {
       ...(this.deps.agentProfile ? { agentProfile: (agentId: Id, extra: KnowledgeExtra | undefined, run: Id) => this.deps.agentProfile!(agentId, extra, run) } : {}),
       ...(this.deps.resolveTemplate ? { resolveTemplate: (id: Id, version: number | 'latest', run?: Id) => this.deps.resolveTemplate!(id, version, run) } : {}),
       maxDepth: options.maxDepth ?? 8,
+      decisionTimeoutMs: options.decisionTimeoutMs ?? DECISION_TIMEOUT_MS,
       root: diagram,
       rootExtra: diagram.extra,
       deliverable,
@@ -127,6 +139,9 @@ export class Orchestrator {
       failRun: (reason) => {
         failReason = reason;
       },
+      timers,
+      ...(this.deps.restoreFiles ? { restoreFiles: (files: { path: string; change?: FileChange }[]) => this.deps.restoreFiles!(runId, files) } : {}),
+      limitsFor: async (node) => mergeLimits(node.limits, node.agentId ? await Promise.resolve(this.deps.agentLimits?.(node.agentId, runId)).catch(() => undefined) : undefined, options.limits),
       execute: (d, input, path, depth, stack) => executeDiagram(services, this.nodes, d, input, path, depth, stack),
     };
     const input: Payload = typeof order === 'string' ? { text: order, files: [] } : order;
@@ -308,6 +323,8 @@ async function executeDiagram(run: RunServices, nodes: NodeRegistry, diagram: Di
   /** Lo que ve el paso; se arma al ejecutarlo porque la vuelta de una revisión cambia entre pasadas. */
   const stepOf = (node: DiagramNode): StepContext => ({
     ...run,
+    // Las decisiones del paso, con tiempo máximo y reintentos [R70.12][R71.13].
+    decider: guardDecider(run.decider, { emitter, retry: run.retry, timers: run.timers, signal, timeoutMs: run.decisionTimeoutMs, attempts: run.retry.decisionAttempts }, node.id, path),
     outEdges: outgoing.get(node.id) ?? [],
     nodeById,
     depth,

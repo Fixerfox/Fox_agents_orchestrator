@@ -36,7 +36,10 @@ interface EventBase { runId: Id; seq: number; ts: string; type: string; nodePath
 | `supervisor.note` | `nodeId, text, files, reviewed?` | Entrada de la memoria de la ejecución (SPEC-060) |
 | `supervisor.skipped` | `count, reason: 'timeout' \| 'failed'` | Revisiones que no se pudieron hacer (SPEC-060) |
 | `supervisor.verified` | `met, detail, forPerson?` | Comprobó si el resultado final cumple lo pedido (SPEC-062); `forPerson`: lo que queda para una persona (SPEC-065) |
-| `node.retrying` | `nodeId, attempt, max, delayMs, message` | Reintento automático tras error temporal |
+| `node.retrying` | `nodeId, attempt, max, delayMs, message, kind?, cause?` | Reintento automático tras error temporal; `kind`, el tipo del error si no es uno temporal normal, y `cause`, `timeout` o `loop` si lo cortó el motor (SPEC-071) |
+| `node.timeout` | `nodeId, attempt, kind: idle\|tool\|total\|loop, minutes, tool?` | El motor cortó el intento por inactividad, por su duración o por repetir la misma acción (SPEC-070) |
+| `files.restored` | `nodeId, attempt, restored, removed, failed` | Lo que tocó un intento fallido, devuelto al punto de partida antes de reintentar (SPEC-071) |
+| `question.reminder` | `nodeId, questionId, text, minutes` | Recordatorio de una pregunta que sigue sin respuesta (SPEC-070) |
 | `workspace.merged` | `nodeId, files` | Cambios de un agente fusionados en el proyecto |
 | `workspace.conflict` | `nodeIds, files` | Conflicto entre agentes paralelos; requiere atención |
 | `iteration.snapshot` | `loopId, n, path` | Instantánea de resultados de una vuelta de bucle |
@@ -44,11 +47,11 @@ interface EventBase { runId: Id; seq: number; ts: string; type: string; nodePath
 | `subdiagram.finished` | `nodeId, status` | Se sale del nodo compuesto con su resultado |
 | `knowledge.used` | `nodeId, attempt, kind, id, via, required` | Una skill, contexto o MCP se incluyó en el prompt (`inline`), se leyó (`read`) o se usó con una herramienta (`tool`); solo ids, nunca contenido (SPEC-036) |
 | `knowledge.unmet` | `nodeId, attempt, kind, id` | Un obligatorio no se usó en ese intento; el intento falla y se reintenta con aviso (SPEC-036) |
-| `agent.request` | `nodeId, agentId, attempt, input, task?, model?, confirm?, deliverable?, extra?, snapshot?, previousAnswers?` | Lo que recibe exactamente el agente en cada intento y la configuración usada |
+| `agent.request` | `nodeId, agentId, attempt, input, task?, model?, confirm?, deliverable?, extra?, snapshot?, previousAnswers?, previousAttempt?` | Lo que recibe exactamente el agente en cada intento y la configuración usada; `previousAttempt`, lo que se le contó del intento anterior (SPEC-071) |
 | `decision` | `nodeId, kind: route\|condition\|judge, request, response` | Decisión de IA fuera de los agentes de trabajo |
 | `transform.done` | `nodeId, mode: rules\|ai, format: json\|markdown\|text, attempts, ok, errors?, warnings?` | Resultado del nodo «Transformar» (SPEC-037), antes de su `node.finished` |
 | `agent.question` | `nodeId, questionId, text, options?, confirm?: { round }, kind?: 'question' \| 'permission' \| 'gate' \| 'unfinished'` | El agente pregunta al usuario; el nodo pasa a `waiting_input`. Con `confirm` es la confirmación del paso (SPEC-043); `kind` dice si es una pregunta del agente, un permiso de la app la supervisión de R39.4 (SPEC-045) o un paso sin terminar (SPEC-062) |
-| `agent.answer` | `nodeId, questionId, text` | El usuario responde desde el chat del nodo |
+| `agent.answer` | `nodeId, questionId, text, auto?` | El usuario responde desde el chat del nodo; `auto`: nadie respondió y se tomó la respuesta segura (SPEC-070) |
 | `confirm.decided` | `nodeId, round, verdict: approved\|changes, text?` | Respuesta a «Confirmar antes de terminar» (SPEC-043); con `changes` el agente vuelve a trabajar |
 | `deliverable.done` | `nodeId, ok, fileName, markdown, json?, links?, items[]` | Entregable compuesto por la Salida del nivel principal (SPEC-046), antes de su `node.finished`; `store` lo guarda en `output/<fileName>.md` |
 | `error` | `nodeId?, message, retriable` | Error |

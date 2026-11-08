@@ -1,6 +1,6 @@
 import type { DeliverableSpec, TransformFormat } from '../diagrams';
 import { type Id, type KnowledgeExtra, type KnowledgeKind, type Payload, redactSecrets } from '../shared';
-import type { AgentSnapshot, AnsweredQuestion, FileChange, FileVia, KnowledgeVia, QuestionKind, ReviewQuestion } from './adapter';
+import type { AgentErrorKind, AgentSnapshot, AnsweredQuestion, FileChange, FileVia, KnowledgeVia, PreviousAttempt, QuestionKind, ReviewQuestion } from './adapter';
 import type { DeliverableItemResult, DeliverableLinks } from './deliverable';
 import type { NodeStatus, RunStatus } from './run-types';
 import type { SplitProblem } from './text/split';
@@ -40,6 +40,8 @@ export type EventBody =
       extra?: { diagram?: KnowledgeExtra; node?: KnowledgeExtra };
       snapshot?: AgentSnapshot;
       previousAnswers?: AnsweredQuestion[];
+      /** Lo que se le contó del intento anterior [R71.8]. */
+      previousAttempt?: PreviousAttempt;
     }
   | {
       /** Decisión tomada por la IA fuera de los agentes de trabajo (enrutado, condición, evaluador de bucle). */
@@ -59,6 +61,10 @@ export type EventBody =
       max: number;
       delayMs: number;
       message: string;
+      /** Tipo del error [R71.6]. */
+      kind?: AgentErrorKind;
+      /** Por qué se reintenta: un error, un corte por tiempo o por repetir la misma acción [R71.6]. */
+      cause?: 'error' | 'timeout' | 'loop';
     }
   | { type: 'token.stream'; nodeId: Id; text: string }
   | { type: 'tool.called'; nodeId: Id; tool: string; input: unknown }
@@ -70,7 +76,13 @@ export type EventBody =
   | { type: 'agent.question'; nodeId: Id; questionId: string; text: string; options?: string[]; /** Confirmación del paso [R43.5]. */ confirm?: { round: number }; /** [R45.3] */ kind?: QuestionKind; /** Revisión humana [R53.3] */ review?: ReviewQuestion }
   /** Respuesta a una confirmación: aprobada o con cambios pedidos [R43.6][R43.7]. */
   | { type: 'confirm.decided'; nodeId: Id; round: number; verdict: 'approved' | 'changes'; text?: string }
-  | { type: 'agent.answer'; nodeId: Id; questionId: string; text: string }
+  | { type: 'agent.answer'; nodeId: Id; questionId: string; text: string; /** Nadie respondió y se tomó la respuesta segura [R70.15]. */ auto?: true }
+  /** Recordatorio de una pregunta que sigue sin respuesta [R70.16]. */
+  | { type: 'question.reminder'; nodeId: Id; questionId: string; text: string; minutes: number }
+  /** Archivos devueltos al punto de partida antes de reintentar [R71.10]. */
+  | { type: 'files.restored'; nodeId: Id; attempt: number; restored: string[]; removed: string[]; failed: { path: string; reason: string }[] }
+  /** El motor cortó un intento por inactividad, por su duración o por repetir la misma acción [R70.5][R70.11]. */
+  | { type: 'node.timeout'; nodeId: Id; attempt: number; kind: 'idle' | 'tool' | 'total' | 'loop'; minutes: number; tool?: string }
   /** Revisión humana: a qué paso vuelve el trabajo y quién lo decidió [R53.5]. */
   | { type: 'correction.routed'; nodeId: Id; round: number; targetId: Id; reason: string; by: 'assistant' | 'user' }
   /** El paso corregido de una corrección arranca con la corrección del usuario [R53.8]. */

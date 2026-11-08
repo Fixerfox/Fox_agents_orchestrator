@@ -204,7 +204,7 @@ export function createWritePolicy(deps: WritePolicyDeps): (tool: string, input: 
 
   const confirmModify = async (rel: string): Promise<boolean | string> => {
     if (deps.level === 'auto' || deps.level === 'full' || allowedThisRun) return true;
-    const answer = (await deps.ask({ text: `¿Puedo modificar ${rel}?`, options: [ALLOW_ONCE, ALLOW_RUN, DENY], kind: 'permission' })).trim();
+    const answer = (await deps.ask({ text: `¿Puedo modificar ${rel}?`, options: [ALLOW_ONCE, ALLOW_RUN, DENY], kind: 'permission', fallback: DENY })).trim();
     if (answer === ALLOW_ONCE) return true;
     if (answer === ALLOW_RUN) {
       allowedThisRun = true;
@@ -294,7 +294,7 @@ export function createWritePolicy(deps: WritePolicyDeps): (tool: string, input: 
       if (key !== null && deps.commandGrants?.has(key)) return allow(input);
       const forRun = key !== null && deps.commandGrants ? allowCommandForRun(key) : undefined;
       const text = danger === null ? `¿Puedo ejecutar este comando?\n${command}` : `¿Puedo ejecutar este comando? (${danger})\n${command}`;
-      const answer = (await deps.ask({ text, options: [ALLOW_ONCE, ...(forRun ? [forRun] : []), DENY], kind: 'permission' })).trim();
+      const answer = (await deps.ask({ text, options: [ALLOW_ONCE, ...(forRun ? [forRun] : []), DENY], kind: 'permission', fallback: DENY })).trim();
       if (answer === ALLOW_ONCE) return allow(input);
       if (forRun && answer === forRun) {
         deps.commandGrants!.add(key!);

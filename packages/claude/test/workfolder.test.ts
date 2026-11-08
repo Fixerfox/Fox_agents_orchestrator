@@ -106,7 +106,7 @@ describe('SPEC-031 · política de herramientas', () => {
   it('[R31.4] modificar uno existente pregunta con tres opciones; Permitir guarda copia y deja pasar', async () => {
     const { canUse, asked, backups } = policy({ answers: [ALLOW_ONCE, DENY] });
     expect(await canUse('Edit', { file_path: 'src/viejo.ts' })).toMatchObject({ behavior: 'allow' });
-    expect(asked[0]).toEqual({ text: '¿Puedo modificar src/viejo.ts?', options: ['Permitir', 'Permitir en esta ejecución', 'Denegar'], kind: 'permission' });
+    expect(asked[0]).toEqual({ text: '¿Puedo modificar src/viejo.ts?', options: ['Permitir', 'Permitir en esta ejecución', 'Denegar'], kind: 'permission', fallback: 'Denegar' });
     expect(backups).toEqual(['src/viejo.ts']);
     expect(await canUse('Edit', { file_path: 'src/viejo.ts' })).toMatchObject({ behavior: 'deny' });
     expect(asked).toHaveLength(2);
@@ -147,7 +147,7 @@ describe('SPEC-031 · política de herramientas', () => {
   it('[R31.5] en «Preguntar», los comandos que no son sencillos preguntan', async () => {
     const { canUse, asked } = policy({ answers: [ALLOW_ONCE, DENY] });
     expect(await canUse('Bash', { command: 'npm test' })).toMatchObject({ behavior: 'allow' });
-    expect(asked[0]).toEqual({ text: '¿Puedo ejecutar este comando?\nnpm test', options: ['Permitir', 'Denegar'], kind: 'permission' });
+    expect(asked[0]).toEqual({ text: '¿Puedo ejecutar este comando?\nnpm test', options: ['Permitir', 'Denegar'], kind: 'permission', fallback: 'Denegar' });
     expect(await canUse('Bash', { command: 'rm -rf src' })).toMatchObject({ behavior: 'deny' });
   });
 

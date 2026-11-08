@@ -1,5 +1,5 @@
-import { deliverableProblems, isRelativeInside } from '@orquestador/core';
-import type { DeliverableSpec, Diagram, Id, PendingQuestion, RunEvent } from '@orquestador/core';
+import { deliverableProblems, isRelativeInside, readUnanswered } from '@orquestador/core';
+import type { DeliverableSpec, Diagram, Id, PendingQuestion, RunEvent, UnansweredPolicy } from '@orquestador/core';
 import { UNHANDLED, isObject, safeId, type RequestCheck } from './check';
 import { CHANNELS } from './contract';
 import type { ApiResult } from './result';
@@ -17,6 +17,8 @@ export interface StartRunRequest {
   attachments?: string[];
   /** Si ya hay otra de este diagrama en marcha: a la vez (por defecto) o en cola [R52.3]. */
   whenBusy?: 'parallel' | 'queue';
+  /** Qué hacer si nadie responde a una pregunta de esta ejecución [R70.19]. */
+  unanswered?: UnansweredPolicy;
 }
 
 /** Lo que devuelve lanzar: la ejecución, o el lanzamiento en cola [R52.4]. */
@@ -171,7 +173,8 @@ export function parseRunsRequest(channel: string, payload: unknown, { bad, exact
       return undefined;
     case CHANNELS.startRun: {
       if (!isObject(payload)) throw bad('se esperaba un objeto');
-      exact(payload, ['diagramId', 'order', 'maxTokens', 'maxCostUsd', 'deliverable', 'files', 'attachments', 'whenBusy']);
+      exact(payload, ['diagramId', 'order', 'maxTokens', 'maxCostUsd', 'deliverable', 'files', 'attachments', 'whenBusy', 'unanswered']);
+      if (payload.unanswered !== undefined && !readUnanswered(payload.unanswered)) throw bad('unanswered no válido');
       if (payload.whenBusy !== undefined && payload.whenBusy !== 'parallel' && payload.whenBusy !== 'queue') throw bad('whenBusy no válido');
       // Archivos de la entrada: rutas relativas y adjuntos ya guardados [R48.6].
       const files = payload.files ?? [];

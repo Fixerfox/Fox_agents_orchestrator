@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, Eye, Folder, Gauge, KeyRound, Palette, ShieldCheck, Sparkles, type LucideIcon } from 'lucide-react';
-import { MODELS, loadsClaudeConfig, projectPermission, type AppSettings, type AuthMode, type Engine, type ProjectPermission, supervisorHumanChecks, supervisorModel, supervisorReviews } from '@orquestador/core';
+import { ArrowLeft, Clock, Eye, Folder, Gauge, KeyRound, Palette, ShieldCheck, Sparkles, type LucideIcon } from 'lucide-react';
+import { DEFAULT_IDLE_MINUTES, DEFAULT_TOOL_MINUTES, DEFAULT_UNANSWERED, MODELS, UNANSWERED_ACTIONS, loadsClaudeConfig, projectPermission, type AppSettings, type AuthMode, type Engine, type ProjectPermission, supervisorHumanChecks, supervisorModel, supervisorReviews } from '@orquestador/core';
 import { PermissionPicker, permissionName } from '../common';
 import { PROJECT_LEVELS, permissionMatrix, t, type ConnectionResult, type MessageKey, type PermAnswer, type ProjectApi, type SettingsView, type WorkFolderView } from '@orquestador/editor';
 import { fieldErrors } from '../common';
@@ -77,6 +77,8 @@ export function SettingsDialog({ api, onClose, onSaved }: Props) {
       ...(draft.supervisorReview !== undefined ? { supervisorReview: draft.supervisorReview } : {}),
       ...(draft.supervisorModel !== undefined ? { supervisorModel: draft.supervisorModel } : {}),
       ...(draft.supervisorHumanChecks !== undefined ? { supervisorHumanChecks: draft.supervisorHumanChecks } : {}),
+      ...(draft.limits ? { limits: draft.limits } : {}),
+      ...(draft.unanswered ? { unanswered: draft.unanswered } : {}),
     };
     const res = await api.saveSettings(body);
     if (!res.ok) {
@@ -310,6 +312,38 @@ export function SettingsDialog({ api, onClose, onSaved }: Props) {
       ),
     },
     {
+      id: 'limits',
+      group: 'general',
+      icon: Clock,
+      label: t('settings.section.limits'),
+      summary: t('settings.sum.limits', { idle: draft.limits?.idleMinutes ?? DEFAULT_IDLE_MINUTES, unanswered: t(`rundlg.unanswered.${(draft.unanswered ?? DEFAULT_UNANSWERED).action}`) }),
+      intro: t('settings.limits.intro'),
+      content: (
+        <div className="orq-setrows">
+          <Row id="set-idle" label={t('settings.limits.idle')} error={errors['limits.idleMinutes']}>
+            <input id="set-idle" type="number" min={2} max={120} value={draft.limits?.idleMinutes ?? DEFAULT_IDLE_MINUTES} onChange={(e) => set({ limits: { ...draft.limits, idleMinutes: Number(e.target.value) } })} />
+          </Row>
+          <Row id="set-toolidle" label={t('settings.limits.tool')} error={errors['limits.toolMinutes']}>
+            <input id="set-toolidle" type="number" min={5} max={480} value={draft.limits?.toolMinutes ?? DEFAULT_TOOL_MINUTES} onChange={(e) => set({ limits: { ...draft.limits, toolMinutes: Number(e.target.value) } })} />
+          </Row>
+          <Row id="set-unanswered" label={t('settings.limits.unanswered')} error={errors['unanswered']}>
+            <select id="set-unanswered" value={(draft.unanswered ?? DEFAULT_UNANSWERED).action} onChange={(e) => set({ unanswered: { ...(draft.unanswered ?? DEFAULT_UNANSWERED), action: e.target.value as (typeof UNANSWERED_ACTIONS)[number] } })}>
+              {UNANSWERED_ACTIONS.map((a) => (
+                <option key={a} value={a}>
+                  {t(`rundlg.unanswered.${a}`)}
+                </option>
+              ))}
+            </select>
+          </Row>
+          {(draft.unanswered ?? DEFAULT_UNANSWERED).action !== 'wait' && (
+            <Row id="set-unanswered-after" label={t('rundlg.unanswered.after')}>
+              <input id="set-unanswered-after" type="number" min={1} max={1440} value={(draft.unanswered ?? DEFAULT_UNANSWERED).afterMinutes} onChange={(e) => set({ unanswered: { ...(draft.unanswered ?? DEFAULT_UNANSWERED), afterMinutes: Math.max(1, Number(e.target.value) || 1) } })} />
+            </Row>
+          )}
+        </div>
+      ),
+    },
+    {
       id: 'look',
       group: 'general',
       icon: Palette,
@@ -393,7 +427,7 @@ export function SettingsDialog({ api, onClose, onSaved }: Props) {
   );
 }
 
-type SectionId = 'claude' | 'perms' | 'supervisor' | 'budget' | 'look' | 'work';
+type SectionId = 'claude' | 'perms' | 'supervisor' | 'budget' | 'limits' | 'look' | 'work';
 
 /** Una sección de Ajustes: entrada del índice y su contenido [R67.1]. */
 interface Section {

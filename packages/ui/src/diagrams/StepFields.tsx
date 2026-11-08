@@ -1,6 +1,6 @@
 import { BookOpen, Bot, FileText, ListChecks, ShieldCheck, UserCheck, type LucideIcon } from 'lucide-react';
 import { useId, useState, type ReactNode } from 'react';
-import { DEFAULT_MODEL, MAX_TASK_LENGTH, MODELS, COORDINATOR_ID, coordinatorAgent, type DiagramNode, type ProjectPermission } from '@orquestador/core';
+import { DEFAULT_MODEL, MAX_TASK_LENGTH, MODELS, COORDINATOR_ID, coordinatorAgent, limitProblems, type DiagramNode, type ProjectPermission } from '@orquestador/core';
 import { extraCount, stepOverrides, t, type EditorSnapshot, type NodePatch, type ProjectApi } from '@orquestador/editor';
 import { AgentAvatar, AskFirstMark, ClaudeButton, ClaudeDiff, ClaudeMenu, ClaudeStatus, PermissionPicker, permissionName, useClaudeAssist, type AssistConfig } from '../common';
 import { ExtraKnowledge, type KnowledgeCatalog } from './ExtraKnowledge';
@@ -241,6 +241,36 @@ export function stepSections({ node, snap, agents, patch, api, files, catalog, o
         <input type="checkbox" className="orq-toggle" checked={node.confirm === true} onChange={(e) => patch({ confirm: e.target.checked })} />
       </label>
       <p className="orq-hint">{t('insp.confirm.hint')}</p>
+      {/* Qué hacer con lo que dejó un intento fallido [R71.16]. */}
+      <label className="orq-field">
+        <span>{t('step.retry')}</span>
+        <select aria-label={t('step.retry')} value={node.onRetry ?? 'keep'} onChange={(e) => patch({ onRetry: e.target.value as 'keep' | 'restore' })}>
+          <option value="keep">{t('step.retry.keep')}</option>
+          <option value="restore">{t('step.retry.restore')}</option>
+        </select>
+      </label>
+      <p className="orq-hint">{t('step.retry.hint')}</p>
+      {/* Límites de tiempo propios del paso [R70.21]. */}
+      <fieldset className="orq-field orq-insp__limits">
+        <legend>{t('step.limits')}</legend>
+        {(['idleMinutes', 'toolMinutes', 'maxMinutes'] as const).map((k) => (
+          <label key={k} className="orq-field orq-field--inline">
+            <span>{t(k === 'idleMinutes' ? 'step.limits.idle' : k === 'toolMinutes' ? 'step.limits.tool' : 'step.limits.max')}</span>
+            <input
+              type="number"
+              min={1}
+              aria-label={t(k === 'idleMinutes' ? 'step.limits.idle' : k === 'toolMinutes' ? 'step.limits.tool' : 'step.limits.max')}
+              value={node.limits?.[k] ?? ''}
+              onChange={(e) => {
+                const v = e.target.value === '' ? undefined : Number(e.target.value);
+                const next = { ...node.limits, [k]: v };
+                if (limitProblems(next).length === 0) patch({ limits: next });
+              }}
+            />
+          </label>
+        ))}
+        <p className="orq-hint">{t('step.limits.hint')}</p>
+      </fieldset>
     </div>
   );
   const sections: StepSection[] = [

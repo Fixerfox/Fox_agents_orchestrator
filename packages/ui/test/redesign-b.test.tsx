@@ -236,7 +236,7 @@ describe('SPEC-032 · M7b panel del nodo, inicio y ajustes', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Ajustes' }));
     const page = within(await screen.findByRole('region', { name: 'Ajustes' }));
     await page.findByRole('heading', { name: 'Claude' });
-    expect([...document.querySelectorAll('.orq-setnav__title')].map((a) => a.textContent)).toEqual(['Claude', 'Permisos de los agentes', 'Supervisor', 'Ejecución y presupuesto', 'Apariencia']);
+    expect([...document.querySelectorAll('.orq-setnav__title')].map((a) => a.textContent)).toEqual(['Claude', 'Permisos de los agentes', 'Supervisor', 'Ejecución y presupuesto', 'Límites de tiempo', 'Apariencia']);
     expect(page.getByText(/Los cambios se guardan al momento/)).toBeTruthy();
     await userEvent.click(await page.findByRole('radio', { name: /Claude \(real\)/ }));
     await settingsSaved();
