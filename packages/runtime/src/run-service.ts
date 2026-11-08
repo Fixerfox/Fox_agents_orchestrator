@@ -112,6 +112,22 @@ export class RunService {
     return this.control.settled(runId);
   }
 
+  /**
+   * Ejecuciones interrumpidas de las últimas `hours` horas, para ofrecer reanudarlas al abrir [R74.12]: el diagrama y
+   * el último paso que terminó, sin leer el registro entero (R74.11).
+   */
+  async interruptedRecent(now = Date.now(), hours = 72): Promise<{ runId: string; diagramName: string; lastStep?: string }[]> {
+    const recent = (await this.list()).filter((m) => m.status === 'interrupted' && !m.resumedBy && now - Date.parse(m.startedAt) <= hours * 3_600_000);
+    return Promise.all(
+      recent.map(async (m) => {
+        const diagram = await this.runDiagram(m.runId).catch(() => null);
+        const id = m.lastStepKey?.slice(0, m.lastStepKey.lastIndexOf('#')).split('/').pop();
+        const label = id === undefined ? undefined : (findLabel(diagram, id) ?? id);
+        return { runId: m.runId, diagramName: m.diagramName ?? diagram?.name ?? m.diagramId, ...(label ? { lastStep: label } : {}) };
+      }),
+    );
+  }
+
   runDiagram(runId: string): Promise<Diagram | null> {
     return this.history.runDiagram(runId);
   }
@@ -140,4 +156,14 @@ export class RunService {
   readOutput(runId: string, rel: string): Promise<{ text: string; truncated: boolean }> {
     return this.files.readOutput(runId, rel);
   }
+}
+
+/** Etiqueta de un nodo en cualquier nivel del diagrama (bucles incluidos). */
+function findLabel(d: Pick<Diagram, 'nodes'> | null, id: string): string | undefined {
+  for (const n of d?.nodes ?? []) {
+    if (n.id === id) return n.label ?? n.id;
+    const inner = n.loop ? findLabel(n.loop.body, id) : undefined;
+    if (inner) return inner;
+  }
+  return undefined;
 }

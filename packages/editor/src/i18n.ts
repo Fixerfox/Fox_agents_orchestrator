@@ -2148,6 +2148,10 @@ export const es = {
   'node.iso.merged': 'fusionada',
   'node.iso.conflict': 'conflicto',
   'problem.shared-fan': '«{node}»: estas ramas comparten carpeta: si tocan los mismos archivos, se pisan',
+  'rsum.reusedFrom.saved': 'Ahorro: {usd} US$.',
+  'sup.rule.resume-diverged': 'Se volvió a decidir al reanudar',
+  'sup.rule.resume-diverged.why': 'El diagrama cambió desde la ejecución anterior y la decisión que se tomó entonces ya no encaja.',
+  'rsum.reusedFrom': 'Se reutilizó de la ejecución anterior: {steps} pasos, {decisions} decisiones y {answers} respuestas.',
 } as const;
 
 export type MessageKey = keyof typeof es;

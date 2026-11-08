@@ -40,6 +40,12 @@ async function setProject(h: HandlerState, root: string, store: ProjectStore): P
       mcpSecrets: async (id, scope) => (await h.deps.mcpVault?.read(mcpVaultKey(root, id, scope))) ?? {},
     }), () => runDefaultsFrom(h.settings), snapshots);
   h.runs.watch((event, diagram) => h.deps.watchRun?.(event, diagram));
+  // Las interrumpidas recientes se ofrecen para reanudar; nada se reanuda solo [R74.12].
+  const runs = h.runs;
+  void runs
+    .interruptedRecent()
+    .then((list) => h.deps.offerInterrupted?.(list, { resume: (id) => runs.resumeRun(id), dismiss: (id) => runs.dismiss(id) }))
+    .catch(() => undefined);
   store.useAppMcp(h.deps.appMcpDir);
   h.store = store; // como máximo un proyecto abierto: el anterior se sustituye [R19.5]
   h.root = root;

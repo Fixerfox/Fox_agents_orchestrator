@@ -96,6 +96,13 @@ export function SummaryBody({ summary: s, onPick, wide = false, onOpenDeliverabl
         {icon(s.status)}
         <strong>{s.headline}</strong>
       </p>
+      {/* Lo reutilizado al reanudar y lo que ahorró [R74.13]. */}
+      {s.reused && (
+        <p className="orq-rsum__reused" role="note">
+          {t('rsum.reusedFrom', { steps: s.reused.steps, decisions: s.reused.decisions, answers: s.reused.answers })}
+          {s.reused.savedUsd > 0 && ` ${t('rsum.reusedFrom.saved', { usd: s.reused.savedUsd.toFixed(2) })}`}
+        </p>
+      )}
       {s.branches.length > 0 && (
         <section className="orq-rsum__branches" aria-label={t('rsum.branches')}>
           <h3>{t('rsum.branches')}</h3>

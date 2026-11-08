@@ -1,5 +1,6 @@
 import type { RunEvent } from './events';
 import type { RetryConfig } from './run/retry-policy';
+import type { ReplayDecision } from './replay-plan';
 import type { DeliverableSpec } from '../diagrams';
 import type { Payload, StepLimits, UnansweredPolicy } from '../shared';
 
@@ -42,6 +43,14 @@ export interface RunOptions {
     approvedReviews?: string[];
     /** Rastro de cada paso reutilizado [R41.7]. */
     trail?: Record<string, readonly RunEvent[]>;
+    /**
+     * Al reanudar, por clave de paso (`ruta/nodo#pasada`) [R74.3]: decisiones, respuestas, lo que tocaban los pasos
+     * cortados y lo que costó cada uno. Una clave sin `#` es la primera pasada de un paso del nivel principal.
+     */
+    decisions?: Record<string, ReplayDecision[]>;
+    answers?: Record<string, { question: string; answer: string }[]>;
+    interrupted?: Record<string, { files: string[] }>;
+    costs?: Record<string, number>;
   };
   /** Corregir: el paso del nivel principal que recibe la corrección y su entrega anterior [R53.8]. */
   correction?: {

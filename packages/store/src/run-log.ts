@@ -1,4 +1,4 @@
-import { closeSync, mkdirSync, openSync, writeSync } from 'node:fs';
+import { closeSync, fsyncSync, mkdirSync, openSync, writeSync } from 'node:fs';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import {
@@ -79,10 +79,31 @@ export class RunLogWriter {
     atomicWriteSync(path.join(this.runDir, 'meta.json'), `${JSON.stringify(this.meta, null, 2)}\n`);
   }
 
+  /** Pasadas de cada paso, para su clave [R74.11]. */
+  private readonly passes = new Map<string, number>();
+
   private onEvent(e: RunEvent): void {
     if (this.fd === undefined) return;
     writeSync(this.fd, `${JSON.stringify(e)}\n`);
     this.meta.eventCount++;
+    // Lo que se reutiliza al reanudar llega al disco antes de seguir [R74.10].
+    if ((e.type === 'node.finished' && e.status === 'succeeded') || e.type === 'decision' || e.type === 'agent.answer') {
+      try {
+        fsyncSync(this.fd);
+      } catch {
+        /* sin fsync (p. ej. un sistema de archivos que no lo admite) se sigue igual */
+      }
+    }
+    if (e.type === 'node.started') {
+      const k = [...(e.nodePath ?? []), e.nodeId].join('/');
+      this.passes.set(k, (this.passes.get(k) ?? 0) + 1);
+    }
+    if (e.type === 'node.finished' && e.status === 'succeeded') {
+      const k = [...(e.nodePath ?? []), e.nodeId].join('/');
+      this.meta.lastStepKey = `${k}#${this.passes.get(k) ?? 1}`;
+      this.meta.stepsDone = (this.meta.stepsDone ?? 0) + 1;
+      this.writeMeta();
+    }
     if (e.type === 'run.started') {
       this.meta.startedAt = e.ts;
       if (e.resumedFrom) this.meta.resumedFrom = e.resumedFrom;

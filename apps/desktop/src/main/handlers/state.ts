@@ -47,6 +47,8 @@ export interface DesktopDeps {
   push?(runId: string, events: RunEvent[]): void;
   /** Recibe los eventos de todas las ejecuciones, para los avisos del sistema [R61.9]. */
   watchRun?(event: RunEvent, diagram: Diagram): void;
+  /** Ejecuciones interrumpidas del proyecto recién abierto, con qué hacer con ellas [R74.12]. */
+  offerInterrupted?(runs: { runId: string; diagramName: string; lastStep?: string }[], act: { resume(runId: string): Promise<unknown>; dismiss(runId: string): Promise<unknown> }): void;
   /** Ventana de agrupación en ms (por defecto 50). */
   batchMs?: number;
 }

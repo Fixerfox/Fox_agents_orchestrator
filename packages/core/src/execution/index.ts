@@ -27,3 +27,4 @@ export { MEMORY_FILE_VERSION, diagramLabelOf, memoryFiles } from './memory/memor
 export { CONFLICT_AGENT, CONFLICT_HALT, CONFLICT_PREVIEW_KEY, CONFLICT_STOP, keepVersionOf } from './run/isolation';
 export { mergeTask } from './run/merge-agent';
 export type * from './branch-spaces';
+export { normalStepKey, replayPlan, stepKey, stepKeysOf, type ReplayDecision, type ReplayPlan } from './replay-plan';

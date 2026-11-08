@@ -1,3 +1,4 @@
+import { replayedIn } from '../run/replay-decider';
 import { chargeDecision, failStep, nodeStarted, type NodeHandler } from './handler';
 
 /** Bucle: repite su cuerpo un número de veces o hasta que el evaluador diga que basta. */
@@ -21,7 +22,7 @@ export const loopHandler: NodeHandler = {
       if (cfg.mode === 'ai-judge') {
         const request = { prompt: cfg.prompt!, output: current, iteration: n };
         const { usage, ...verdict } = await step.decider.judge(request, signal);
-        emitter.emit({ type: 'decision', nodeId: node.id, kind: 'judge', request, response: verdict }, path);
+        emitter.emit({ type: 'decision', nodeId: node.id, kind: 'judge', request, response: verdict, ...(replayedIn(step.decider, 'judge') ? { reused: true } : {}) }, path);
         chargeDecision(step, node, path, usage);
         if (signal.aborted) return { status: 'cancelled' };
         reason = verdict.reason;

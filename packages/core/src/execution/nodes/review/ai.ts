@@ -4,6 +4,7 @@ import type { JudgeRequest } from '../../adapter';
 import { DEFAULT_REVIEW_CRITERIA, parseVerdict } from '../../review';
 import { failStep, type Outcome, type StepContext } from '../handler';
 import { portLabel } from './port-label';
+import { replayedIn } from '../../run/replay-decider';
 
 type Verdict = 'approved' | 'rejected' | 'exhausted';
 
@@ -33,7 +34,7 @@ export async function runAiReview(step: StepContext, node: DiagramNode, input: P
     const criteria = cfg.criteria?.trim();
     const request = { prompt: criteria || DEFAULT_REVIEW_CRITERIA, output: input, iteration: round };
     const res = step.decider.judgeReview ? await askJudge(step, node, { ...(criteria ? { criteria } : {}), output: input, round, max }, path) : await step.decider.judge(request, signal);
-    emitter.emit({ type: 'decision', nodeId: node.id, kind: 'judge', request, response: res }, path);
+    emitter.emit({ type: 'decision', nodeId: node.id, kind: 'judge', request, response: res, ...(replayedIn(step.decider, 'judge') ? { reused: true } : {}) }, path);
     approved = res.done;
     reason = res.reason;
   }

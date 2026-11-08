@@ -22,6 +22,9 @@ import { RunEmitter } from './run/run-emitter';
 import { Supervisor } from './run/supervisor';
 import { RunMemoryService } from './run/memory-service';
 import { LevelIsolation } from './run/isolation';
+import { replayDecider } from './run/replay-decider';
+import { stepKey } from './replay-plan';
+import { validateTree } from './run/prevalidate';
 import type { BranchSpaces, SpaceRef } from './branch-spaces';
 import type { NodeStatus, RunOptions, RunStatus } from './run-types';
 import { mergeInputs } from './text/merge-inputs';
@@ -126,6 +129,7 @@ export class Orchestrator {
     // La memoria va con el Supervisor (como antes) o sola si se pide [R72.3].
     const memory = watch || this.deps.memory ? new RunMemoryService(emitter, labels, new Map(), () => this.deps.memory?.tokens?.()) : undefined;
     const spaces = this.deps.spaces?.(runId);
+    const passes = new Map<string, number>();
     const services: RunServices = {
       signal: stop.signal,
       emitter,
@@ -161,6 +165,13 @@ export class Orchestrator {
       timers,
       ...(this.deps.restoreFiles ? { restoreFiles: (files: { path: string; change?: FileChange }[], dir?: string) => this.deps.restoreFiles!(runId, files, dir) } : {}),
       limitsFor: async (node) => mergeLimits(node.limits, node.agentId ? await Promise.resolve(this.deps.agentLimits?.(node.agentId, runId)).catch(() => undefined) : undefined, options.limits),
+      nextPass: (path, nodeId) => {
+        const k = pathKey(path, nodeId);
+        const n = (passes.get(k) ?? 0) + 1;
+        passes.set(k, n);
+        return n;
+      },
+      templates: new Map(),
       execute: (d, input, path, depth, stack, space) => executeDiagram(services, this.nodes, d, input, path, depth, stack, space),
     };
     const input: Payload = typeof order === 'string' ? { text: order, files: [] } : order;
@@ -168,8 +179,14 @@ export class Orchestrator {
     const result = (async (): Promise<RunResult> => {
       emitter.emit({ type: 'run.started', diagramId: diagram.id, ...(options.reuse && !options.correction ? { resumedFrom: options.reuse.fromRunId } : {}), ...(options.correction ? { correctedFrom: options.correction.fromRunId } : {}), ...(deliverable ? { deliverable } : {}) });
       let outcome: DiagramOutcome;
+      // Todo el árbol se valida antes de ejecutar nada: nada se paga para fallar a mitad [R74.9].
+      const problems = await validateTree(diagram, services, this.nodes);
       try {
-        outcome = await services.execute(diagram, input, [], 0, [diagram.id]);
+        if (problems.length > 0) {
+          for (const p of problems) emitter.emit({ type: 'error', message: p.message, retriable: false }, p.path);
+          failReason = problems.some((p) => p.message.startsWith('No se sabe ejecutar')) ? NO_HANDLER : 'invalid-diagram';
+          outcome = { status: 'failed' };
+        } else outcome = await services.execute(diagram, input, [], 0, [diagram.id]);
       } catch (err) {
         emitter.emit({ type: 'error', message: errorMessage(err), retriable: false });
         outcome = { status: 'failed' };
@@ -345,10 +362,11 @@ async function executeDiagram(run: RunServices, nodes: NodeRegistry, diagram: Di
   };
 
   /** Lo que ve el paso; se arma al ejecutarlo porque la vuelta de una revisión cambia entre pasadas. */
-  const stepOf = (node: DiagramNode, space: SpaceRef | undefined): StepContext => ({
+  const stepOf = (node: DiagramNode, space: SpaceRef | undefined, key: string): StepContext => ({
     ...run,
-    // Las decisiones del paso, con tiempo máximo y reintentos [R70.12][R71.13].
-    decider: guardDecider(run.decider, { emitter, retry: run.retry, timers: run.timers, signal, timeoutMs: run.decisionTimeoutMs, attempts: run.retry.decisionAttempts }, node.id, path),
+    // Las decisiones del paso, con tiempo máximo y reintentos [R70.12][R71.13]; al reanudar, las de entonces [R74.3].
+    decider: replayDecider(guardDecider(run.decider, { emitter, retry: run.retry, timers: run.timers, signal, timeoutMs: run.decisionTimeoutMs, attempts: run.retry.decisionAttempts }, node.id, path), run.cache.takeDecisions(key), { emitter, node, path }),
+    stepKey: key,
     outEdges: outgoing.get(node.id) ?? [],
     nodeById,
     depth,
@@ -360,14 +378,16 @@ async function executeDiagram(run: RunServices, nodes: NodeRegistry, diagram: Di
   });
 
   const runNode = async (node: DiagramNode, nodeInput: Payload): Promise<Outcome> => {
-    // Reanudar: lo que ya terminó bien en la anterior no se repite, la primera vez que se llega a ello [R41.1].
-    const reused = path.length === 0 && REUSABLE.has(node.kind) ? run.cache.takeReused(node.id) : undefined;
+    const key = stepKey(path, node.id, run.nextPass(path, node.id));
+    // Reanudar: lo que ya terminó bien en la anterior no se repite, en cualquier nivel y pasada [R41.1][R74.2].
+    const reused = REUSABLE.has(node.kind) ? run.cache.takeReused(key) : undefined;
     // Lo reutilizado se reparte otra vez; si ya no cumple el formato, el paso se ejecuta de nuevo [R59.9].
     if (reused && (!isCoordinator(node) || partsOf(node, reused))) {
       emitter.emit({ type: 'node.started', nodeId: node.id, input: nodeInput }, path);
-      emitter.emit({ type: 'node.reused', nodeId: node.id, fromRunId: run.cache.reuseFrom! }, path);
+      const cost = run.cache.costOf(key);
+      emitter.emit({ type: 'node.reused', nodeId: node.id, fromRunId: run.cache.reuseFrom!, ...(cost ? { costUsd: cost } : {}) }, path);
       // Su rastro viaja con él: ramas, archivos, avisos y memoria siguen en la ejecución nueva [R41.7].
-      for (const past of run.cache.trailOf(node.id)) {
+      for (const past of run.cache.trailOf(key)) {
         const body = trailBody(past);
         if (body.type === 'supervisor.note' || body.type === 'supervisor.alert') run.supervisor?.restore(body, past.nodePath ?? []);
         else emitter.emit(body, past.nodePath ?? []);
@@ -376,7 +396,7 @@ async function executeDiagram(run: RunServices, nodes: NodeRegistry, diagram: Di
       return { status: 'succeeded', output: reused };
     }
     const space = iso ? await iso.spaceFor(node.id) : levelSpace;
-    return nodes.find(node.kind)!.run(stepOf(node, space), node, nodeInput, path);
+    return nodes.find(node.kind)!.run(stepOf(node, space, key), node, nodeInput, path);
   };
 
   const start = (node: DiagramNode, given: Payload) => {

@@ -17,6 +17,7 @@ import { APP_USER_MODEL_ID, appIdRegistration } from './windows-app-id';
 if (!app.requestSingleInstanceLock()) app.exit(0);
 let mainWindow: BrowserWindow | undefined;
 let tray: Tray | undefined;
+let trayBase: { open(): void; quit(): void } | undefined;
 /** Electron suelta el aviso si nadie lo guarda, y entonces pulsarlo no hace nada [R61.11]. */
 const notices = new Set<Notification>();
 const ICON = join(__dirname, 'icon.png');
@@ -88,6 +89,7 @@ const handlers = new DesktopHandlers({
     if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(RUN_EVENTS_CHANNEL, { runId, events });
   },
   watchRun: (event, diagram) => background.onRunEvent(event, diagram),
+  offerInterrupted: (runs, act) => background.offerInterrupted(runs, act),
   async pickSkillFiles(kind) {
     const res = await dialog.showOpenDialog({
       title: kind === 'folder' ? 'Elige la carpeta de referencia' : 'Elige los archivos de referencia',
@@ -126,8 +128,15 @@ const background = new Background({
   createTray({ open, quit }) {
     tray = new Tray(nativeImage.createFromPath(ICON).resize({ width: process.platform === 'win32' ? 16 : 24 }));
     tray.setToolTip('Orquestador');
+    trayBase = { open, quit };
     tray.setContextMenu(Menu.buildFromTemplate([{ label: 'Abrir Orquestador', click: open }, { type: 'separator' }, { label: 'Salir', click: quit }]));
     tray.on('click', open);
+  },
+  // Las interrumpidas, con «Reanudar» y «Descartar» [R74.12].
+  setTrayRuns(items) {
+    if (!tray || !trayBase) return;
+    const runs = items.map((i) => ({ label: i.label, submenu: [{ label: 'Reanudar', click: i.resume }, { label: 'Descartar', click: i.dismiss }] }));
+    tray.setContextMenu(Menu.buildFromTemplate([{ label: 'Abrir Orquestador', click: trayBase.open }, ...(runs.length > 0 ? [{ type: 'separator' as const }, ...runs] : []), { type: 'separator' }, { label: 'Salir', click: trayBase.quit }]));
   },
   notify({ title, body }, onClick) {
     if (!Notification.isSupported()) return;

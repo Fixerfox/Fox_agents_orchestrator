@@ -18,12 +18,30 @@ function scopeOf(step: StepContext, node: DiagramNode, input: Payload): string[]
   return fromCoordinator ? declaredFiles(input.text) : undefined;
 }
 
+/** Motivo del intento anterior de un paso que se cortó con la ejecución [R74.5]. */
+export const INTERRUPTED_MESSAGE = 'La ejecución se interrumpió mientras este paso trabajaba';
+
+/**
+ * Al reanudar un paso que estaba en marcha: recibe lo que la persona ya respondió en esa pasada y, como intento
+ * anterior, que la ejecución se interrumpió y qué había tocado [R74.5][R74.6].
+ */
+function resumeTurn(step: StepContext, turn: AgentTurn): void {
+  const answers = step.cache.takeAnswers(step.stepKey);
+  if (answers.length > 0) {
+    turn.replay = answers;
+    turn.answered.push(...answers.map((a) => ({ question: a.question, answer: a.answer })));
+  }
+  const cut = step.cache.takeInterrupted(step.stepKey);
+  if (cut) turn.previous = { attempt: 0, kind: 'transient', message: INTERRUPTED_MESSAGE, ended: 'interrupted', actions: [], files: cut.files.map((path) => ({ path })) };
+}
+
 /** Agente: intentos, preguntas al usuario y confirmación antes de terminar [R27.6][R43.5]. */
 export const agentHandler: NodeHandler = {
   kind: 'agent',
   async run(step, node, input, path) {
     const scope = scopeOf(step, node, input);
     const turn: AgentTurn = { slot: { held: false }, answered: [], missing: [], attempts: 0, base: 0, trace: newTrace(), ...(scope ? { scope } : {}) };
+    resumeTurn(step, turn);
     let fixes = 0;
     await step.limiter.acquire();
     turn.slot.held = true;
@@ -50,7 +68,7 @@ export const agentHandler: NodeHandler = {
         if (missing !== undefined) {
           let answer: string;
           try {
-            answer = await step.limiter.whileWaiting(turn.slot, step.signal, () => step.questions.ask(node.id, path, { text: unfinishedQuestion(missing), options: UNFINISHED_OPTIONS, kind: 'unfinished', fallback: UNFINISHED_STOP }));
+            answer = await step.limiter.whileWaiting(turn.slot, step.signal, () => step.questions.askReplaying(node.id, path, { text: unfinishedQuestion(missing), options: UNFINISHED_OPTIONS, kind: 'unfinished', fallback: UNFINISHED_STOP }, turn.replay ?? []));
           } catch (err) {
             if (step.signal.aborted) return { status: 'cancelled' };
             return failStep(step, node, errorMessage(err), path);
@@ -68,7 +86,7 @@ export const agentHandler: NodeHandler = {
           // Confirmar antes de terminar: espera a que el usuario apruebe o pida cambios [R43.5].
           let reply: string;
           try {
-            reply = await step.limiter.whileWaiting(turn.slot, step.signal, () => step.questions.ask(node.id, path, { text: out.output!.text, options: [CONFIRM_APPROVE], confirm: { round } }));
+            reply = await step.limiter.whileWaiting(turn.slot, step.signal, () => step.questions.askReplaying(node.id, path, { text: out.output!.text, options: [CONFIRM_APPROVE], confirm: { round } }, turn.replay ?? []));
           } catch (err) {
             if (step.signal.aborted) return { status: 'cancelled' };
             return failStep(step, node, errorMessage(err), path);

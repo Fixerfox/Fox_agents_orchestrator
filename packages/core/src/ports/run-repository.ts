@@ -24,6 +24,9 @@ export interface RunMeta {
   correctedBy?: string[];
   /** Avisos de una ejecución que terminó bien con algo pendiente, p. ej. el entregable [R46.11]. */
   warnings?: string[];
+  /** Último paso que terminó bien (`ruta/nodo#pasada`) y cuántos terminaron, para la bandeja [R74.11]. */
+  lastStepKey?: string;
+  stepsDone?: number;
   /** Dada por buena tras fallar: quién, por qué, cuándo y el motivo del fallo [R65.5]. */
   accepted?: RunAcceptance & { at: string; previousReason?: string };
 }

@@ -57,10 +57,12 @@ export type EventBody =
       kind: 'route' | 'condition' | 'judge';
       request: unknown;
       response: unknown;
+      /** Se tomó de la ejecución que se reanuda, sin consultar al motor [R74.4]. */
+      reused?: boolean;
     }
   | { type: 'node.finished'; nodeId: Id; status: NodeStatus; output?: Payload }
   /** El paso no se ejecuta: se reutiliza la salida que dio en la ejecución reanudada [R41.1]. */
-  | { type: 'node.reused'; nodeId: Id; fromRunId: string }
+  | { type: 'node.reused'; nodeId: Id; fromRunId: string; /** Lo que costó en la anterior: lo que se ahorra [R74.13]. */ costUsd?: number }
   | {
       type: 'node.retrying';
       nodeId: Id;
@@ -83,7 +85,7 @@ export type EventBody =
   | { type: 'agent.question'; nodeId: Id; questionId: string; text: string; options?: string[]; /** Confirmación del paso [R43.5]. */ confirm?: { round: number }; /** [R45.3] */ kind?: QuestionKind; /** Revisión humana [R53.3] */ review?: ReviewQuestion; /** Conflicto al juntar ramas [R73.14] */ conflict?: ConflictQuestion }
   /** Respuesta a una confirmación: aprobada o con cambios pedidos [R43.6][R43.7]. */
   | { type: 'confirm.decided'; nodeId: Id; round: number; verdict: 'approved' | 'changes'; text?: string }
-  | { type: 'agent.answer'; nodeId: Id; questionId: string; text: string; /** Nadie respondió y se tomó la respuesta segura [R70.15]. */ auto?: true }
+  | { type: 'agent.answer'; nodeId: Id; questionId: string; text: string; /** Nadie respondió y se tomó la respuesta segura [R70.15]. */ auto?: true; /** Respondida con lo que dijo la persona en la ejecución que se reanuda [R74.6]. */ reused?: true }
   /** Recordatorio de una pregunta que sigue sin respuesta [R70.16]. */
   | { type: 'question.reminder'; nodeId: Id; questionId: string; text: string; minutes: number }
   /** Archivos devueltos al punto de partida antes de reintentar [R71.10]. */

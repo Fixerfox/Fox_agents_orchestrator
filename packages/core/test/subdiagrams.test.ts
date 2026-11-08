@@ -80,7 +80,10 @@ describe('SPEC-006 · subdiagramas', () => {
     const missing = setup({ templates: { otra: chain(['p1']) } });
     const r3 = await missing.orch.start(root('pintar'), 'x').result;
     expect(r3.status).toBe('failed');
-    expect(nodeFinished(r3.events, 'S')?.status).toBe('failed');
+    // Desde SPEC-074 se descubre antes de empezar: no llega a arrancar ningún paso [R74.9].
+    expect(r3.reason).toBe('invalid-diagram');
+    expect(nodeFinished(r3.events, 'S')).toBeUndefined();
+    expect(ofType(r3.events, 'node.started')).toHaveLength(0);
   });
 
   it('[R6.7] comparte concurrencia y presupuesto con la ejecución padre', async () => {

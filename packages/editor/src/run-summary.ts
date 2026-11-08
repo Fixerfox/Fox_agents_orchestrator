@@ -56,6 +56,8 @@ export interface RunSummaryView {
   headline: string;
   /** Dada por buena tras fallar: quién, por qué y por qué había fallado [R65.7]. */
   accepted?: { by: 'user' | 'assistant'; reason: string; previousReason?: string };
+  /** Al reanudar: lo que se reutilizó de la anterior y lo que eso ahorró [R74.13]. */
+  reused?: { steps: number; decisions: number; answers: number; savedUsd: number };
   /** Entregable pedido y, si se compuso, cómo quedó [R46.12]. */
   deliverable?: { done?: { ok: boolean; fileName: string; markdown: string; items: DeliverableItemResult[] } };
 }
@@ -222,5 +224,22 @@ export function summarizeRun(events: readonly RunEvent[], labelOf: (nodeId: stri
     headline,
     ...(deliverable ? { deliverable } : {}),
     ...(accepted ? { accepted } : {}),
+    ...reusedOf(events),
   };
+}
+
+/** Pasos, decisiones y respuestas reutilizados de la ejecución que se reanudó, y lo que costaron entonces [R74.13]. */
+function reusedOf(events: readonly RunEvent[]): Pick<RunSummaryView, 'reused'> {
+  let steps = 0;
+  let decisions = 0;
+  let answers = 0;
+  let savedUsd = 0;
+  for (const e of events) {
+    if (e.type === 'node.reused') {
+      steps++;
+      savedUsd += e.costUsd ?? 0;
+    } else if (e.type === 'decision' && e.reused) decisions++;
+    else if (e.type === 'agent.answer' && e.reused) answers++;
+  }
+  return steps + decisions + answers > 0 ? { reused: { steps, decisions, answers, savedUsd } } : {};
 }

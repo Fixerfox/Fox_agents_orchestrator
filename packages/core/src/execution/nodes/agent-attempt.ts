@@ -30,6 +30,8 @@ export interface AgentTurn {
   ended?: 'timeout' | 'loop' | undefined;
   /** Lo que dejó el intento anterior [R71.7]. */
   previous?: PreviousAttempt;
+  /** Respuestas de la persona en esta pasada de la ejecución que se reanuda [R74.6]. */
+  replay?: { question: string; answer: string }[];
 }
 
 /** Traza vacía de un intento [R71.7]. */
@@ -134,8 +136,8 @@ export async function attemptAgent(step: StepContext, node: DiagramNode, input: 
     step.limiter.whileWaiting(slot, step.signal, async () => {
       watchdog.suspend();
       try {
-        const answer = await step.questions.ask(node.id, path, q);
-        answered.push({ question: q.text, answer });
+        const answer = turn.replay ? await step.questions.askReplaying(node.id, path, q, turn.replay) : await step.questions.ask(node.id, path, q);
+        if (!answered.some((a) => a.question === q.text && a.answer === answer)) answered.push({ question: q.text, answer });
         return answer;
       } finally {
         watchdog.resume();

@@ -108,6 +108,20 @@ export class QuestionBroker {
     });
   }
 
+  /**
+   * Como `ask`, pero si la persona ya respondió esa misma pregunta en esa pasada de la ejecución que se reanuda, se
+   * responde sola con lo mismo, marcada como reutilizada [R74.6]. `pool` se consume.
+   */
+  askReplaying(nodeId: Id, path: Id[], question: AgentQuestion, pool: { question: string; answer: string }[]): Promise<string> {
+    const i = pool.findIndex((p) => p.question === question.text);
+    if (i < 0) return this.ask(nodeId, path, question);
+    const [{ answer }] = pool.splice(i, 1) as [{ question: string; answer: string }];
+    const questionId = `q-${++this.seq}`;
+    this.emitter.emit({ type: 'agent.question', nodeId, questionId, text: question.text, ...(question.options ? { options: question.options } : {}), ...(question.kind ? { kind: question.kind } : {}) }, path);
+    this.emitter.emit({ type: 'agent.answer', nodeId, questionId, text: answer, reused: true }, path);
+    return Promise.resolve(answer);
+  }
+
   /** `auto`: respondida sola porque nadie respondió [R70.15]. */
   answer(questionId: string, text: string, auto = false): boolean {
     const entry = this.pending.get(questionId);

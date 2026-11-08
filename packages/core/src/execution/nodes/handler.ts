@@ -82,6 +82,10 @@ export interface RunServices {
   timers: Timers;
   /** Límites efectivos de un paso: los suyos, los de su agente y los de la ejecución [R70.7]. */
   limitsFor(node: DiagramNode): Promise<StepLimits>;
+  /** Siguiente pasada de un nodo en una ruta (1, 2…) [R74.1]. */
+  nextPass(path: readonly Id[], nodeId: Id): number;
+  /** Plantillas de los subdiagramas, resueltas y validadas antes de empezar [R74.9]. */
+  templates?: Map<string, Diagram>;
   /** Ejecuta un diagrama anidado (cuerpo de bucle o subdiagrama). */
   execute(diagram: Diagram, input: Payload, path: Id[], depth: number, stack: Id[], space?: SpaceRef): Promise<DiagramOutcome>;
 }
@@ -98,6 +102,8 @@ export interface StepContext extends RunServices {
   level: ReviewLevel;
   /** Espacio aislado de la rama en la que está el paso, si lo hay [R73.2]. */
   space?: SpaceRef;
+  /** Clave estable del paso: ruta, nodo y pasada [R74.1]. */
+  stepKey: string;
 }
 
 /** Comportamiento de un tipo de nodo [R56.12]. */
