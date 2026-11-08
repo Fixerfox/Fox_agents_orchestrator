@@ -7,7 +7,7 @@ import { MockAgent, MockDecider, Orchestrator, newAgent } from '@orquestador/cor
 import { createDiagram } from '@orquestador/editor';
 import { App } from '../src/App';
 import { createMemoryApi, type MemoryApiOptions } from '../src/memoryApi';
-import { goLib } from './nav';
+import { goLib, stepTab } from './nav';
 
 async function mount(options: MemoryApiOptions = {}) {
   const api = createMemoryApi([createDiagram('principal', 'Principal')], { agents: [{ ...newAgent('pix', 'Pixelador'), description: 'Pinta' }], ...options });
@@ -101,6 +101,7 @@ describe('SPEC-039 · ficha del agente y panel del paso', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Añadir «Pixelador» al diagrama' }));
     const task = within(await screen.findByRole('region', { name: 'Tarea del paso' }));
     expect(task.getByLabelText('Qué tiene que hacer')).toBeTruthy();
+    await stepTab('Agente');
     const who = within(screen.getByRole('group', { name: 'Quién lo hace' }));
     expect(who.getByText('Pixelador')).toBeTruthy();
     expect(who.getByText('Sonnet 5.5')).toBeTruthy();

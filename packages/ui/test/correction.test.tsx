@@ -88,6 +88,18 @@ describe('SPEC-053 · pedir corrección (interfaz)', () => {
     expect(list.find((r) => r.runId === runId)!.correctedBy).toEqual([newId]);
   });
 
+  it('[R68.3] plegado, el lateral es solo la franja: el botón de corregir vuelve al desplegar', async () => {
+    const { api, runId, runs } = await finishedRun();
+    screenWith({ section: 'history', runId }, runs, api);
+    const side = await screen.findByRole('complementary', {}, { timeout: 4000 });
+    expect(within(side).getByRole('button', { name: 'Pedir corrección de este paso' })).toBeTruthy();
+    await userEvent.click(within(side).getByRole('button', { name: 'Plegar el panel' }));
+    expect(within(side).queryByRole('button', { name: 'Pedir corrección de este paso' })).toBeNull();
+    expect(side.classList.contains('is-folded')).toBe(true);
+    await userEvent.click(within(side).getByRole('button', { name: 'Desplegar el panel' }));
+    expect(within(side).getByRole('button', { name: 'Pedir corrección de este paso' })).toBeTruthy();
+  });
+
   it('[R53.13] desde el detalle de un paso, ese paso es la propuesta', async () => {
     const { api, runId, runs } = await finishedRun();
     screenWith({ section: 'history', runId }, runs, api);

@@ -19,6 +19,8 @@ El 07/11 el usuario pidió mejorar cómo se edita un agente desde el diagrama. H
 5. **Lo que no se ha guardado.** Lo escrito en un campo del paso se aplica al cerrar, como al salir de él en el lateral. Lo que no se ha guardado en la ficha del agente se queda como borrador, igual que en Agentes (R32.34): al volver a abrirla sigue ahí.
 6. **Cambia R32.34:** el menú del botón derecho de un agente empieza ahora por «Configurar…», y después van «Editar el agente» y «Cambiar el agente…».
 
+> **Cambiada por SPEC-066 (07/11):** la ventana ya no tiene pestañas. Los ajustes del paso van en un índice con una sección cada vez, y «El agente» se abre con «Editar el agente» al pie del índice (con «Volver al paso»).
+
 ## Requisitos
 - **R64.1** [M13] En el Diseñador, el doble clic sobre un nodo agente (incluido el Coordinador) abre la ventana «Configurar «<paso>»». Sobre un bucle sigue entrando en él, y en los demás tipos de nodo no cambia nada.
 - **R64.2** [M13] El menú del botón derecho de un nodo agente empieza por «Configurar…», que abre la misma ventana, también con el diagrama en solo lectura. La cabecera del lateral, con un paso agente seleccionado, tiene «Abrir en grande», que abre la misma ventana.

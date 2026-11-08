@@ -31,3 +31,22 @@ export async function settingsSaved() {
   await new Promise((r) => setTimeout(r, 400));
   await waitFor(() => expect(screen.getByText('Ajustes guardados')).toBeTruthy());
 }
+
+/** Abre una pestaña del paso agente en el lateral («Tarea», «Agente», «Conocimiento» o «Permisos») [R66.6]. */
+export async function stepTab(name: 'Tarea' | 'Agente' | 'Conocimiento' | 'Permisos') {
+  const side = within(screen.getByRole('complementary', { name: 'Propiedades' }));
+  await userEvent.click(side.getByRole('tab', { name: new RegExp(`^${name}`) }));
+  return side;
+}
+
+/** Abre una sección de Ajustes desde su índice («Claude», «Permisos de los agentes»…) [R67.1]. */
+export async function settingsSection(name: string) {
+  const page = within(screen.getByRole('region', { name: 'Ajustes' }));
+  await userEvent.click(within(page.getByRole('navigation', { name: 'Ajustes' })).getByRole('button', { name: new RegExp(`^${name}`) }));
+  return page;
+}
+
+/** El panel de un paso con salida se abre en «Resumen»: pasa a «Conversación» para ver la transcripción [R68.2]. */
+export async function showConversation(scope: { getByRole: typeof screen.getByRole } = screen) {
+  await userEvent.click(scope.getByRole('tab', { name: /^Conversación/ }));
+}

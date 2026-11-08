@@ -4,7 +4,7 @@ import { correctionTargets } from '@orquestador/core';
 import { type HistoryRow, type RunAction, defaultStep, t, formatDuration, filesByStep } from '@orquestador/editor';
 import { CorrectionDialog } from './CorrectionDialog';
 import { PreviewThumb, PreviewDialog } from './Preview';
-import { NodePanel } from './NodePanel';
+import { FoldedStep, NodePanel } from './NodePanel';
 import type { InboxItem } from './useRunsIndex';
 import { FileViewer } from './RunFiles';
 import { RunDoneBanner } from './RunDoneBanner';
@@ -31,7 +31,13 @@ export function RunDetail(
   const [version, setVersion] = useState(0);
   const [accepting, setAccepting] = useState(false);
   const d = useRunData(p.api, p.runId, p.main, p.row, p.index.loaded, p.now, version);
-  const [picked, setPicked] = useState<string | undefined>(p.nav.step);
+  const [picked, setPickedRaw] = useState<string | undefined>(p.nav.step);
+  /** Panel del paso plegado a una franja; elegir otro paso lo despliega [R68.3]. */
+  const [folded, setFolded] = useState(false);
+  const setPicked = useCallback((k: string | undefined) => {
+    setPickedRaw(k);
+    setFolded(false);
+  }, []);
   /** Modal de la ejecución y la pestaña con la que se abre: «Resumen» si ya terminó y «Cronograma» mientras corre [R44.5]. */
   const [modal, setModal] = useState<Btab>();
   /** Paso desde el que se abrió la pestaña «Supervisor» [R60.36][R60.40]. */
@@ -151,7 +157,7 @@ export function RunDetail(
         <div className="orq-run__left">
           <div className="orq-run__canvas">
             {diagram ? (
-              <RunCanvas diagram={diagram} live={live} events={d.events} agentNames={p.agentNames} label={label} onSupervisor={openSupervisor} onSelect={setPicked} onOpenFile={openPreview} previewCard={previewCard} />
+              <RunCanvas diagram={diagram} live={live} events={d.events} agentNames={p.agentNames} label={label} onSupervisor={openSupervisor} onMemory={() => setModal('memory')} onSelect={setPicked} onOpenFile={openPreview} previewCard={previewCard} />
             ) : (
               <p className="orq-runs2__empty">{diagram === null ? t('runs.noDiagram') : t('runs.loading')}</p>
             )}
@@ -162,14 +168,17 @@ export function RunDetail(
             />
           </div>
         </div>
-        <aside className="orq-run__side" aria-label={step ? label(step.nodeId, step.nodePath) : t('runs.step.none')}>
-          {step && step.nodePath.length === 0 && fixable.includes(step.nodeId) && (
+        <aside className={`orq-run__side${step && folded ? ' is-folded' : ''}`} aria-label={step ? label(step.nodeId, step.nodePath) : t('runs.step.none')}>
+          {/* Plegado no cabe: el botón vuelve al desplegar [R68.3]. */}
+          {step && !folded && step.nodePath.length === 0 && fixable.includes(step.nodeId) && (
             <button type="button" className="orq-btn orq-btn--small orq-run__fixstep" onClick={() => setFix({ prefer: step.nodeId })}>
               {t('fix.open.step')}
             </button>
           )}
-          {step ? (
-            <NodePanel events={d.events} live={live} nodeId={step.nodeId} nodePath={step.nodePath} label={label(step.nodeId, step.nodePath)} labelOf={(id) => label(id, step.nodePath)} onAnswer={answerHere} closed={!running} onOpenFile={setViewing} onPreview={openPreview} renderThumb={previewCard} />
+          {step && folded ? (
+            <FoldedStep events={d.events} live={live} nodeId={step.nodeId} nodePath={step.nodePath} label={label(step.nodeId, step.nodePath)} onUnfold={() => setFolded(false)} />
+          ) : step ? (
+            <NodePanel key={[...step.nodePath, step.nodeId].join('/')} events={d.events} live={live} nodeId={step.nodeId} nodePath={step.nodePath} label={label(step.nodeId, step.nodePath)} labelOf={(id) => label(id, step.nodePath)} onAnswer={answerHere} closed={!running} onOpenFile={setViewing} onPreview={openPreview} renderThumb={previewCard} onFold={() => setFolded(true)} />
           ) : (
             <p className="orq-hint">{t('runs.step.none')}</p>
           )}

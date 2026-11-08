@@ -7,7 +7,7 @@ import { newAgent, newContext, newSkill, type AgentDefinition } from '@orquestad
 import { createDiagram } from '@orquestador/editor';
 import { App } from '../src/App';
 import { createMemoryApi, type MemoryApiOptions } from '../src/memoryApi';
-import { content, goLib, settingsSaved } from './nav';
+import { content, goLib, settingsSaved, stepTab } from './nav';
 
 const enc = new TextEncoder();
 const agent = (id: string, name: string, patch: Partial<AgentDefinition> = {}): AgentDefinition => ({ ...newAgent(id, name), ...patch });
@@ -189,11 +189,13 @@ describe('SPEC-032 · M7b panel del nodo, inicio y ajustes', () => {
     await screen.findByLabelText(/^Agente «pix»/);
     expect(screen.getByText('Paso', { selector: '.orq-side__title' })).toBeTruthy();
     expect(screen.queryByRole('tab', { name: 'Última ejecución' })).toBeNull();
+    await stepTab('Conocimiento');
     const know = within(screen.getByRole('group', { name: 'Conocimiento' }));
     expect(know.getByText('pixel-art')).toBeTruthy();
     expect(know.getByText('Paleta')).toBeTruthy();
     await userEvent.click(screen.getByRole('button', { name: 'Duplicar' }));
     expect(await screen.findAllByLabelText(/^Agente «pix/)).toHaveLength(2);
+    await stepTab('Agente');
     await userEvent.click(screen.getByRole('button', { name: 'Editar el agente' }));
     // abre «Configurar» en «El agente»; desde ahí se llega a Agentes
     await userEvent.click(within(screen.getByRole('dialog', { name: /^Configurar «/ })).getByRole('button', { name: 'Abrir en Agentes' }));
@@ -233,7 +235,8 @@ describe('SPEC-032 · M7b panel del nodo, inicio y ajustes', () => {
     render(<App api={api} confirm={() => true} />);
     await userEvent.click(screen.getByRole('button', { name: 'Ajustes' }));
     const page = within(await screen.findByRole('region', { name: 'Ajustes' }));
-    expect(page.getAllByRole('link').map((a) => a.textContent)).toEqual(['Claude', 'Reglas de los agentes', 'Presupuesto', 'Supervisor', 'Apariencia']);
+    await page.findByRole('heading', { name: 'Claude' });
+    expect([...document.querySelectorAll('.orq-setnav__title')].map((a) => a.textContent)).toEqual(['Claude', 'Permisos de los agentes', 'Supervisor', 'Ejecución y presupuesto', 'Apariencia']);
     expect(page.getByText(/Los cambios se guardan al momento/)).toBeTruthy();
     await userEvent.click(await page.findByRole('radio', { name: /Claude \(real\)/ }));
     await settingsSaved();

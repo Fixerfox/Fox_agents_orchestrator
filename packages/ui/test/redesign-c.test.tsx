@@ -8,7 +8,7 @@ import { createDiagram, type DraftRequest } from '@orquestador/editor';
 import { App } from '../src/App';
 import { ProjectChanges } from '../src/runs/RunFiles';
 import { createMemoryApi, type MemoryApiOptions } from '../src/memoryApi';
-import { goLib } from './nav';
+import { goLib, stepTab } from './nav';
 
 const agent = (id: string, name: string, patch: Partial<AgentDefinition> = {}): AgentDefinition => ({ ...newAgent(id, name), ...patch });
 const BUILT_IN = [
@@ -84,6 +84,7 @@ describe('SPEC-032 · fidelidad a los prototipos', () => {
     await mount();
     await insertAgent(/Sprites/);
     expect(within(screen.getByLabelText('Recibe:')).getByText('@entrada')).toBeTruthy();
+    await stepTab('Agente');
     const card = within(screen.getByRole('group', { name: 'Quién lo hace' }));
     expect(card.getByRole('button', { name: 'Editar el agente' })).toBeTruthy();
     await userEvent.click(card.getByRole('button', { name: 'Cambiar el agente' }));
@@ -98,6 +99,8 @@ describe('SPEC-032 · fidelidad a los prototipos', () => {
     await userEvent.click(rail.getByRole('button', { name: 'Proyecto' }));
     await userEvent.click(rail.getByRole('button', { name: 'Diseñador' }));
     await addAgent(/Sprites/);
+    await screen.findByRole('tab', { name: 'Permisos' });
+    await stepTab('Permisos');
     const files = within(await screen.findByRole('group', { name: 'Archivos' }));
     expect(await files.findByText('Crear archivos nuevos en INCWars')).toBeTruthy();
     const create = files.getByRole('switch', { name: 'Crear archivos nuevos en INCWars' }) as HTMLInputElement;
@@ -116,6 +119,8 @@ describe('SPEC-032 · fidelidad a los prototipos', () => {
   it('[R47.11] si el agente del paso tiene sus propios permisos, «Archivos» lo dice', async () => {
     await mount({ workFolderPick: { name: 'INCWars', files: 10 }, agents: [agent('lector', 'Lector', { permissions: 'readonly' })] });
     await addAgent(/Lector/);
+    await screen.findByRole('tab', { name: 'Permisos' });
+    await stepTab('Permisos');
     const files = within(await screen.findByRole('group', { name: 'Archivos' }));
     expect(files.getByText('Este agente usa los suyos: Solo lectura.')).toBeTruthy();
   });

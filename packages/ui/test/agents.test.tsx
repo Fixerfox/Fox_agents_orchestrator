@@ -6,7 +6,7 @@ import userEvent from '@testing-library/user-event';
 import { newAgent, newContext, type AgentDefinition, type ContextDefinition } from '@orquestador/core';
 import { createDiagram } from '@orquestador/editor';
 import { App } from '../src/App';
-import { goLib, openSettingsPage, settingsSaved } from './nav';
+import { goLib, openSettingsPage, settingsSaved, settingsSection } from './nav';
 import { createMemoryApi, type MemoryApiOptions } from '../src/memoryApi';
 
 const diagramWith = (agentId: string) => {
@@ -184,7 +184,9 @@ describe('SPEC-023 · ajustes', () => {
   it('[R23.5] se abre desde la barra y tiene las secciones Claude, Presupuesto y Apariencia', async () => {
     await mount();
     const s = await openSettings();
-    for (const name of ['Claude', 'Presupuesto', 'Apariencia']) expect(await s.findByRole('heading', { name })).toBeTruthy();
+    expect(await s.findByRole('heading', { name: 'Claude' })).toBeTruthy();
+    const index = within(s.getByRole('navigation', { name: 'Ajustes' }));
+    for (const name of [/^Claude/, /^Ejecución y presupuesto/, /^Apariencia/]) expect(index.getByRole('button', { name })).toBeTruthy();
     await userEvent.click(within(screen.getByRole('navigation', { name: 'Secciones' })).getByRole('button', { name: 'Diseñador' }));
     expect(screen.queryByRole('region', { name: 'Ajustes' })).toBeNull();
   });
@@ -192,9 +194,12 @@ describe('SPEC-023 · ajustes', () => {
   it('[R23.5][R32.25] los cambios se guardan solos', async () => {
     const api = await mount();
     const s = await openSettings();
+    await s.findByRole('heading', { name: 'Claude' });
+    await settingsSection('Ejecución y presupuesto');
     const par = await s.findByLabelText(/Agentes en paralelo/);
     await userEvent.clear(par);
     await userEvent.type(par, '8');
+    await settingsSection('Claude');
     await userEvent.selectOptions(s.getByLabelText('Modelo por defecto'), 'claude-haiku-5-5');
     await settingsSaved();
     expect(await s.findByText('Ajustes guardados')).toBeTruthy();
@@ -205,6 +210,8 @@ describe('SPEC-023 · ajustes', () => {
   it('[R23.5] un valor no válido muestra el error junto al campo y no se guarda', async () => {
     const api = await mount();
     const s = await openSettings();
+    await s.findByRole('heading', { name: 'Claude' });
+    await settingsSection('Ejecución y presupuesto');
     const par = await s.findByLabelText(/Agentes en paralelo/);
     await userEvent.clear(par);
     await userEvent.type(par, '99');
@@ -247,6 +254,8 @@ describe('SPEC-023 · ajustes', () => {
     expect(((await screen.findByLabelText('Presupuesto (tokens)')) as HTMLInputElement).value).toBe('');
     await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
     const s = await openSettings();
+    await s.findByRole('heading', { name: 'Claude' });
+    await settingsSection('Ejecución y presupuesto');
     await userEvent.type(await s.findByLabelText(/Límite de tokens por defecto/), '5000');
     await settingsSaved();
     await userEvent.click(within(screen.getByRole('navigation', { name: 'Secciones' })).getByRole('button', { name: 'Diseñador' }));
@@ -257,6 +266,8 @@ describe('SPEC-023 · ajustes', () => {
   it('[R23.5] el tema se cambia desde Apariencia', async () => {
     await mount();
     const s = await openSettings();
+    await s.findByRole('heading', { name: 'Claude' });
+    await settingsSection('Apariencia');
     await userEvent.click(await s.findByRole('radio', { name: 'Oscuro' }));
     expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
   });

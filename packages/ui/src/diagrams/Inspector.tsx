@@ -1,13 +1,14 @@
-import { Copy, Trash2, Workflow } from 'lucide-react';
+import { Copy, RotateCcw, Trash2, Workflow } from 'lucide-react';
 import { finalSteps, correctionCandidates, type Diagram, type DiagramNode } from '@orquestador/core';
 import { type ReactNode } from 'react';
-import { t, type ProjectApi, type EditorSession, type EditorSnapshot, type NodePatch } from '@orquestador/editor';
+import { resetStepPatch, t, type MessageKey, type ProjectApi, type EditorSession, type EditorSnapshot, type NodePatch } from '@orquestador/editor';
 import type { AgentOption } from './Palette';
 import { ExtraKnowledge, type KnowledgeCatalog } from './ExtraKnowledge';
 import type { Selection } from './Canvas';
 import { TransformPanel } from './TransformPanel';
 import { DeliverablePanel } from './DeliverablePanel';
-import { AgentStepFields, incomingNames, type StepFiles } from './StepFields';
+import { AgentStepFields, agentOfNode, incomingNames, type StepFiles, type StepTabId } from './StepFields';
+import { KIND_ICON } from './OrqNode';
 import type { RunEvent } from '@orquestador/core';
 
 interface Props {
@@ -36,6 +37,9 @@ interface Props {
   events?: readonly RunEvent[];
   /** «En marcha»: sustituye al aviso de solo lectura cuando no hay nada seleccionado [R38.12]. */
   liveCard?: ReactNode;
+  /** Pestaña del paso agente, recordada al cambiar de paso [R66.6]. */
+  stepTab?: StepTabId;
+  onStepTab?: (tab: StepTabId) => void;
 }
 
 /** Los campos de texto confirman al salir (un paso de historial por edición, no por pulsación). */
@@ -81,7 +85,7 @@ function NumberField({ label, value, min, onCommit }: { label: string; value: nu
   );
 }
 
-export function Inspector({ session, snap, selection, agents, onError, onEditAgent, onSelect, onChangeAgent, api, files, catalog, onCreateKnowledge, diagramNames, onOpenDiagram, events, liveCard }: Props) {
+export function Inspector({ session, snap, selection, agents, onError, onEditAgent, onSelect, onChangeAgent, api, files, catalog, onCreateKnowledge, diagramNames, onOpenDiagram, events, liveCard, stepTab, onStepTab }: Props) {
   const guard = (fn: () => void) => {
     try {
       fn();
@@ -127,6 +131,7 @@ export function Inspector({ session, snap, selection, agents, onError, onEditAge
 
       {node && (
         <div className="orq-insp">
+          <NodeHead node={node} agents={agents} />
           <input
             key={`${node.id}|${node.label ?? ''}`}
             className="orq-insp__title"
@@ -151,10 +156,13 @@ export function Inspector({ session, snap, selection, agents, onError, onEditAge
               onCreateKnowledge={onCreateKnowledge}
               onEditAgent={onEditAgent}
               onChangeAgent={onChangeAgent}
+              tab={stepTab}
+              onTab={onStepTab}
             />
           )}
 
           {node.kind === 'router' && (
+            <div className="orq-insp__card">
             <label>
               {t('inspector.router.mode')}
               <select value={node.router?.mode ?? 'ai'} onChange={(e) => patch(node.id, { router: { mode: e.target.value as 'ai' | 'rules' } })}>
@@ -162,15 +170,16 @@ export function Inspector({ session, snap, selection, agents, onError, onEditAge
                 <option value="rules">{t('inspector.router.rules')}</option>
               </select>
             </label>
+            <p className="orq-hint orq-sees">{t((node.router?.mode ?? 'ai') === 'ai' ? 'insp.sees.router.ai' : 'insp.sees.router.rules')}</p>
+            </div>
           )}
-          {node.kind === 'router' && <p className="orq-hint orq-sees">{t((node.router?.mode ?? 'ai') === 'ai' ? 'insp.sees.router.ai' : 'insp.sees.router.rules')}</p>}
 
           {node.kind === 'transform' && node.transform && (
             <TransformPanel key={node.id} node={{ ...node, transform: node.transform }} level={level} path={snap.path} events={events ?? []} incoming={incoming} patch={(p) => patch(node.id, p)} />
           )}
 
           {node.kind === 'subdiagram' && node.subdiagram && (
-            <div className="orq-insp__sec" role="group" aria-label={t('sub.uses')}>
+            <div className="orq-insp__sec orq-insp__card" role="group" aria-label={t('sub.uses')}>
               <span className="orq-insp__label">{t('sub.uses')}</span>
               <div className="orq-agentcard">
                 <span className="orq-agentcard__av" aria-hidden="true">
@@ -203,7 +212,7 @@ export function Inspector({ session, snap, selection, agents, onError, onEditAge
           )}
 
           {node.kind === 'loop' && node.loop && (
-            <>
+            <div className="orq-insp__card">
               <label>
                 {t('inspector.loop.mode')}
                 <select
@@ -229,11 +238,11 @@ export function Inspector({ session, snap, selection, agents, onError, onEditAge
                 <p className="orq-hint orq-sees">{t('insp.sees.loop')}</p>
               )}
               <NumberField label={t('inspector.loop.max')} min={1} value={node.loop.maxIterations} onCommit={(n) => patch(node.id, { loop: { maxIterations: n } })} />
-            </>
+            </div>
           )}
 
           {node.kind === 'review' && node.review && (
-            <>
+            <div className="orq-insp__card">
               <NumberField label={t('insp.review.max')} min={1} value={node.review.maxRounds} onCommit={(n) => patch(node.id, { review: { maxRounds: n } })} />
               <label>
                 {t('insp.review.mode')}
@@ -251,7 +260,7 @@ export function Inspector({ session, snap, selection, agents, onError, onEditAge
               {node.review.mode === 'verdict' && <p className="orq-hint">{t('insp.review.howto')}</p>}
               <p className="orq-hint">{t(node.review.mode === 'human' ? 'insp.review.ports.human' : 'insp.review.ports')}</p>
               <p className="orq-hint orq-sees">{node.review.mode === 'human' ? t('insp.sees.review.human') : `${t('insp.sees.review')} ${t('insp.sees.review.back')}`}</p>
-            </>
+            </div>
           )}
 
           {/* Entregable de la ejecución: solo en la Salida del diagrama principal [R46.13]. */}
@@ -266,6 +275,11 @@ export function Inspector({ session, snap, selection, agents, onError, onEditAge
 
           {node.kind !== 'entry' && node.kind !== 'output' && (
             <div className="orq-insp__foot">
+              {node.kind === 'agent' && (
+                <button type="button" className="orq-btn orq-btn--small" title={t('stepcfg.reset.hint')} disabled={!resetStepPatch(node)} onClick={() => { const r = resetStepPatch(node); if (r) patch(node.id, r); }}>
+                  <RotateCcw size={14} aria-hidden="true" /> {t('stepcfg.reset')}
+                </button>
+              )}
               <button
                 type="button"
                 className="orq-btn orq-btn--small"
@@ -288,8 +302,10 @@ export function Inspector({ session, snap, selection, agents, onError, onEditAge
       )}
 
       {edge && (
-        <div>
-          <h3>{t('inspector.edge.title')}</h3>
+        <div className="orq-insp">
+          <div className="orq-insp__head">
+            <h3 className="orq-insp__kind">{t('inspector.edge.title')}</h3>
+          </div>
           <button type="button" className="orq-btn orq-btn--danger" onClick={() => guard(() => session.removeSelection({ edges: [edge.id] }))}>
             <Trash2 size={16} aria-hidden="true" /> {t('inspector.edge.delete')}
           </button>
@@ -354,5 +370,20 @@ function HumanReviewFields({ node, level, onRoute }: { node: DiagramNode; level:
         <p className="orq-hint is-warn">{t('insp.review.targets.none')}</p>
       )}
     </>
+  );
+}
+
+/** Cabecera del lateral: qué es el elemento (tipo con icono) y, en un paso agente, de qué agente [R66.5]. */
+function NodeHead({ node, agents }: { node: DiagramNode; agents: readonly AgentOption[] }) {
+  const Icon = KIND_ICON[node.kind];
+  const agent = node.kind === 'agent' ? agentOfNode(agents, node.agentId) : undefined;
+  return (
+    <div className="orq-insp__head">
+      <span className="orq-insp__kind">
+        <Icon size={14} strokeWidth={1.7} aria-hidden="true" />
+        {t(`node.${node.kind}` as MessageKey)}
+        {node.kind === 'agent' && <span className="orq-insp__kindsub">· {agent?.name ?? node.agentId}</span>}
+      </span>
+    </div>
   );
 }

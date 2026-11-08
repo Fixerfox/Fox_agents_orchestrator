@@ -5,7 +5,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createDiagram } from '@orquestador/editor';
 import { App } from '../src/App';
-import { settingsSaved } from './nav';
+import { settingsSaved, settingsSection } from './nav';
 import { createMemoryApi, type MemoryApiOptions } from '../src/memoryApi';
 
 async function openSettings(options: MemoryApiOptions = {}, createProject = true) {
@@ -13,12 +13,21 @@ async function openSettings(options: MemoryApiOptions = {}, createProject = true
   render(<App api={api} confirm={() => true} />);
   if (createProject) await userEvent.click(screen.getByRole('button', { name: 'Crear proyecto' }));
   await userEvent.click(await screen.findByRole('button', { name: 'Ajustes' }));
-  return { api, dlg: within(await screen.findByRole('region', { name: 'Ajustes' })) };
+  const dlg = within(await screen.findByRole('region', { name: 'Ajustes' }));
+  await dlg.findByRole('heading', { name: 'Claude' });
+  return { api, dlg };
+}
+
+/** La carpeta está en «Este proyecto › Carpeta de trabajo» [R67.1]. */
+async function openWork(options: MemoryApiOptions = {}) {
+  const r = await openSettings(options);
+  await settingsSection('Carpeta de trabajo');
+  return r;
 }
 
 describe('SPEC-031 · carpeta de trabajo en Ajustes', () => {
   it('[R31.1] sin carpeta lo explica y ofrece elegirla; al elegirla muestra nombre y número de archivos, nunca la ruta', async () => {
-    const { dlg } = await openSettings({ workFolderPick: { name: 'mi-juego', files: 42 } });
+    const { dlg } = await openWork({ workFolderPick: { name: 'mi-juego', files: 42 } });
     expect(await dlg.findByText(/Sin carpeta: los agentes trabajan en la carpeta del proyecto/)).toBeTruthy();
     await userEvent.click(dlg.getByRole('button', { name: 'Elegir carpeta…' }));
     expect(await dlg.findByText('mi-juego · 42 archivos')).toBeTruthy();
@@ -26,7 +35,7 @@ describe('SPEC-031 · carpeta de trabajo en Ajustes', () => {
   });
 
   it('[R31.1] cancelar el diálogo del sistema no cambia nada y «Quitar carpeta» la deja sin elegir', async () => {
-    const { dlg, api } = await openSettings();
+    const { dlg, api } = await openWork();
     await userEvent.click(await dlg.findByRole('button', { name: 'Elegir carpeta…' }));
     expect(dlg.queryByText(/archivos$/)).toBeNull();
     const picked = await createMemoryApi([], { workFolderPick: { name: 'x', files: 1 } }).pickWorkFolder();
@@ -35,7 +44,7 @@ describe('SPEC-031 · carpeta de trabajo en Ajustes', () => {
   });
 
   it('[R31.1] quitar la carpeta vuelve al estado inicial', async () => {
-    const { dlg } = await openSettings({ workFolderPick: { name: 'mi-juego', files: 3 } });
+    const { dlg } = await openWork({ workFolderPick: { name: 'mi-juego', files: 3 } });
     await userEvent.click(await dlg.findByRole('button', { name: 'Elegir carpeta…' }));
     await userEvent.click(await dlg.findByRole('button', { name: 'Quitar carpeta' }));
     expect(await dlg.findByText(/Sin carpeta/)).toBeTruthy();
@@ -52,6 +61,7 @@ describe('SPEC-031 · carpeta de trabajo en Ajustes', () => {
 
   it('[R31.4][R47.11][R51.1] los permisos están en «Sin preguntar nunca» por defecto, se cambian y se guardan', async () => {
     const { dlg, api } = await openSettings();
+    await settingsSection('Permisos de los agentes');
     const perms = within(await dlg.findByRole('group', { name: 'Permisos de los agentes' }));
     expect((perms.getByRole('radio', { name: /^Sin preguntar nunca/ }) as HTMLInputElement).checked).toBe(true);
     expect(dlg.getByText('Cada agente puede tener sus propios permisos en su ficha.')).toBeTruthy();
