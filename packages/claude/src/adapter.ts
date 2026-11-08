@@ -9,7 +9,7 @@ import { buildSystemPrompt, buildUserPrompt, claudeCodePrompt } from './prompt';
 import type { PermissionResult, QueryFn, SdkMcpServer } from './sdk-types';
 import { createMcpPolicy, sdkMcpConfig, type ResolvedMcp } from './mcp';
 import { KnowledgeTracker, describeKnowledge, planKnowledge } from './knowledge';
-import { agentTools, createWritePolicy, withIsolation, withScope, withVerifier, guardedPolicy, summarizeFolder, type WritePolicyDeps } from './workfolder';
+import { agentTools, createWritePolicy, withIsolation, withScope, withSelfProtection, withVerifier, guardedPolicy, summarizeFolder, type WritePolicyDeps } from './workfolder';
 import { CommandWatch } from './changes';
 import { classifyCommand } from './commands';
 
@@ -118,7 +118,7 @@ export class ClaudeAdapter implements AgentAdapter {
       const level = effectivePermission(agent, settings);
       // La política corre en canUseTool y en el gancho, con una sola decisión por llamada [R50.4].
       const guard = guardedPolicy(
-        withPause(request.whilePaused, watchCommands(
+        withPause(request.whilePaused, withSelfProtection(note, watchCommands(
           watch,
           root,
           withMcp(
@@ -137,7 +137,7 @@ export class ClaudeAdapter implements AgentAdapter {
             },
           })), root)),
           ),
-        )),
+        ))),
       );
       const options = {
         ...baseOptions({

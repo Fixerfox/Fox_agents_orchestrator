@@ -3,7 +3,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import type { AgentQuestion } from '@orquestador/core';
 import type { PermissionLevel } from '@orquestador/core';
-import { ISOLATED_GIT_DENY, allowCommandForRun, classifyCommand, grantKey, sensitiveCommand, writesGit } from './commands';
+import { APP_KILL_DENY, ISOLATED_GIT_DENY, allowCommandForRun, killsAppProcess, classifyCommand, grantKey, sensitiveCommand, writesGit } from './commands';
 import { AUTO_TOOLS } from './connection';
 import type { CanUseTool, PermissionResult, PreToolUseHook } from './sdk-types';
 
@@ -208,6 +208,18 @@ export function withVerifier(on: boolean | undefined, note: WritePolicyDeps['not
 /** Motivo al escribir en la carpeta de trabajo desde una rama en paralelo [R73.8]. */
 export const ISOLATED_DENY =
   'Este paso trabaja en una copia aislada de la carpeta porque corre en paralelo con otros: escribe en tu carpeta actual, no en la original. Lo tuyo se junta con lo de las otras ramas al terminar.';
+
+/** Ningún agente cierra la app matando por nombre sus procesos, con ningún permiso [R79.2]. */
+export function withSelfProtection<P extends (tool: string, input: Record<string, unknown>, id?: string) => Promise<PermissionResult>>(note: WritePolicyDeps['note'], inner: P): P {
+  return (async (tool: string, input: Record<string, unknown>, id?: string) => {
+    const command = tool === 'Bash' && typeof input['command'] === 'string' ? (input['command'] as string) : undefined;
+    if (command !== undefined && killsAppProcess(command)) {
+      note?.({ kind: 'denied', path: command, reason: APP_KILL_DENY });
+      return deny(APP_KILL_DENY);
+    }
+    return inner(tool, input, id);
+  }) as P;
+}
 
 /**
  * Rama en paralelo [R73.8][R73.9]: nunca se escribe en la carpeta original (también con «Sin preguntar nunca») ni se
