@@ -108,6 +108,17 @@ export function RunDetail(
           ))}
         </div>
       )}
+      {/* El proveedor pidió esperar, y el aviso del 80 % del presupuesto [R77.5][R77.6]. */}
+      {running && live.cooldown && Date.parse(live.cooldown.untilTs) > p.now() && (
+        <p className="orq-run__note" role="status">
+          {t('run.cooldown', { provider: live.cooldown.provider === 'claude' ? 'Claude' : live.cooldown.provider, time: new Date(live.cooldown.untilTs).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) })}
+        </p>
+      )}
+      {running && live.budgetWarning && !live.budgetReached && (
+        <p className="orq-run__note" role="status">
+          {t('run.budgetWarning', { pct: Math.round((live.budgetWarning.used / live.budgetWarning.max) * 100) })}
+        </p>
+      )}
       {d.accepted && (
         // Aceptada: quién, por qué y por qué había fallado [R65.8].
         <p className="orq-run__note" role="note">

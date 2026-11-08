@@ -71,6 +71,8 @@ export interface RunSummary {
   correctedBy?: string[];
   /** Dada por buena tras fallar [R65.7]. */
   accepted?: { by: 'user' | 'assistant'; reason: string; at: string; previousReason?: string };
+  /** Reintentos de la ejecución [R77.19]. */
+  retries?: number;
 }
 /** Vista previa de un archivo que hizo un paso [R54.4]. */
 export interface FilePreview {

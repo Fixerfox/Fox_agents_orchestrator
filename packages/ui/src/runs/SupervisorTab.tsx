@@ -26,6 +26,8 @@ const RULES: Readonly<Record<string, { title: MessageKey; why: MessageKey }>> = 
   'note-too-long': { title: 'sup.rule.note-too-long', why: 'sup.rule.note-too-long.why' },
   'isolation-failed': { title: 'sup.rule.isolation-failed', why: 'sup.rule.isolation-failed.why' },
   'resume-diverged': { title: 'sup.rule.resume-diverged', why: 'sup.rule.resume-diverged.why' },
+  'instructions-changed': { title: 'sup.rule.instructions-changed', why: 'sup.rule.instructions-changed.why' },
+  'burn-rate': { title: 'sup.rule.burn-rate', why: 'sup.rule.burn-rate.why' },
 };
 
 /** Cuánto acierta cada regla: en esta ejecución y en las últimas [R75.22]. */

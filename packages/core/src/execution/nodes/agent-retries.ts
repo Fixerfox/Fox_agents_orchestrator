@@ -83,6 +83,11 @@ export async function attemptsOf(step: StepContext, node: DiagramNode, input: Pa
       step.emitter.emit({ type: 'error', nodeId: node.id, message, retriable }, path);
       // Los límites de uso tienen su propia cuenta [R71.5].
       const limit = isLimitError(err);
+      // El proveedor pidió esperar: ninguna ejecución arranca nada nuevo con él hasta que pase [R77.4].
+      if (limit && err instanceof AgentError && err.retryAfterMs !== undefined) {
+        const c = step.resources?.limited({ retryAfterMs: err.retryAfterMs, reason: err.kind === 'overloaded' ? 'overloaded' : 'rate_limit' });
+        if (c) step.emitter.emit({ type: 'provider.cooldown', nodeId: node.id, ...c }, path);
+      }
       const used = limit ? ++limited : ++normal;
       if (!retriable || used >= (limit ? limitAttempts : maxAttempts)) return { status: 'failed' };
       turn.previous = await previousOf(step, node, path, turn, turn.attempts, err);

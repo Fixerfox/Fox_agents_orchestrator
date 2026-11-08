@@ -6,6 +6,7 @@ import { UNFINISHED_OPTIONS, UNFINISHED_STOP, unfinishedDecision, unfinishedQues
 import { newTrace } from './agent-attempt';
 import { attemptsOf, type AgentTurn } from './agent-retries';
 import { verifyStep } from './agent-checks';
+import { BUDGET_SPENT } from '../run/budget-tracker';
 import { errorMessage, failStep, type NodeHandler, type StepContext } from './handler';
 
 /** Veces que se repite un paso que no reparte bien, antes de fallar [R59.8]. */
@@ -49,6 +50,12 @@ export const agentHandler: NodeHandler = {
     try {
       if (step.signal.aborted) return { status: 'cancelled' };
       step.emitter.emit({ type: 'node.started', nodeId: node.id, input }, path);
+      // Desde el 90 % del presupuesto no arranca ningún paso sin que lo diga la persona; sin él, ninguno [R77.7][R77.8].
+      // Sin acercarse al límite no se espera nada: el paso arranca en el mismo instante [R7.1].
+      const gate = step.budget.beforeStep((q) => step.limiter.whileWaiting(turn.slot, step.signal, () => step.questions.ask(node.id, path, q)));
+      const budget = typeof gate === 'string' ? gate : await gate;
+      if (step.signal.aborted) return { status: 'cancelled' };
+      if (budget === 'stop') return failStep(step, node, BUDGET_SPENT, path);
       // La memoria se fija al arrancar y no cambia entre intentos [R72.9].
       const memory = step.memory?.forStep(node.id, path);
       if (memory?.text) {

@@ -28,3 +28,4 @@ export * from './step-config';
 export * from './permissions-view';
 export { setDiagramChecks, type StepPatch } from './ops-step';
 export * from './memory-proposals-view';
+export * from './metrics-view';

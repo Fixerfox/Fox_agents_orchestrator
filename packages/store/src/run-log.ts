@@ -94,6 +94,7 @@ export class RunLogWriter {
         /* sin fsync (p. ej. un sistema de archivos que no lo admite) se sigue igual */
       }
     }
+    if (e.type === 'node.retrying') this.meta.retries = (this.meta.retries ?? 0) + 1;
     if (e.type === 'node.started') {
       const k = [...(e.nodePath ?? []), e.nodeId].join('/');
       this.passes.set(k, (this.passes.get(k) ?? 0) + 1);

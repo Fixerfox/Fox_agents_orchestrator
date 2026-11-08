@@ -7,6 +7,7 @@ import { deliverableNotice } from '../text/deliverable-notice';
 import { splitRule, type SplitBranch } from '../text/split';
 import { explainTouchedFiles } from '../text/touched-files';
 import type { Outcome, StepContext } from './handler';
+import { SharedSlot, pauseHold } from './agent-resources';
 import type { MemoryStats } from '../memory/memory-render';
 import { splitNote, NOTE_MAX } from '../memory/notes';
 
@@ -56,6 +57,22 @@ function branchesOf(step: StepContext, node: DiagramNode): Promise<SplitBranch[]
 }
 
 export async function attemptAgent(step: StepContext, node: DiagramNode, input: Payload, attempt: number, path: Id[], turn: AgentTurn): Promise<Outcome> {
+  // Cada intento necesita hueco también en toda la app, y espera si el proveedor pidió esperar [R77.1][R77.4].
+  const shared = new SharedSlot(step, node.id, path);
+  try {
+    // Sin recursos compartidos no se espera nada [R7.1].
+    if (step.resources) await shared.take();
+    if (step.signal.aborted) return { status: 'cancelled' };
+    return await attemptOnce(step, node, input, attempt, path, turn, shared);
+  } catch (err) {
+    if (step.signal.aborted) return { status: 'cancelled' };
+    throw err;
+  } finally {
+    shared.drop();
+  }
+}
+
+async function attemptOnce(step: StepContext, node: DiagramNode, input: Payload, attempt: number, path: Id[], turn: AgentTurn, shared: SharedSlot): Promise<Outcome> {
   const agentId = node.agentId!;
   const { answered, slot } = turn;
   const missing = [...turn.missing];
@@ -134,19 +151,23 @@ export async function attemptAgent(step: StepContext, node: DiagramNode, input: 
     },
   });
 
-  // Mientras espera al usuario el agente libera su hueco de concurrencia, y el reloj se detiene [R70.3].
+  // Mientras espera al usuario el agente libera sus huecos, el de la ejecución y el global, y el reloj se detiene [R70.3][R77.2].
   const ask = (q: AgentQuestion): Promise<string> =>
-    step.limiter.whileWaiting(slot, step.signal, async () => {
-      watchdog.suspend();
-      try {
-        const answer = turn.replay ? await step.questions.askReplaying(node.id, path, q, turn.replay) : await step.questions.ask(node.id, path, q);
-        if (!answered.some((a) => a.question === q.text && a.answer === answer)) answered.push({ question: q.text, answer });
-        return answer;
-      } finally {
-        watchdog.resume();
-      }
-    });
-  const request = { nodeId: node.id, agentId, runId: step.emitter.runId, input, ...(task ? { task } : {}), ...(node.model ? { model: node.model } : {}), ...(node.confirm ? { confirm: true } : {}), ...(split ? { split } : {}), ...(turn.memory ? { memory: turn.memory } : {}), ...(turn.scope ? { scope: turn.scope } : {}), ...(deliverable ? { deliverable } : {}), ...(hasExtra ? { extra } : {}), ...(missing.length > 0 ? { missing } : {}), attempt, ask, previousAnswers: [...answered], ...(turn.previous ? { previousAttempt: turn.previous } : {}), ...(step.space ? { workspace: { dir: step.space.dir } } : {}), ...(turn.projectMemory ? { projectMemory: turn.projectMemory } : {}) };
+    step.limiter.whileWaiting(slot, step.signal, () =>
+      shared.without(async () => {
+        watchdog.suspend();
+        try {
+          const answer = turn.replay ? await step.questions.askReplaying(node.id, path, q, turn.replay) : await step.questions.ask(node.id, path, q);
+          if (!answered.some((a) => a.question === q.text && a.answer === answer)) answered.push({ question: q.text, answer });
+          return answer;
+        } finally {
+          watchdog.resume();
+        }
+      }),
+    );
+  // En pausa, el paso queda retenido antes de su siguiente herramienta o al acabar su turno [R77.12][R77.13].
+  const hold = pauseHold(step, node.id, path, watchdog);
+  const request = { nodeId: node.id, agentId, runId: step.emitter.runId, input, ...(task ? { task } : {}), ...(node.model ? { model: node.model } : {}), ...(node.confirm ? { confirm: true } : {}), ...(split ? { split } : {}), ...(turn.memory ? { memory: turn.memory } : {}), ...(turn.scope ? { scope: turn.scope } : {}), ...(deliverable ? { deliverable } : {}), ...(hasExtra ? { extra } : {}), ...(missing.length > 0 ? { missing } : {}), attempt, ask, previousAnswers: [...answered], ...(turn.previous ? { previousAttempt: turn.previous } : {}), ...(step.space ? { workspace: { dir: step.space.dir } } : {}), ...(turn.projectMemory ? { projectMemory: turn.projectMemory } : {}), ...(limits.maxCostUsd !== undefined ? { maxCostUsd: limits.maxCostUsd } : {}), whilePaused: (tool: string) => hold(tool) };
 
   // Misma acción seguida sin cambiar archivos [R70.10][R70.11].
   let lastSig = '';
@@ -179,12 +200,7 @@ export async function attemptAgent(step: StepContext, node: DiagramNode, input: 
       if (ev.type === 'tool_call') watchdog.activity('tool_call', ev.tool);
       else if (ev.type === 'tool_result') watchdog.activity('tool_result', ev.tool);
       else watchdog.activity('other');
-      watchdog.suspend();
-      try {
-        await step.gate.wait(step.signal);
-      } finally {
-        watchdog.resume();
-      }
+      await hold();
       if (step.signal.aborted) return { status: 'cancelled' };
       switch (ev.type) {
         case 'token':

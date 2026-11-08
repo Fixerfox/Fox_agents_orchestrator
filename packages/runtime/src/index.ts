@@ -7,3 +7,4 @@ export * from './engine';
 export * from './snapshot';
 export * from './jobs';
 export { RunMemory, type ProjectMemoryPort } from './run-memory';
+export { AppResources, GlobalLimiter, ProviderCooldowns, type Clock } from './resources';

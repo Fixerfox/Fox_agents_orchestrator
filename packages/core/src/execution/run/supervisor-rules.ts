@@ -9,7 +9,7 @@ import { LOOP_WARN, toolSignature } from './watchdog';
 export interface SupervisorAlert {
   nodeId: Id;
   path: readonly Id[];
-  rule: 'undeclared-file' | 'empty-output' | 'unexpected-branch' | 'retry-loop' | 'budget-burn' | 'tool-loop' | 'instructions-changed';
+  rule: 'undeclared-file' | 'empty-output' | 'unexpected-branch' | 'retry-loop' | 'budget-burn' | 'tool-loop' | 'instructions-changed' | 'burn-rate';
   detail: string;
 }
 
@@ -24,6 +24,23 @@ export interface RuleState {
   retries: Map<string, { attempt: number; max: number; message: string }>;
   /** Última herramienta de cada paso y cuántas veces seguidas se repitió [R70.10]. */
   loops: Map<string, { sig: string; count: number }>;
+  /** Lo que gasta cada paso y cuándo, para `burn-rate` [R77.10]. */
+  burn?: Map<string, { spends: { at: number; costUsd: number }[]; alerted: boolean }>;
+}
+
+/** Minutos seguidos que tiene que durar el gasto alto [R77.10]. */
+export const BURN_MINUTES = 3;
+export const BURN_RATE_USD_PER_MIN = 1;
+
+/** ¿Gastó más de `rate` $ en cada uno de los últimos minutos seguidos? [R77.10] */
+function burning(spends: readonly { at: number; costUsd: number }[], now: number, rate: number): boolean {
+  if (spends.length === 0 || now - spends[0]!.at < (BURN_MINUTES - 1) * 60_000) return false;
+  for (let m = 0; m < BURN_MINUTES; m++) {
+    const to = now - m * 60_000;
+    const sum = spends.filter((s) => s.at > to - 60_000 && s.at <= to).reduce((n, s) => n + s.costUsd, 0);
+    if (sum <= rate) return false;
+  }
+  return true;
 }
 
 export const newRuleState = (): RuleState => ({ declared: new Map(), agents: new Set(), rejected: new Map(), spent: new Map(), retries: new Map(), loops: new Map() });
@@ -32,7 +49,7 @@ export const newRuleState = (): RuleState => ({ declared: new Map(), agents: new
 const MAX_REJECTIONS = 3;
 
 /** Reglas del Supervisor: solo miran eventos, nunca llaman al motor [R60.2]. */
-export function applyRules(state: RuleState, e: RunEvent, budget: RunOptions['budget']): SupervisorAlert[] {
+export function applyRules(state: RuleState, e: RunEvent, budget: RunOptions['budget'], opts: { burnRate?: number } = {}): SupervisorAlert[] {
   const path = e.nodePath ?? [];
   const alert = (nodeId: Id, rule: SupervisorAlert['rule'], detail: string): SupervisorAlert[] => [{ nodeId, path, rule, detail }];
   switch (e.type) {
@@ -97,6 +114,18 @@ export function applyRules(state: RuleState, e: RunEvent, budget: RunOptions['bu
       spent.tokens += e.inputTokens + e.outputTokens;
       spent.costUsd += e.costUsd ?? 0;
       state.spent.set(key, spent);
+      // Más de 1 $ por minuto durante 3 minutos seguidos [R77.10].
+      const burn = (state.burn ??= new Map<string, { spends: { at: number; costUsd: number }[]; alerted: boolean }>());
+      const b = burn.get(key) ?? { spends: [], alerted: false };
+      burn.set(key, b);
+      const at = Date.parse(e.ts);
+      if (e.costUsd && Number.isFinite(at)) b.spends.push({ at, costUsd: e.costUsd });
+      b.spends = b.spends.filter((s: { at: number }) => s.at > at - BURN_MINUTES * 60_000);
+      const rate = opts.burnRate ?? BURN_RATE_USD_PER_MIN;
+      if (!b.alerted && burning(b.spends, at, rate)) {
+        b.alerted = true;
+        return alert(e.nodeId, 'burn-rate', `Lleva ${BURN_MINUTES} minutos gastando más de ${rate} $ por minuto.`);
+      }
       const burned = (budget?.maxTokens !== undefined && spent.tokens > budget.maxTokens / 2) || (budget?.maxCostUsd !== undefined && spent.costUsd > budget.maxCostUsd / 2);
       return burned ? alert(e.nodeId, 'budget-burn', 'Este paso ha gastado más de la mitad del presupuesto.') : [];
     }

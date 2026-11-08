@@ -70,6 +70,20 @@ export interface LiveView {
   /** Ramas en paralelo: «aislada» en sus pasos y, al juntarse, «fusionada» o «conflicto» en lo que las junta [R73.20]. */
   isolation: Record<string, 'isolated' | 'merged' | 'conflict'>;
   needsAttention: boolean;
+  /** Pasos esperando hueco en toda la app (agentes trabajando) y cómo van en la pausa [R77.3][R77.13]. */
+  waits: Record<string, StepWait>;
+  /** El proveedor pidió esperar hasta esa hora [R77.5]. */
+  cooldown?: { provider: string; untilTs: string };
+  /** Se pasó del 80 % del presupuesto [R77.6]. */
+  budgetWarning?: { limit: 'tokens' | 'cost'; used: number; max: number };
+}
+
+/** Por qué está quieto un paso que ya empezó [R77.3][R77.13]. */
+export interface StepWait {
+  /** Esperando hueco: agentes trabajando en toda la app. */
+  queuedBehind?: number;
+  /** En pausa: terminando lo que hace, o ya retenido. */
+  pause?: 'pausing' | 'paused';
 }
 
 /** Cómo va un paso en marcha: sin actividad desde hace N minutos, o cortado y a punto de reintentarse [R70.20]. */
@@ -100,6 +114,7 @@ export const EMPTY_LIVE: LiveView = {
   health: {},
   isolation: {},
   needsAttention: false,
+  waits: {},
 };
 
 const textOf = (p: Payload | undefined): string | undefined => (p ? p.text : undefined);
@@ -107,7 +122,9 @@ const textOf = (p: Payload | undefined): string | undefined => (p ? p.text : und
 /** Estado visible de una ejecución, reconstruido solo con sus eventos (vivo o replay). */
 export function deriveLive(events: readonly RunEvent[]): LiveView {
   if (events.length === 0) return EMPTY_LIVE;
-  const v: LiveView = { ...EMPTY_LIVE, knowledge: {}, status: 'running', nodeStatus: {}, edges: new Set(), loops: {}, reviews: {}, exhausted: [], usage: { inputTokens: 0, outputTokens: 0, costUsd: 0 }, pending: [], produced: [], alerts: {}, health: {}, isolation: {} };
+  const v: LiveView = { ...EMPTY_LIVE, knowledge: {}, status: 'running', nodeStatus: {}, edges: new Set(), loops: {}, reviews: {}, exhausted: [], usage: { inputTokens: 0, outputTokens: 0, costUsd: 0 }, pending: [], produced: [], alerts: {}, health: {}, isolation: {}, waits: {} };
+  const agentSteps = new Set<string>();
+  let held = new Set<string>();
   const open = new Map<string, PendingItem>();
   // Orden en que empezó cada paso y se recorrió cada conexión, para reiniciar la vuelta al volver atrás [R38.18].
   const startedAt = new Map<string, number>();
@@ -127,9 +144,20 @@ export function deriveLive(events: readonly RunEvent[]): LiveView {
         break;
       case 'run.paused':
         v.paused = true;
+        held = new Set();
         break;
       case 'run.resumed':
         v.paused = false;
+        held = new Set();
+        break;
+      case 'node.paused':
+        held.add(pathKey(np, e.nodeId));
+        break;
+      case 'provider.cooldown':
+        if (!v.cooldown || v.cooldown.untilTs < e.untilTs) v.cooldown = { provider: e.provider, untilTs: e.untilTs };
+        break;
+      case 'run.budget_warning':
+        v.budgetWarning = { limit: e.limit, used: e.used, max: e.max };
         break;
       case 'run.budget_reached':
         v.budgetReached = { limit: e.limit, used: e.used, max: e.max };
@@ -137,6 +165,12 @@ export function deriveLive(events: readonly RunEvent[]): LiveView {
       case 'agent.request':
         // Cada intento empieza de cero: lo que se ve es el estado del último [R36.18].
         v.knowledge[pathKey(np, e.nodeId)] = {};
+        agentSteps.add(pathKey(np, e.nodeId));
+        // Ya tiene hueco en toda la app [R77.3].
+        if (v.waits[pathKey(np, e.nodeId)]?.queuedBehind !== undefined) {
+          delete v.waits[pathKey(np, e.nodeId)];
+          if (v.nodeStatus[pathKey(np, e.nodeId)] === 'queued') v.nodeStatus[pathKey(np, e.nodeId)] = 'running';
+        }
         delete v.health[pathKey(np, e.nodeId)];
         break;
       case 'node.timeout':
@@ -150,6 +184,7 @@ export function deriveLive(events: readonly RunEvent[]): LiveView {
         break;
       case 'node.queued':
         v.nodeStatus[pathKey(np, e.nodeId)] = 'queued';
+        if (e.others !== undefined) v.waits[pathKey(np, e.nodeId)] = { queuedBehind: e.others };
         break;
       case 'node.started':
         v.nodeStatus[pathKey(np, e.nodeId)] = 'running';
@@ -159,6 +194,7 @@ export function deriveLive(events: readonly RunEvent[]): LiveView {
         if (sentBack.delete(pathKey(np, e.nodeId)) && e.status === 'succeeded') delete v.nodeStatus[pathKey(np, e.nodeId)];
         else v.nodeStatus[pathKey(np, e.nodeId)] = e.status;
         delete v.health[pathKey(np, e.nodeId)];
+        delete v.waits[pathKey(np, e.nodeId)];
         if (np.length === 0 && e.nodeId === 'output') {
           const t = textOf(e.output);
           if (t !== undefined) v.finalOutput = t;
@@ -240,6 +276,11 @@ export function deriveLive(events: readonly RunEvent[]): LiveView {
     }
   }
   v.pending = [...open.values()];
+  // En pausa, los pasos de agente en marcha terminan lo que hacen y quedan retenidos [R77.13].
+  if (v.paused && v.status === 'running') {
+    for (const k of agentSteps) if (v.nodeStatus[k] === 'running') v.waits[k] = { ...v.waits[k], pause: held.has(k) ? 'paused' : 'pausing' };
+  }
+  if (v.status !== 'running') delete v.cooldown;
   const git = branchesOf(events);
   v.branches = git.byStep;
   v.gitActions = git.actions;
@@ -442,36 +483,4 @@ export function stepOverview(events: readonly RunEvent[], nodeId: Id, nodePath: 
   return out;
 }
 
-type ToolItem = Extract<TranscriptItem, { kind: 'tool' }>;
-
-/** Un elemento de la conversación: los de siempre o un grupo de herramientas seguidas [R69.2]. */
-export type ConversationBlock = TranscriptItem | { kind: 'tools'; tools: ToolItem[] };
-
-/** Junta las herramientas seguidas en un bloque; lo demás queda igual y en su orden [R69.2]. */
-export function conversationBlocks(items: readonly TranscriptItem[]): ConversationBlock[] {
-  const out: ConversationBlock[] = [];
-  for (const it of items) {
-    const last = out[out.length - 1];
-    if (it.kind === 'tool') {
-      if (last?.kind === 'tools') last.tools.push(it);
-      else out.push({ kind: 'tools', tools: [it] });
-    } else out.push(it);
-  }
-  return out;
-}
-
-const TARGET_KEYS = ['file_path', 'path', 'command', 'pattern', 'url', 'notebook_path', 'query'] as const;
-
-/** Objetivo principal de una herramienta (fichero, comando, patrón o dirección), corto; nada si no lo hay [R69.2]. */
-export function toolTarget(input: unknown, max = 60): string | undefined {
-  if (!input || typeof input !== 'object') return undefined;
-  const rec = input as Record<string, unknown>;
-  for (const k of TARGET_KEYS) {
-    const v = rec[k];
-    if (typeof v === 'string' && v.trim() !== '') {
-      const one = v.trim().split('\n')[0]!;
-      return one.length > max ? `${one.slice(0, max - 1)}…` : one;
-    }
-  }
-  return undefined;
-}
+export { conversationBlocks, toolTarget, type ConversationBlock } from './live-blocks';

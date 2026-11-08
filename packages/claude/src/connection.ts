@@ -36,6 +36,7 @@ export function baseOptions(args: {
   cwd: string;
   model?: string;
   maxTurns?: number;
+  maxBudgetUsd?: number;
   controller: AbortController;
   tools?: boolean;
   toolList?: readonly string[];
@@ -49,6 +50,7 @@ export function baseOptions(args: {
     model: args.model ?? args.settings.defaultModel,
     cwd: args.cwd,
     ...(args.maxTurns !== undefined ? { maxTurns: args.maxTurns } : {}),
+    ...(args.maxBudgetUsd !== undefined ? { maxBudgetUsd: args.maxBudgetUsd } : {}),
     tools,
     // `allowedTools` aprueba sin llamar a `canUseTool`: solo las lecturas. Escribir, ejecutar y preguntar pasan
     // siempre por la política (copia, permiso y registro de lo tocado) [R45.1].

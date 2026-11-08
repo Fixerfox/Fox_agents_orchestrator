@@ -270,6 +270,21 @@ export function stepSections({ node, snap, agents, patch, api, files, catalog, o
             />
           </label>
         ))}
+        {/* Presupuesto propio de cada intento [R77.9]. */}
+        <label className="orq-field orq-field--inline">
+          <span>{t('step.limits.cost')}</span>
+          <input
+            type="number"
+            min={0.01}
+            step={0.1}
+            aria-label={t('step.limits.cost')}
+            value={node.limits?.maxCostUsd ?? ''}
+            onChange={(e) => {
+              const next = { ...node.limits, maxCostUsd: e.target.value === '' ? undefined : Number(e.target.value) };
+              if (limitProblems(next).length === 0) patch({ limits: next });
+            }}
+          />
+        </label>
         <p className="orq-hint">{t('step.limits.hint')}</p>
       </fieldset>
       {/* Comprobaciones, revisión con IA y verificador del paso [R75.11][R75.24]. */}

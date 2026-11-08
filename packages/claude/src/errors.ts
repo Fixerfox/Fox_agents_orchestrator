@@ -97,12 +97,13 @@ export function explainAssistantError(code: string): AgentError {
 }
 
 /** Resultado final con error. */
-export function explainResult(subtype: string | undefined, errors: string[] | undefined, text: string | undefined, secret?: string): AgentError {
+export function explainResult(subtype: string | undefined, errors: string[] | undefined, text: string | undefined, secret?: string, maxBudgetUsd?: number): AgentError {
   switch (subtype) {
     case 'error_max_turns':
       return new AgentError('El agente agotó su máximo de turnos sin terminar. Sube el máximo o simplifica la tarea.', false);
     case 'error_max_budget_usd':
-      return new AgentError('Se alcanzó el presupuesto máximo de la consulta.', false);
+      // No se reintenta: volvería a gastar lo mismo [R77.9].
+      return new AgentError(maxBudgetUsd !== undefined ? `El paso llegó a su presupuesto de ${maxBudgetUsd} $` : 'Se alcanzó el presupuesto máximo de la consulta.', false, [], { kind: 'fatal' });
     default: {
       const detail = scrub((errors && errors.length > 0 ? errors.join('; ') : text) ?? 'sin detalle', secret);
       const kind = kindOfText(detail);

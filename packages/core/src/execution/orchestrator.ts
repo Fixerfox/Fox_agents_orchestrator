@@ -52,11 +52,12 @@ export class Orchestrator {
     const runId = this.deps.newRunId?.() ?? globalThis.crypto.randomUUID();
     const bus = new EventBus(runId, this.deps.now);
     const stop = new RunAbort();
-    const emitter = new RunEmitter(bus);
-    const gate = new PauseGate();
     const timers = this.deps.timers ?? realTimers;
+    // Los tokens seguidos de un paso van juntos al bus [R77.15].
+    const emitter = new RunEmitter(bus, this.deps.coalesceTokens ? { ...this.deps.coalesceTokens, timers } : undefined);
+    const gate = new PauseGate();
     const questions = new QuestionBroker(emitter, stop.signal, unansweredPolicy(options), timers);
-    const budget = new BudgetTracker(options.budget, emitter, stop);
+    const budget = new BudgetTracker(options.budget, emitter, stop, options.onBudget);
     const deliverable = options.deliverable === null ? undefined : (options.deliverable ?? diagram.deliverable);
     // El motor queda fijado para toda la ejecución [R63.13].
     const engine = this.deps.forRun?.() ?? { getAdapter: (agentId: Id) => this.deps.getAdapter(agentId), decider: this.deps.decider };
@@ -68,7 +69,7 @@ export class Orchestrator {
     let failReason: string | undefined;
     const watch = this.deps.supervisor;
     const supervisor = watch
-      ? new Supervisor({ ...supervisorExtras(watch, this.deps.checks, diagram, { emitter, questions, signal: stop.signal, final: () => finalOutput }), ...(this.deps.falseAlarms ? { falseAlarms: (agentId?: Id) => this.deps.falseAlarms!(runId, { diagramId: diagram.id, ...(agentId ? { agentId } : {}) }).catch(() => []) } : {}), order: typeof order === 'string' ? { text: order, files: [] } : order, ...(options.correction ? { correction: { text: options.correction.text, ...(options.correction.before ? { before: options.correction.before } : {}) } } : {}), ...(deliverable ? { deliverable: JSON.stringify(deliverable) } : {}), ...(watch.checkMs !== undefined ? { checkMs: watch.checkMs } : {}), emitter, decider: engine.decider, budget, limits: options.budget, signal: stop.signal, review: () => watch.review() && (engine.review?.() ?? true), ...(watch.model ? { model: () => watch.model!() } : {}), ...(watch.humanChecks ? { humanChecks: () => watch.humanChecks!() } : {}), labelOf, ...(outputId !== undefined ? { outputId } : {}), ...(watch.settleMs !== undefined ? { settleMs: watch.settleMs } : {}) })
+      ? new Supervisor({ ...supervisorExtras(watch, this.deps.checks, diagram, { emitter, questions, signal: stop.signal, final: () => finalOutput }), ...(this.deps.falseAlarms ? { falseAlarms: (agentId?: Id) => this.deps.falseAlarms!(runId, { diagramId: diagram.id, ...(agentId ? { agentId } : {}) }).catch(() => []) } : {}), order: typeof order === 'string' ? { text: order, files: [] } : order, ...(options.correction ? { correction: { text: options.correction.text, ...(options.correction.before ? { before: options.correction.before } : {}) } } : {}), ...(deliverable ? { deliverable: JSON.stringify(deliverable) } : {}), ...(watch.checkMs !== undefined ? { checkMs: watch.checkMs } : {}), emitter, decider: engine.decider, budget, limits: options.budget, signal: stop.signal, review: () => watch.review() && (engine.review?.() ?? true), ...(watch.model ? { model: () => watch.model!() } : {}), ...(watch.humanChecks ? { humanChecks: () => watch.humanChecks!() } : {}), ...(watch.burnRate ? { burnRate: () => watch.burnRate!() } : {}), labelOf, ...(outputId !== undefined ? { outputId } : {}), ...(watch.settleMs !== undefined ? { settleMs: watch.settleMs } : {}) })
       : undefined;
     if (supervisor) bus.subscribe((e) => supervisor.observe(e));
     // La memoria va con el Supervisor (como antes) o sola si se pide [R72.3].
@@ -81,6 +82,7 @@ export class Orchestrator {
       gate,
       limiter: new ConcurrencyLimiter(Math.max(1, options.maxConcurrency ?? 4)),
       budget,
+      ...(this.deps.resources ? { resources: this.deps.resources } : {}),
       ...(supervisor ? { supervisor } : {}),
       ...(memory ? { memory } : {}),
       ...(spaces ? { spaces } : {}),
@@ -147,7 +149,7 @@ export class Orchestrator {
         status = 'cancelled';
         reason = stop.detail;
         emitter.emit({ type: 'run.cancelled', ...(reason !== undefined ? { reason } : {}) });
-      } else if (stop.reason === 'budget_exceeded') {
+      } else if (stop.reason === 'budget_exceeded' || budget.exhausted) {
         status = 'failed';
         reason = 'budget_exceeded';
       } else if (status === 'failed' && failReason) {

@@ -13,10 +13,10 @@ interface EventBase { runId: Id; seq: number; ts: string; type: string; nodePath
 | `run.paused` / `run.resumed` | `nodeId?` | Pausa/reanudación global o de un nodo |
 | `run.budget_reached` | `limit, used` | Se alcanza el límite de presupuesto y se detiene la ejecución |
 | `run.cancelled` | `reason?` | Cancelación solicitada |
-| `node.queued` | `nodeId` | Nodo listo y en cola |
+| `node.queued` | `nodeId, others?` | Nodo listo y en cola; con `others`, un paso ya empezado espera hueco en toda la app (agentes trabajando, SPEC-077) |
 | `node.started` | `nodeId` | El agente empieza |
 | `node.finished` | `nodeId, status, output?` | El agente termina |
-| `token.stream` | `nodeId, text` | Salida en streaming (por lotes) |
+| `token.stream` | `nodeId, text` | Salida en streaming (por lotes) (la app junta los seguidos de un paso cada 250 ms o 2.000 caracteres, SPEC-077) |
 | `tool.called` | `nodeId, tool, input` | El agente invoca una herramienta |
 | `tool.result` | `nodeId, tool, ok, output?` | Resultado de la herramienta |
 | `agent.usage` | `nodeId, inputTokens, outputTokens, costUsd?` | Consumo |
@@ -29,7 +29,7 @@ interface EventBase { runId: Id; seq: number; ts: string; type: string; nodePath
 | `file.produced` | `nodeId, path, change?: 'created' \| 'modified'` | Un agente crea o modifica un archivo; se emite al terminar la herramienta que lo escribió, también si luego el paso falla (SPEC-045) |
 | `git.branch` | `nodeId, branch, via: 'head' \| 'command' \| 'mcp' \| 'ran', created?` | El paso creó una rama o actuó en ella (SPEC-058) |
 | `git.action` | `nodeId, branch, action: 'commit' \| 'push' \| 'pr' \| 'merge' \| 'delete' \| 'switch', url?` | El paso hizo eso en esa rama; `url` es la de la PR (SPEC-058) |
-| `supervisor.alert` | `nodeId?, rule, severity, detail, gravity?, evidence?` | El Supervisor detecta algo o bloquea una acción (SPEC-060); `instructions-changed` si un paso toca `CLAUDE.md`, `AGENTS.md` o `.claude/` (SPEC-076); `gravity` y `evidence`, la gravedad y la evidencia de la revisión con IA (SPEC-075) |
+| `supervisor.alert` | `nodeId?, rule, severity, detail, gravity?, evidence?` | El Supervisor detecta algo o bloquea una acción (SPEC-060); `instructions-changed` si un paso toca `CLAUDE.md`, `AGENTS.md` o `.claude/` (SPEC-076); `burn-rate` si gasta más de N $ por minuto durante 3 minutos (SPEC-077); `gravity` y `evidence`, la gravedad y la evidencia de la revisión con IA (SPEC-075) |
 | `agent.usage` (`source?`) | `source: 'supervisor' \| 'judge' \| 'decision'` | Gasto de una pieza interna: suma al total, no al paso (SPEC-060, SPEC-034). `decision` (router, condiciones, evaluador de bucles) también cuenta en el presupuesto (SPEC-063) |
 | `supervisor.started` | `review, model?` | El Supervisor empieza a vigilar la ejecución (SPEC-060) |
 | `supervisor.reviewing` | `nodeId` | Empieza a revisar un paso con IA (SPEC-060) |
@@ -43,6 +43,10 @@ interface EventBase { runId: Id; seq: number; ts: string; type: string; nodePath
 | `verify.result` | `nodeId, met, findings[{severity, where, what}]` | Lo que encontró el agente verificador (SPEC-075) |
 | `memory.note` | `nodeId, text` | La nota «Notas para los siguientes pasos» que dejó un agente, ya separada de su salida (SPEC-072) |
 | `supervisor.feedback` | `alertSeq, verdict: 'false-alarm' \| 'confirmed', note?, nodeId?` | La persona dice si un aviso era cierto; un falso aviso sale de «Avisos abiertos» de la memoria (SPEC-072, SPEC-075) |
+| `run.budget_warning` | `limit, used, max` | Se pasó del 80 % del presupuesto; una vez por límite (SPEC-077) |
+| `run.budget_raised` | `limit, max` | La persona subió el límite al llegar al 90 % (SPEC-077) |
+| `provider.cooldown` | `provider, untilTs, reason: 'rate_limit' \| 'overloaded', nodeId?` | El proveedor pidió esperar: ninguna ejecución arranca nada nuevo con él hasta `untilTs` (SPEC-077) |
+| `node.paused` | `nodeId, tool?` | Con la ejecución en pausa, el paso quedó retenido antes de `tool` o al acabar su turno; una vez por pausa (SPEC-077) |
 | `memory.proposed` | `proposals[{id, action: add\|update\|archive, entryId?, kind, scope, title, text, reason?, origin}], usage?` | Lo que la ejecución propone recordar; va después de `run.finished` y nada se guarda solo (SPEC-076) |
 | `memory.decided` | `proposalId, decision: 'save' \| 'discard', entryId?, edited?, by?` | La persona guardó (o editó y guardó) o descartó una propuesta (SPEC-076) |
 | `supervisor.skipped` | `count, reason: 'timeout' \| 'failed'` | Revisiones que no se pudieron hacer (SPEC-060) |

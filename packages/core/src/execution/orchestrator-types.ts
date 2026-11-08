@@ -3,6 +3,7 @@ import type { Id, KnowledgeExtra, Payload, StepCheck, StepLimits, StopAt } from 
 import type { AgentAdapter, AgentProfile, AgentSnapshot, Decider, FileChange, RestoreResult } from './adapter';
 import type { BranchSpaces } from './branch-spaces';
 import type { CheckRunner, EvidenceSource } from './checks-port';
+import type { SharedResources } from './resources-port';
 import type { EventBus, RunEvent } from './events';
 import type { NodeRegistry } from './nodes/registry';
 import type { PendingQuestion } from './run/question-broker';
@@ -22,7 +23,7 @@ export interface OrchestratorDeps {
   now?(): Date;
   newRunId?(): Id;
   /** Activa el Supervisor; `review` dice si revisa con IA, y se pregunta en cada paso [R60.1]. */
-  supervisor?: { review(): boolean; model?(): string; humanChecks?(): 'warn' | 'fail'; settleMs?: number; checkMs?: number; stopAt?(): StopAt; unverified?(): 'warn' | 'fail' };
+  supervisor?: { review(): boolean; model?(): string; humanChecks?(): 'warn' | 'fail'; settleMs?: number; checkMs?: number; stopAt?(): StopAt; unverified?(): 'warn' | 'fail'; /** Dólares por minuto de la regla `burn-rate` [R77.10]. */ burnRate?(): number };
   /** Comprobaciones deterministas y evidencia para la revisión [R75.1]–[R75.7]. */
   checks?: { runner?: CheckRunner; evidence?: EvidenceSource; agentChecks?(agentId: Id, runId: Id): Promise<StepCheck[] | undefined> };
   /** Tipos de nodo; por defecto, los de la aplicación [R56.12]. */
@@ -50,6 +51,10 @@ export interface OrchestratorDeps {
   falseAlarms?(runId: Id, o: { diagramId: Id; agentId?: Id }): Promise<string[]>;
   /** ¿Puede escribir el agente? Por defecto, sí [R73.2]. */
   canWrite?(agentId: Id, runId: Id): boolean | Promise<boolean>;
+  /** Hueco global y enfriamiento de los proveedores, compartidos por todas las ejecuciones [R77.1][R77.4]. */
+  resources?: SharedResources;
+  /** Junta los `token.stream` seguidos de un paso antes del bus [R77.15]. */
+  coalesceTokens?: { ms: number; chars: number };
 }
 
 export interface RunResult {

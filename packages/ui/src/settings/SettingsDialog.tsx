@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Brain, Clock, Eye, Folder, Gauge, KeyRound, Palette, ShieldCheck, Sparkles } from 'lucide-react';
-import { MEMORY_TOKENS, PROJECT_MEMORY_TOKENS, isolatesBranches, DEFAULT_IDLE_MINUTES, DEFAULT_TOOL_MINUTES, DEFAULT_UNANSWERED, MODELS, UNANSWERED_ACTIONS, loadsClaudeConfig, projectPermission, type AppSettings, type AuthMode, type Engine, type StopAt, supervisorHumanChecks, supervisorModel, supervisorReviews, supervisorStopAt, supervisorUnverified, supervisorVerifyModel } from '@orquestador/core';
+import { BURN_RATE_USD_PER_MIN, MEMORY_TOKENS, PROJECT_MEMORY_TOKENS, agentsTotal, isolatesBranches, DEFAULT_IDLE_MINUTES, DEFAULT_TOOL_MINUTES, DEFAULT_UNANSWERED, MODELS, UNANSWERED_ACTIONS, loadsClaudeConfig, projectPermission, type AppSettings, type AuthMode, type Engine, type StopAt, supervisorHumanChecks, supervisorModel, supervisorReviews, supervisorStopAt, supervisorUnverified, supervisorVerifyModel } from '@orquestador/core';
 import { PermissionPicker, permissionName } from '../common';
 import { t, type ConnectionResult, type MessageKey, type ProjectApi, type SettingsView, type WorkFolderView } from '@orquestador/editor';
 import { fieldErrors } from '../common';
@@ -87,6 +87,9 @@ export function SettingsDialog({ api, onClose, onSaved }: Props) {
       ...(draft.isolateBranches !== undefined ? { isolateBranches: draft.isolateBranches } : {}),
       ...(draft.claudeAutoMemory !== undefined ? { claudeAutoMemory: draft.claudeAutoMemory } : {}),
       ...(draft.projectMemoryTokens !== undefined ? { projectMemoryTokens: draft.projectMemoryTokens } : {}),
+      ...(draft.maxAgentsTotal !== undefined ? { maxAgentsTotal: draft.maxAgentsTotal } : {}),
+      ...(draft.onBudget !== undefined ? { onBudget: draft.onBudget } : {}),
+      ...(draft.burnRateUsdPerMin !== undefined ? { burnRateUsdPerMin: draft.burnRateUsdPerMin } : {}),
     };
     const res = await api.saveSettings(body);
     if (!res.ok) {
@@ -321,6 +324,10 @@ export function SettingsDialog({ api, onClose, onSaved }: Props) {
               <option value="fail">{t('set.sup.human.fail')}</option>
             </select>
           </Row>
+          {/* Gasto por minuto que avisa [R77.10]. */}
+          <Row id="set-sup-burn" label={t('set.sup.burn')} hint={t('set.sup.burn.hint')} error={errors['burnRateUsdPerMin']}>
+            <input id="set-sup-burn" type="number" min={0.1} max={100} step={0.1} value={draft.burnRateUsdPerMin ?? BURN_RATE_USD_PER_MIN} onChange={(e) => set({ burnRateUsdPerMin: Number(e.target.value) })} />
+          </Row>
         </div>
       ),
     },
@@ -335,6 +342,16 @@ export function SettingsDialog({ api, onClose, onSaved }: Props) {
         <div className="orq-setrows">
           <Row id="set-parallel" label={t('settings.parallel')} error={errors['maxParallel']}>
             <input id="set-parallel" type="number" min={1} max={16} value={draft.maxParallel} onChange={(e) => set({ maxParallel: Number(e.target.value) })} />
+          </Row>
+          {/* Agentes a la vez en toda la app y qué hacer al llegar al presupuesto [R77.1][R77.8]. */}
+          <Row id="set-agents-total" label={t('settings.agentsTotal')} hint={t('settings.agentsTotal.hint')} error={errors['maxAgentsTotal']}>
+            <input id="set-agents-total" type="number" min={1} max={32} value={agentsTotal(draft)} onChange={(e) => set({ maxAgentsTotal: Number(e.target.value) })} />
+          </Row>
+          <Row id="set-onbudget" label={t('settings.onBudget')} hint={t('settings.onBudget.hint')} error={errors['onBudget']}>
+            <select id="set-onbudget" value={draft.onBudget ?? 'stop-now'} onChange={(e) => set({ onBudget: e.target.value as 'stop-now' | 'finish-running' })}>
+              <option value="stop-now">{t('settings.onBudget.stop')}</option>
+              <option value="finish-running">{t('settings.onBudget.finish')}</option>
+            </select>
           </Row>
           <Row id="set-tokens" label={t('settings.tokens')} error={errors['defaultMaxTokens']}>
             <input id="set-tokens" type="number" min={1} value={tokens} onChange={(e) => ((touched.current = true), setTokens(e.target.value), setStatus(t('settings.saving')))} />

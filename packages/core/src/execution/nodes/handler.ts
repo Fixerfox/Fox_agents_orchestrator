@@ -1,4 +1,5 @@
 import type { DeliverableSpec, Diagram, DiagramNode, Edge, ReturnInfo } from '../../diagrams';
+import type { SharedResources } from '../resources-port';
 import type { Id, KnowledgeExtra, Payload, StepCheck, StepLimits } from '../../shared';
 import type { CheckRunner } from '../checks-port';
 import type { AgentAdapter, AgentProfile, AgentSnapshot, Decider, FileChange, RestoreResult, TransformUsage } from '../adapter';
@@ -44,6 +45,8 @@ export interface RunServices {
   gate: PauseGate;
   limiter: ConcurrencyLimiter;
   budget: BudgetTracker;
+  /** Hueco global y enfriamiento de los proveedores, si la app los comparte [R77.1][R77.4]. */
+  resources?: SharedResources;
   /** Vigila la ejecución, si la app lo activa [R60.1]. */
   supervisor?: Supervisor;
   /** La memoria de la ejecución, con el Supervisor o si se pide [R72.3]. */

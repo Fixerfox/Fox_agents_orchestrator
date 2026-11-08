@@ -8,7 +8,7 @@ import type { RunOptions } from '../run-types';
 import type { BudgetTracker } from './budget-tracker';
 import type { RunEmitter } from './run-emitter';
 import { REQUIREMENTS_UNMET } from '../text/unfinished';
-import { applyRules, newRuleState } from './supervisor-rules';
+import { BURN_RATE_USD_PER_MIN, applyRules, newRuleState } from './supervisor-rules';
 
 /** Tiempo que se espera a las revisiones pendientes al terminar [R60.13]. */
 const SETTLE_MS = 10_000;
@@ -78,6 +78,8 @@ export interface SupervisorDeps {
   checkMs?: number;
   /** Lo que solo puede comprobar una persona: avisar o fallar [R65.3]. */
   humanChecks?(): 'warn' | 'fail';
+  /** Dólares por minuto de `burn-rate` [R77.10]. */
+  burnRate?(): number;
   /** Desde qué gravedad se para y se pregunta; por defecto, «grave» [R75.10]. */
   stopAt?(): StopAt;
   /** Si no se puede comprobar el resultado: avisar (por defecto) o hacer fallar [R75.20]. */
@@ -132,7 +134,7 @@ export class Supervisor {
       if (e.type === 'run.started') this.started();
       if (e.type === 'agent.question') this.asked.set(e.questionId, e.text);
       if (e.type === 'agent.answer') this.decisions.push(`${(this.asked.get(e.questionId) ?? '').slice(0, 300)} → ${e.text.slice(0, 300)}`);
-      for (const a of applyRules(this.rules, e, this.d.limits)) this.alert(a.nodeId, a.path, a.rule, a.detail);
+      for (const a of applyRules(this.rules, e, this.d.limits, { burnRate: this.d.burnRate?.() ?? BURN_RATE_USD_PER_MIN })) this.alert(a.nodeId, a.path, a.rule, a.detail);
       this.follow(e);
     } catch {
       // El Supervisor nunca rompe una ejecución.

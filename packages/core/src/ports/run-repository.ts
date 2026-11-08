@@ -27,6 +27,8 @@ export interface RunMeta {
   /** Último paso que terminó bien (`ruta/nodo#pasada`) y cuántos terminaron, para la bandeja [R74.11]. */
   lastStepKey?: string;
   stepsDone?: number;
+  /** Reintentos de toda la ejecución, para ordenar y filtrar [R77.19]. */
+  retries?: number;
   /** Dada por buena tras fallar: quién, por qué, cuándo y el motivo del fallo [R65.5]. */
   accepted?: RunAcceptance & { at: string; previousReason?: string };
 }

@@ -180,7 +180,7 @@ export interface BlameCandidate {
   output?: Payload;
 }
 
-export type QuestionKind = 'question' | 'permission' | 'gate' | 'unfinished' | 'conflict';
+export type QuestionKind = 'question' | 'permission' | 'gate' | 'unfinished' | 'conflict' | 'budget';
 
 export interface AnsweredQuestion {
   question: string;
@@ -225,6 +225,10 @@ export interface AgentRequest {
   verify?: boolean;
   /** Memoria del proyecto del paso: el texto del prompt, qué entradas lleva y de qué ámbitos [R76.14][R76.15]. */
   projectMemory?: { text: string; ids: Id[]; scopes?: string[] };
+  /** Presupuesto del intento en dólares; el motor lo aplica y al pasarse falla sin reintentar [R77.9]. */
+  maxCostUsd?: number;
+  /** Con la ejecución en pausa, espera a que se reanude; el adaptador la llama antes de cada herramienta [R77.12]. */
+  whilePaused?: (tool: string) => Promise<void>;
 }
 
 /** Lo que un intento fallido le deja al siguiente [R71.7]. */

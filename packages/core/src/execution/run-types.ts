@@ -18,6 +18,8 @@ export type RunStatus = 'running' | 'succeeded' | 'failed' | 'cancelled';
 
 export interface RunOptions {
   budget?: { maxTokens?: number; maxCostUsd?: number };
+  /** Al llegar al 100 % del presupuesto: parar ya (por defecto) o dejar terminar lo que está en marcha [R77.8]. */
+  onBudget?: 'stop-now' | 'finish-running';
   /** Agentes en paralelo. Por defecto 4. */
   maxConcurrency?: number;
   /** Profundidad máxima de anidación (bucles y subdiagramas). Por defecto 8. */

@@ -1,9 +1,9 @@
 import { promises as fsp } from 'node:fs';
 import path from 'node:path';
 import { MEMORY_SERVER, claudePathPolicy, createClaudeEngine, type AppToolDef, type ClaudeEnvironment, type CreateAppServer, type QueryFn } from '@orquestador/claude';
-import { searchMemory, type MemoryEntry } from '@orquestador/core';
+import { agentsTotal, defaultSettings, searchMemory, type MemoryEntry } from '@orquestador/core';
 import type { AppSettings, LibraryReader, Orchestrator } from '@orquestador/core';
-import { createEngineOrchestrator, snapshotLibrary, withBuiltinAgents, type RunPorts, type RunSnapshots } from '@orquestador/runtime';
+import { AppResources, createEngineOrchestrator, snapshotLibrary, withBuiltinAgents, type RunPorts, type RunSnapshots } from '@orquestador/runtime';
 import { ProjectStore, libraryReaderOf, runRepositoryOf } from '@orquestador/store';
 import { BranchSpaceManager, cleanupBranchSpaces, workspaceFiles } from '@orquestador/workspace';
 import { tmpdir } from 'node:os';
@@ -117,10 +117,16 @@ export function restoreAttemptFiles(store: Pick<ProjectStore, 'restoreBackup' | 
   };
 }
 
+/** Ajustes del proyecto abierto, para los límites de toda la app. */
+let appSettings: () => AppSettings = defaultSettings;
+/** Uno por app: agentes y decisiones a la vez y enfriamiento del proveedor, para todas las ejecuciones [R77.1][R77.4]. */
+export const appResources = new AppResources({ maxAgents: () => agentsTotal(appSettings()), provider: () => appSettings().engine });
+
 /** Orquestador del proyecto con el motor de Claude y el de demostración [R27.1][R56.5]. */
 export function composeOrchestrator(ctx: OrchestratorContext, query: QueryFn): Orchestrator {
+  appSettings = ctx.settings;
   return createEngineOrchestrator(
-    { library: libraryOf(ctx), settings: ctx.settings, restoreFiles: restoreAttemptFiles(ctx.store, ctx.projectRoot), spaces: branchSpacesFor(ctx), checkRunner: checkRunnerFor(ctx.store, ctx.projectRoot), evidence: evidenceFor(ctx.store, ctx.projectRoot) },
+    { library: libraryOf(ctx), settings: ctx.settings, resources: appResources, restoreFiles: restoreAttemptFiles(ctx.store, ctx.projectRoot), spaces: branchSpacesFor(ctx), checkRunner: checkRunnerFor(ctx.store, ctx.projectRoot), evidence: evidenceFor(ctx.store, ctx.projectRoot) },
     [createClaudeEngine(claudeEnvironment(ctx), query)],
   );
 }

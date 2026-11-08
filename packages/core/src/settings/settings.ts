@@ -47,7 +47,23 @@ export interface AppSettings {
   claudeAutoMemory?: boolean;
   /** Tope de la memoria del proyecto en el prompt, en tokens [R76.14]. */
   projectMemoryTokens?: number;
+  /** Agentes trabajando a la vez en toda la app; 8 por defecto [R77.1]. */
+  maxAgentsTotal?: number;
+  /** Al llegar al 100 % del presupuesto: parar ya (por defecto) o dejar terminar lo que está en marcha [R77.8]. */
+  onBudget?: 'stop-now' | 'finish-running';
+  /** Dólares por minuto que dispara `burn-rate`; 1 por defecto [R77.10]. */
+  burnRateUsdPerMin?: number;
 }
+
+/** Límites de toda la app [R77.1]. */
+export const MAX_AGENTS_TOTAL = 8;
+export const MAX_AGENTS_TOTAL_RANGE = [1, 32] as const;
+export const MAX_DECISIONS_TOTAL = 4;
+const agentsTotalOk = (v: unknown): v is number => Number.isInteger(v) && (v as number) >= MAX_AGENTS_TOTAL_RANGE[0] && (v as number) <= MAX_AGENTS_TOTAL_RANGE[1];
+const burnRateOk = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0 && v <= 100;
+export const ON_BUDGET = ['stop-now', 'finish-running'] as const;
+/** Agentes a la vez en toda la app [R77.1]. */
+export const agentsTotal = (s: Pick<AppSettings, 'maxAgentsTotal'>): number => s.maxAgentsTotal ?? MAX_AGENTS_TOTAL;
 
 /** ¿Se aíslan las ramas en paralelo? Sí, salvo que se apague [R73.2]. */
 export const isolatesBranches = (settings: Pick<AppSettings, 'isolateBranches'>): boolean => settings.isolateBranches !== false;
@@ -121,6 +137,9 @@ export function validateSettings(s: unknown): FieldProblem[] {
   if (s.supervisorUnverified !== undefined && !(HUMAN_CHECKS as readonly unknown[]).includes(s.supervisorUnverified)) out.push({ field: 'supervisorUnverified', message: 'Elige «Avisar» o «Hacer fallar la ejecución»' });
   out.push(...limitProblems(s.limits));
   if (s.unanswered !== undefined && !readUnanswered(s.unanswered)) out.push({ field: 'unanswered', message: 'Elige qué hacer si nadie responde' });
+  if (s.maxAgentsTotal !== undefined && !agentsTotalOk(s.maxAgentsTotal)) out.push({ field: 'maxAgentsTotal', message: `Los agentes a la vez en toda la app van de ${MAX_AGENTS_TOTAL_RANGE[0]} a ${MAX_AGENTS_TOTAL_RANGE[1]}` });
+  if (s.onBudget !== undefined && !(ON_BUDGET as readonly unknown[]).includes(s.onBudget)) out.push({ field: 'onBudget', message: 'Elige qué hacer al llegar al presupuesto' });
+  if (s.burnRateUsdPerMin !== undefined && !burnRateOk(s.burnRateUsdPerMin)) out.push({ field: 'burnRateUsdPerMin', message: 'El gasto por minuto que avisa va de más de 0 a 100 $' });
   if (s.memoryTokens !== undefined && !memoryTokensOk(s.memoryTokens)) out.push({ field: 'memoryTokens', message: `El tope de la memoria va de ${MEMORY_TOKENS_RANGE[0]} a ${MEMORY_TOKENS_RANGE[1]} tokens` });
   return out;
 }
@@ -159,5 +178,8 @@ export function normalizeSettings(raw: unknown): AppSettings {
   const unanswered = readUnanswered(raw.unanswered);
   if (unanswered) out.unanswered = unanswered;
   if (memoryTokensOk(raw.memoryTokens)) out.memoryTokens = raw.memoryTokens;
+  if (agentsTotalOk(raw.maxAgentsTotal)) out.maxAgentsTotal = raw.maxAgentsTotal;
+  if ((ON_BUDGET as readonly unknown[]).includes(raw.onBudget)) out.onBudget = raw.onBudget as NonNullable<AppSettings['onBudget']>;
+  if (burnRateOk(raw.burnRateUsdPerMin)) out.burnRateUsdPerMin = raw.burnRateUsdPerMin;
   return out;
 }

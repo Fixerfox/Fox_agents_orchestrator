@@ -270,6 +270,7 @@ export function NodePanel({ events, live, nodeId, nodePath, label, onAnswer, onE
   const tone = stepTone(status);
   const metrics = stepMetrics(view);
   const health = closed ? undefined : live.health?.[key];
+  const wait = closed ? undefined : live.waits?.[key];
   return (
     <section className="orq-nodepanel" aria-label={t('transcript.title', { name: label })}>
       <div className="orq-nodepanel__head">
@@ -296,6 +297,12 @@ export function NodePanel({ events, live, nodeId, nodePath, label, onAnswer, onE
           {health && (
             <p className="orq-stepstate__health" role="status">
               {health.cut ? t(`step.health.cut.${health.cut}` as MessageKey) : t('step.health.stalled', { n: health.stalledMinutes ?? 0 })}
+            </p>
+          )}
+          {/* En cola por el límite de toda la app, o en pausa [R77.3][R77.13]. */}
+          {wait && (wait.pause || wait.queuedBehind !== undefined) && (
+            <p className="orq-stepstate__health" role="status">
+              {wait.pause ? t(wait.pause === 'paused' ? 'step.wait.paused' : 'step.wait.pausing') : t('step.wait.queued', { n: wait.queuedBehind ?? 0 })}
             </p>
           )}
           {metrics.length > 0 && (

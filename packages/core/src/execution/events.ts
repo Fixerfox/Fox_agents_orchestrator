@@ -16,7 +16,16 @@ export type EventBody =
   | { type: 'run.paused' }
   | { type: 'run.resumed' }
   | { type: 'run.budget_reached'; limit: 'tokens' | 'cost'; used: number; max: number }
-  | { type: 'node.queued'; nodeId: Id }
+  /** Se pasó del 80 % del presupuesto; una vez por límite [R77.6]. */
+  | { type: 'run.budget_warning'; limit: 'tokens' | 'cost'; used: number; max: number }
+  /** La persona subió el límite al llegar al 90 % [R77.7]. */
+  | { type: 'run.budget_raised'; limit: 'tokens' | 'cost'; max: number }
+  /** El proveedor pidió esperar: nada nuevo arranca con él hasta `untilTs` [R77.4]. */
+  | { type: 'provider.cooldown'; provider: string; untilTs: string; reason: 'rate_limit' | 'overloaded'; nodeId?: Id }
+  /** En cola; `others`, si espera hueco en toda la app: agentes trabajando en otras ejecuciones [R77.3]. */
+  | { type: 'node.queued'; nodeId: Id; others?: number }
+  /** Con la ejecución en pausa, el paso queda retenido: su siguiente herramienta (`tool`) o el final de su turno [R77.13]. */
+  | { type: 'node.paused'; nodeId: Id; tool?: string }
   | { type: 'node.started'; nodeId: Id; input?: Payload }
   | {
       /** Lo que recibe exactamente el agente en cada intento, con la configuración usada. */

@@ -29,8 +29,8 @@ export interface SettingsApi {
 /** Ajustes nuevos por forma: objetos, sí/no, números y palabras [R70.21]. */
 const SETTINGS_OBJECTS = ['limits', 'unanswered'];
 const SETTINGS_FLAGS: string[] = ['isolateBranches', 'claudeAutoMemory'];
-const SETTINGS_NUMBERS: string[] = ['memoryTokens', 'projectMemoryTokens'];
-const SETTINGS_WORDS: string[] = ['supervisorStopAt', 'supervisorVerifyModel', 'supervisorUnverified'];
+const SETTINGS_NUMBERS: string[] = ['memoryTokens', 'projectMemoryTokens', 'maxAgentsTotal', 'burnRateUsdPerMin'];
+const SETTINGS_WORDS: string[] = ['supervisorStopAt', 'supervisorVerifyModel', 'supervisorUnverified', 'onBudget'];
 
 export function parseSettingsRequest(channel: string, payload: unknown, { bad, exact, str }: RequestCheck): unknown {
   switch (channel) {

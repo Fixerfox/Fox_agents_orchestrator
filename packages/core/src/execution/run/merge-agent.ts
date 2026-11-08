@@ -1,3 +1,4 @@
+import { SharedSlot, pauseHold } from '../nodes/agent-resources';
 import type { Id, KnowledgeExtra, Payload } from '../../shared';
 import type { SpaceRef } from '../branch-spaces';
 import type { RunServices } from '../nodes/handler';
@@ -26,11 +27,15 @@ export interface InternalRun {
  * con el `nodeId` del paso y su `kind`, y su gasto cuenta en el presupuesto como un paso más.
  */
 export async function runInternalAgent(
-  run: Pick<RunServices, 'emitter' | 'getAdapter' | 'questions' | 'signal' | 'budget' | 'timers'>,
+  run: Pick<RunServices, 'emitter' | 'getAdapter' | 'questions' | 'signal' | 'budget' | 'timers' | 'gate' | 'resources'>,
   o: { nodeId: Id; agentId: Id; path: Id[]; input: Payload; task: string; kind: 'merge' | 'verify'; space?: SpaceRef; extra?: KnowledgeExtra; maxCostUsd?: number; maxMinutes?: number },
 ): Promise<InternalRun> {
+  // También ocupa hueco global y se retiene en la pausa [R77.1][R77.12].
+  const shared = new SharedSlot(run, o.nodeId, o.path);
+  if (run.resources) await shared.take();
   run.emitter.emit({ type: 'agent.request', nodeId: o.nodeId, agentId: o.agentId, attempt: 1, input: o.input, task: o.task, kind: o.kind, ...(o.space ? { isolated: true } : {}) }, o.path);
-  const ask = (q: Parameters<RunServices['questions']['ask']>[2]) => run.questions.ask(o.nodeId, o.path, q);
+  const hold = pauseHold(run, o.nodeId, o.path, { suspend: () => undefined, resume: () => undefined });
+  const ask = (q: Parameters<RunServices['questions']['ask']>[2]) => shared.without(() => run.questions.ask(o.nodeId, o.path, q));
   const own = new AbortController();
   const onAbort = () => own.abort();
   if (run.signal.aborted) own.abort();
@@ -42,7 +47,7 @@ export async function runInternalAgent(
   let result: string | undefined;
   const files: InternalRun['files'] = [];
   try {
-    const stream = run.getAdapter(o.agentId).run({ nodeId: o.nodeId, agentId: o.agentId, runId: run.emitter.runId, input: o.input, task: o.task, attempt: 1, ask, previousAnswers: [], ...(o.space ? { workspace: { dir: o.space.dir } } : {}), ...(o.extra ? { extra: o.extra } : {}), ...(o.kind === 'verify' ? { verify: true } : {}) }, own.signal);
+    const stream = run.getAdapter(o.agentId).run({ nodeId: o.nodeId, agentId: o.agentId, runId: run.emitter.runId, input: o.input, task: o.task, attempt: 1, ask, previousAnswers: [], ...(o.space ? { workspace: { dir: o.space.dir } } : {}), ...(o.extra ? { extra: o.extra } : {}), ...(o.kind === 'verify' ? { verify: true } : {}), ...(o.maxCostUsd !== undefined ? { maxCostUsd: o.maxCostUsd } : {}), whilePaused: (tool: string) => hold(tool) }, own.signal);
     for await (const ev of stream) {
       if (own.signal.aborted) break;
       switch (ev.type) {
@@ -87,6 +92,7 @@ export async function runInternalAgent(
   } finally {
     if (timer !== undefined) run.timers.clear(timer);
     run.signal.removeEventListener('abort', onAbort);
+    shared.drop();
   }
 }
 

@@ -64,3 +64,13 @@ describe('SPEC-076 · la memoria del proyecto en disco', () => {
     expect(after.status).toBe(before.status);
   });
 });
+
+describe('SPEC-077 · en disco', () => {
+  it('[R77.19] la meta de cada ejecución cuenta sus reintentos', async () => {
+    const project = await ProjectStore.create(await tmp(), { name: 'p' });
+    const { orch } = orchestrator({ a: { failTimes: 2 } });
+    const { handle, logged } = startLoggedRun(orch, project, chain(['a']), 'x');
+    await logged;
+    expect((await readRunMeta(project.paths.runDir(handle.runId))).retries).toBe(2);
+  });
+});

@@ -1,5 +1,6 @@
-import { AgentError, DEFAULT_REVIEW_CRITERIA, Orchestrator, PROJECT_MEMORY_TOKENS, memoryFor, renderProjectMemory, ruleProposals, scopesFor, effectivePermission, isolatesBranches, supervisorStopAt, supervisorUnverified, type BranchSpaces, type CheckRunner, type EvidenceSource, supervisorHumanChecks, supervisorModel, supervisorReviews, type AgentEngine, type AgentProfile, type AppSettings, type Decider, type Id, type KnowledgeExtra, type LibraryReader, type RunOptions } from '@orquestador/core';
+import { AgentError, DEFAULT_REVIEW_CRITERIA, Orchestrator, PROJECT_MEMORY_TOKENS, memoryFor, renderProjectMemory, ruleProposals, BURN_RATE_USD_PER_MIN, TOKEN_GROUP_CHARS, TOKEN_GROUP_MS, scopesFor, effectivePermission, isolatesBranches, supervisorStopAt, supervisorUnverified, type BranchSpaces, type CheckRunner, type EvidenceSource, supervisorHumanChecks, supervisorModel, supervisorReviews, type AgentEngine, type AgentProfile, type AppSettings, type Decider, type Id, type KnowledgeExtra, type LibraryReader, type RunOptions } from '@orquestador/core';
 import { createDemoParts } from './demo';
+import type { AppResources } from './resources';
 
 /** Lo que el orquestador necesita saber del proyecto abierto y de Ajustes, siempre al día [R27.1]. */
 export interface EngineContext {
@@ -13,6 +14,8 @@ export interface EngineContext {
   /** Comprobaciones deterministas y evidencia para la revisión [R75.4][R75.7]. */
   checkRunner?: CheckRunner;
   evidence?: EvidenceSource;
+  /** Agentes y decisiones a la vez en toda la app, y enfriamiento del proveedor; uno por app [R77.1][R77.4]. */
+  resources?: AppResources;
 }
 
 /** Ficha de un agente con lo enchufado a su paso, para quien reparte [R59.18]. */
@@ -44,7 +47,9 @@ export function createEngineOrchestrator(ctx: EngineContext, engines: readonly A
       if (!chosen.conditions) throw new AgentError('El motor activo no sabe evaluar varias condiciones a la vez');
       return chosen.conditions(r, s);
     };
-    return {
+    // Cada decisión espera al proveedor y a su hueco en toda la app [R77.1][R77.4].
+    const lim = <T>(s: AbortSignal, f: () => Promise<T>): Promise<T> => (ctx.resources ? ctx.resources.decision(s, f) : f());
+    const d: Decider = {
       route: (r, s) => current().decider.route(r, s),
       judge: (r, s) => current().decider.judge(r, s),
       condition: (r, s) => current().decider.condition(r, s),
@@ -83,11 +88,14 @@ export function createEngineOrchestrator(ctx: EngineContext, engines: readonly A
         return chosen.transform(r, s);
       },
     };
+    const out: Record<string, unknown> = {};
+    for (const [k, f] of Object.entries(d)) out[k] = (r: unknown, s: AbortSignal) => lim(s, async () => (f as (r: unknown, s: AbortSignal) => Promise<unknown>)(r, s));
+    return out as unknown as Decider;
   };
   // Un subdiagrama es otro diagrama del proyecto en su última versión guardada [R33.7], o la de la copia de la
   // ejecución [R52.1].
   // El Supervisor va siempre; revisa con IA si está activa y el motor sabe hacerlo [R60.12][R60.14].
-  const supervisor = { review: () => supervisorReviews(ctx.settings()), model: () => supervisorModel(ctx.settings()), humanChecks: () => supervisorHumanChecks(ctx.settings()), stopAt: () => supervisorStopAt(ctx.settings()), unverified: () => supervisorUnverified(ctx.settings()) };
+  const supervisor = { burnRate: () => ctx.settings().burnRateUsdPerMin ?? BURN_RATE_USD_PER_MIN, review: () => supervisorReviews(ctx.settings()), model: () => supervisorModel(ctx.settings()), humanChecks: () => supervisorHumanChecks(ctx.settings()), stopAt: () => supervisorStopAt(ctx.settings()), unverified: () => supervisorUnverified(ctx.settings()) };
   return new Orchestrator({
     getAdapter: () => pick().adapter,
     // Fuera de una ejecución (proponer una corrección) vale el motor de Ajustes en cada momento.
@@ -98,6 +106,9 @@ export function createEngineOrchestrator(ctx: EngineContext, engines: readonly A
       return { getAdapter: () => chosen.adapter, decider: deciderOf(() => chosen), review: () => chosen.decider.supervise !== undefined };
     },
     supervisor,
+    ...(ctx.resources ? { resources: ctx.resources } : {}),
+    // Los tokens seguidos de un paso van juntos al registro [R77.15].
+    coalesceTokens: { ms: TOKEN_GROUP_MS, chars: TOKEN_GROUP_CHARS },
     // El tope de la memoria de la ejecución, de Ajustes [R72.15].
     memory: { tokens: () => ctx.settings().memoryTokens },
     agentProfile: (id, extra, runId) => profileOf(ctx.library, id, extra, runId),
@@ -132,6 +143,7 @@ export function createEngineOrchestrator(ctx: EngineContext, engines: readonly A
 export function runDefaultsFrom(settings: AppSettings): RunOptions {
   return {
     maxConcurrency: settings.maxParallel,
+    ...(settings.onBudget ? { onBudget: settings.onBudget } : {}),
     retry: { maxAttempts: 3, baseDelayMs: 1000, jitter: true },
     ...(settings.limits ? { limits: { ...settings.limits } } : {}),
     ...(settings.unanswered ? { unanswered: { ...settings.unanswered } } : {}),

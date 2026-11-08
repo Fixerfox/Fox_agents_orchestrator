@@ -16,7 +16,7 @@ El hito indica cuándo debe estar cubierto por tests. `npm run spec:check` exige
 ## Índice
 | Spec | Título | Hito | Estado |
 |---|---|---|---|
-| [077](077-gobierno-de-recursos.md) | Gobierno de recursos: límite global de agentes, enfriamiento compartido ante límites de uso, presupuesto con aviso y freno, pausa en la siguiente herramienta, tokens agrupados y métricas | M15h | Borrador |
+| [077](077-gobierno-de-recursos.md) | Gobierno de recursos: límite global de agentes, enfriamiento compartido ante límites de uso, presupuesto con aviso y freno, pausa en la siguiente herramienta, tokens agrupados y métricas | M15h | Implementada |
 | [076](076-memoria-del-proyecto.md) | Memoria del proyecto: convenciones, preferencias, lecciones y avisos falsos que propone la app y aprueba la persona, con índice en el prompt y herramienta de lectura; memoria propia de Claude Code apagada | M15g | Implementada |
 | [075](075-supervisor-con-evidencia.md) | Supervisor con evidencia: comprobaciones deterministas, diff para la revisión, veredicto con gravedad, verificador con skill y calibración de avisos | M15f | Implementada |
 | [074](074-ejecucion-duradera.md) | Ejecución duradera: reanudar reproduciendo los eventos por clave de paso (también bucles, decisiones y respuestas) y validar todo el árbol antes de empezar | M15e | Implementada |

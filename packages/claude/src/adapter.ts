@@ -85,7 +85,7 @@ export class ClaudeAdapter implements AgentAdapter {
     const abort = () => controller.abort();
     if (signal.aborted) return;
     signal.addEventListener('abort', abort, { once: true });
-    const mapper = new MessageMapper(apiKey);
+    const mapper = new MessageMapper(apiKey, request.maxCostUsd);
     const chosen = await this.env.workFolder?.();
     // En una rama en paralelo, el paso trabaja en su espacio y la carpeta original queda fuera [R73.8].
     const original = request.workspace ? (chosen ?? this.env.projectRoot) : undefined;
@@ -118,7 +118,7 @@ export class ClaudeAdapter implements AgentAdapter {
       const level = effectivePermission(agent, settings);
       // La política corre en canUseTool y en el gancho, con una sola decisión por llamada [R50.4].
       const guard = guardedPolicy(
-        watchCommands(
+        withPause(request.whilePaused, watchCommands(
           watch,
           root,
           withMcp(
@@ -137,7 +137,7 @@ export class ClaudeAdapter implements AgentAdapter {
             },
           })), root)),
           ),
-        ),
+        )),
       );
       const options = {
         ...baseOptions({
@@ -147,6 +147,8 @@ export class ClaudeAdapter implements AgentAdapter {
           // El modelo del paso manda sobre el de la ficha [R40.4].
           model: request.model ?? agent.model,
           ...(agent.maxTurns !== undefined ? { maxTurns: agent.maxTurns } : {}),
+          // El tope del paso o de la ficha lo aplica el SDK [R77.9].
+          ...(request.maxCostUsd !== undefined ? { maxBudgetUsd: request.maxCostUsd } : {}),
           controller,
           toolList: agentTools(loadsClaudeConfig(settings)),
           canUseTool: guard.canUseTool,
@@ -170,7 +172,15 @@ export class ClaudeAdapter implements AgentAdapter {
       for (const u of tracker.inlined()) yield { type: 'knowledge', kind: u.item.kind, id: u.item.id, via: u.via, required: true };
       for await (const msg of this.query({ prompt: buildUserPrompt(request.input, request.previousAnswers, request.task, missed.map((i) => `«${i.name}»`), request.previousAttempt, request.memory), options })) {
         if (signal.aborted) return;
-        for (const ev of mapper.map(msg)) {
+        let mapped: AgentStreamEvent[];
+        try {
+          mapped = mapper.map(msg);
+        } catch (err) {
+          // Lo gastado en un intento que falla también cuenta [R77.9].
+          yield* mapper.usageOf(msg);
+          throw err;
+        }
+        for (const ev of mapped) {
           if (ev.type === 'tool_call') {
             branches.called(ev.tool, ev.input);
             for (const u of tracker.observe(ev.tool, ev.input)) yield { type: 'knowledge', kind: u.item.kind, id: u.item.id, via: u.via, required: u.item.required };
@@ -279,3 +289,12 @@ export const ASK_FIRST_OK = 'Dar por bueno';
 export const ASK_FIRST_REDO = 'Que lo rehaga';
 /** Pregunta que hace la app cuando un agente que debía consultar no lo ha hecho [R39.4]. */
 export const askFirstGate = (name: string) => `«${name}» ha terminado sin consultarte. ¿Doy por bueno su resultado?`;
+
+/** En pausa, la herramienta espera a que se reanude antes de decidir nada: no empieza ninguna nueva [R77.12]. */
+export function withPause<P extends (tool: string, input: Record<string, unknown>, id?: string) => Promise<PermissionResult>>(whilePaused: ((tool: string) => Promise<void>) | undefined, policy: P): P {
+  if (!whilePaused) return policy;
+  return (async (tool: string, input: Record<string, unknown>, id?: string) => {
+    await whilePaused(tool);
+    return policy(tool, input, id);
+  }) as P;
+}
