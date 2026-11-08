@@ -2098,15 +2098,6 @@ button.orq-story__line:hover { background: var(--raised); }
 .orq-sup__tag:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
 .orq-sup__goto.is-warn { border-color: var(--signal); }
 .orq-sup__goto:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
-.orq-supmem { width: 300px; max-height: 44vh; display: flex; flex-direction: column; border: 1px solid color-mix(in srgb, var(--tone-violet) 45%, transparent); border-radius: 4px; background: color-mix(in srgb, var(--tone-violet) 6%, var(--card)); color: var(--text); }
-.orq-supmem__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 4px 4px 12px; }
-.orq-supmem__head h3 { margin: 0; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--tone-violet); }
-.orq-supmem__fold { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: 0; border-radius: 4px; background: none; color: var(--muted); cursor: pointer; }
-.orq-supmem__fold:hover { color: var(--text); background: var(--raised); }
-.orq-supmem__body { overflow-y: auto; padding: 0 12px 10px; font-size: 12px; line-height: 17px; }
-.orq-supmem__body p { margin: 0 0 6px; }
-.orq-supmem__body ol { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
-.orq-supmem__branch { font: 500 11px/16px var(--mono); color: var(--accent-text); overflow-wrap: anywhere; }
 .orq-t__fold > summary { cursor: pointer; }
 .orq-crash { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; margin: 24px; padding: 20px; border: 1px solid var(--signal); border-radius: 10px; background: var(--card); color: var(--text); }
 .orq-crash h2 { margin: 0; font-size: 16px; }
@@ -2375,9 +2366,8 @@ button.orq-node__alerts:hover { text-decoration: underline; }
 .orq-sup__lines path.is-warn { stroke: var(--signal); }
 @keyframes orq-sup-dash { to { stroke-dashoffset: -20; } }
 @media (prefers-reduced-motion: reduce) { .orq-sup__lines path { animation: none; } }
-.orq-sup__anchor { position: absolute; left: 0; top: 0; width: 340px; display: flex; flex-direction: column; gap: 8px; pointer-events: all; }
+.orq-sup__anchor { position: absolute; left: 0; top: 0; width: 440px; max-width: calc(100vw - 48px); display: flex; flex-direction: column; align-items: stretch; pointer-events: all; }
 .react-flow__viewport-portal .orq-sup__tag { left: 0; top: 0; pointer-events: all; }
-.orq-sup__anchor .orq-supmem { position: static; width: auto; max-height: 260px; overflow: auto; }
 
 /* SPEC-069 · memoria en tarjetas [R69.5] */
 .orq-memcards { display: flex; flex-direction: column; gap: 10px; }
@@ -2451,3 +2441,27 @@ button.orq-node__alerts:hover { text-decoration: underline; }
 .orq-metrics__legend .is-queue::before { background: var(--muted); }
 .orq-metrics__legend span::before { content: ''; display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 4px; }
 .orq-metrics__models { margin: 0; padding-left: 18px; }
+
+/* Memoria bajo la tarjeta del Supervisor: su ancho y sus esquinas cortadas, plegada en una línea [R69.4] */
+.orq-supmem { margin: -2px 24px 0; padding: 0 1.5px 1.5px; background: color-mix(in srgb, var(--tone-violet) 70%, transparent); clip-path: polygon(0 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 12px 100%, 0 calc(100% - 12px)); color: var(--text); }
+.orq-supmem__head { display: flex; align-items: center; gap: 10px; width: 100%; padding: 7px 14px; border: 0; background: color-mix(in srgb, var(--tone-violet) 8%, var(--card)); color: var(--text2); font: inherit; font-size: 12px; text-align: left; cursor: pointer; clip-path: polygon(0 0, 100% 0, 100% calc(100% - 11px), calc(100% - 11px) 100%, 11px 100%, 0 calc(100% - 11px)); }
+.orq-supmem.is-open .orq-supmem__head { clip-path: none; }
+.orq-supmem__head:hover { color: var(--text); }
+.orq-supmem__head:focus-visible { outline: 2px solid var(--text); outline-offset: -2px; }
+.orq-supmem__title { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--tone-violet); }
+.orq-supmem__counts { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); font-size: 11px; }
+.orq-supmem__body { max-height: 260px; overflow-y: auto; padding: 4px 14px 14px; background: color-mix(in srgb, var(--tone-violet) 8%, var(--card)); font-size: 12px; line-height: 17px; clip-path: polygon(0 0, 100% 0, 100% calc(100% - 11px), calc(100% - 11px) 100%, 11px 100%, 0 calc(100% - 11px)); }
+
+/* Aprobaciones largas: una línea y un modal con quién pregunta arriba y las respuestas abajo [R78.2][R78.3] */
+.orq-inbox__item.is-compact { gap: 4px; }
+.orq-inbox__item.is-compact .orq-inbox__top { flex-wrap: wrap; align-items: center; gap: 8px; }
+.orq-inbox__preview { margin: 0; color: var(--text2); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.orq-qmodal { width: min(920px, calc(100vw - 48px)); max-height: calc(100vh - 64px); display: flex; flex-direction: column; padding: 0; overflow: hidden; }
+.orq-qmodal__head { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--line); color: var(--accent-text); }
+.orq-qmodal__who { flex: 1; min-width: 0; }
+.orq-qmodal__who h2 { margin: 0; font-size: 16px; color: var(--text); }
+.orq-qmodal__who p { margin: 2px 0 0; }
+.orq-qmodal__body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 14px 18px; overflow-wrap: anywhere; }
+.orq-qmodal__foot { display: flex; flex-direction: column; gap: 8px; padding: 12px 18px; border-top: 1px solid var(--line); background: var(--raised); }
+.orq-inbox__reply.is-multi { align-items: flex-end; }
+.orq-inbox__reply.is-multi textarea { flex: 1; resize: vertical; min-height: 56px; font: inherit; }

@@ -2314,6 +2314,22 @@ export const es = {
   'settings.onBudget.finish': 'Dejar terminar lo que está en marcha',
   'step.limits.cost': 'Presupuesto de cada intento ($)',
   'agent.maxCost': 'Presupuesto de cada intento ($)',
+  'sup.memory.short': 'Memoria',
+  'sup.memory.count.decisions.one': '{n} decisión',
+  'sup.memory.count.decisions.many': '{n} decisiones',
+  'sup.memory.count.agreements.one': '{n} acuerdo',
+  'sup.memory.count.agreements.many': '{n} acuerdos',
+  'sup.memory.count.notes.one': '{n} nota',
+  'sup.memory.count.notes.many': '{n} notas',
+  'sup.memory.count.alerts.one': '{n} aviso abierto',
+  'sup.memory.count.alerts.many': '{n} avisos abiertos',
+  'sup.memory.count.route.one': '{n} decisión del camino',
+  'sup.memory.count.route.many': '{n} decisiones del camino',
+  'sup.memory.count.steps.one': '{n} paso',
+  'sup.memory.count.steps.many': '{n} pasos',
+  'qmodal.open': 'Revisar y responder',
+  'qmodal.agent': 'agente {agent}',
+  'qmodal.changes': 'Pide cambios o escribe otra respuesta (Ctrl+Intro para enviar)',
 } as const;
 
 export type MessageKey = keyof typeof es;

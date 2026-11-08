@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { ArrowLeft, Play, Pause, Square } from 'lucide-react';
-import { correctionTargets } from '@orquestador/core';
+import { correctionTargets, type RunEvent } from '@orquestador/core';
 import { type HistoryRow, type RunAction, defaultStep, t, formatDuration, filesByStep } from '@orquestador/editor';
 import { CorrectionDialog } from './CorrectionDialog';
 import { PreviewThumb, PreviewDialog } from './Preview';
@@ -67,6 +67,11 @@ export function RunDetail(
   const { live, running, status, reason, label, diagram } = d;
   // Pasos que se pueden corregir de una ejecución que ya no está en marcha [R53.13].
   const fixable = !running && diagram ? correctionTargets(diagram, d.events) : [];
+  // Quién pregunta: el agente del último intento del paso [R78.3].
+  const agentOf = (nodeId: string, nodePath: readonly string[]) => {
+    const req = [...d.events].reverse().find((e): e is Extract<RunEvent, { type: 'agent.request' }> => e.type === 'agent.request' && e.nodeId === nodeId && (e.nodePath ?? []).join('/') === nodePath.join('/'));
+    return req ? (p.agentNames[req.agentId] ?? req.agentId) : undefined;
+  };
   const answerHere = (questionId: string, text: string) => p.answer({ runId: p.runId, questionId, nodeId: '', nodePath: [], text: '' }, text);
 
   return (
@@ -103,7 +108,7 @@ export function RunDetail(
         <div className="orq-run__asks">
           {live.pending.map((q) => (
             <div key={q.questionId} className="orq-run__banner">
-              <QuestionCard item={q} from={label(q.nodeId, q.nodePath)} onAnswer={(text) => answerHere(q.questionId, text)} />
+              <QuestionCard item={q} from={label(q.nodeId, q.nodePath)} agent={agentOf(q.nodeId, q.nodePath)} autoOpen onAnswer={(text) => answerHere(q.questionId, text)} />
             </div>
           ))}
         </div>

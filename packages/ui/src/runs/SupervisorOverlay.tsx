@@ -88,18 +88,38 @@ export function SupervisorCard({ view: v, onOpen }: { view: SupervisorView; onOp
   );
 }
 
-/** La memoria en la tarjeta: la rama y las dos últimas entradas, plegable [R69.4]. */
+/** Orden y nombre corto de cada bloque en la línea plegada [R69.4]. */
+const SHORT_BLOCKS = ['decisions', 'agreements', 'notes', 'alerts', 'route', 'steps'] as const;
+
+/** «2 decisiones · 1 nota · 3 pasos»: cuántas entradas tiene cada bloque [R69.4]. */
+export function memoryCounts(memory: SupervisorView['memory']): string {
+  const count = (b: string) => memory.filter((m) => (m.block ?? 'steps') === b).length;
+  return SHORT_BLOCKS.map((b) => ({ b, n: count(b) }))
+    .filter((x) => x.n > 0)
+    .map((x) => t(`sup.memory.count.${x.b}.${x.n === 1 ? 'one' : 'many'}` as MessageKey, { n: x.n }))
+    .join(' · ');
+}
+
+/**
+ * La memoria bajo la tarjeta, con su ancho y su forma: plegada, una línea con lo que hay por bloque; desplegada, la
+ * rama y las dos últimas entradas. Sin nada anotado no se muestra [R69.4].
+ */
 export function SupervisorMemory({ view: v, onAll }: { view: SupervisorView; onAll?: (() => void) | undefined }) {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
+  if (v.memory.length === 0 && !v.branch) return null;
+  const counts = memoryCounts(v.memory);
   return (
-    <section className="orq-supmem" aria-label={t('rsum.sup.memory')}>
-      <header className="orq-supmem__head">
-        <h3>{t('rsum.sup.memory')}</h3>
-        <button type="button" className="orq-supmem__fold" aria-expanded={open} aria-label={t(open ? 'sup.memory.fold' : 'sup.memory.unfold')} onClick={() => setOpen(!open)}>
-          {open ? <ChevronUp size={14} aria-hidden="true" /> : <ChevronDown size={14} aria-hidden="true" />}
-        </button>
-      </header>
-      {open && <MemoryCards notes={v.memory} branch={v.branch} limit={2} onAll={onAll} />}
+    <section className={`orq-supmem${open ? ' is-open' : ''}`} aria-label={t('rsum.sup.memory')}>
+      <button type="button" className="orq-supmem__head" aria-expanded={open} aria-label={t(open ? 'sup.memory.fold' : 'sup.memory.unfold')} onClick={() => setOpen(!open)}>
+        <span className="orq-supmem__title">{t('sup.memory.short')}</span>
+        <span className="orq-supmem__counts">{counts || v.branch}</span>
+        {open ? <ChevronUp size={14} aria-hidden="true" /> : <ChevronDown size={14} aria-hidden="true" />}
+      </button>
+      {open && (
+        <div className="orq-supmem__body">
+          <MemoryCards notes={v.memory} branch={v.branch} limit={2} onAll={onAll} />
+        </div>
+      )}
     </section>
   );
 }
