@@ -304,6 +304,16 @@ function Context({ cur, req, toName, names, full = false }: { cur: EdgeTraversal
           </dd>
         </>
       )}
+      {req.flow && (
+        <>
+          <dt>{t('edgeInspect.flow')}</dt>
+          <dd>
+            <div className="orq-einsp__doc" data-testid="einsp-flow">
+              <Markdown text={req.flow} />
+            </div>
+          </dd>
+        </>
+      )}
       <dt>{t('edgeInspect.skills')}</dt>
       <dd>{list('skill')}</dd>
       <dt>{t('edgeInspect.contexts')}</dt>

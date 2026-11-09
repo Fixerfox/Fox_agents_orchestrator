@@ -78,6 +78,8 @@ export interface SetupOptions {
   describeAgent?: (agentId: Id) => AgentSnapshot | undefined;
   /** Adaptador propio en lugar del simulado. */
   adapter?: AgentAdapter;
+  /** Cuenta a cada paso su sitio en el flujo [R80.10]. */
+  flow?: boolean;
 }
 
 export function setup(opts: SetupOptions = {}) {
@@ -104,6 +106,7 @@ export function setup(opts: SetupOptions = {}) {
       sleeps.push(ms);
     },
     newRunId: () => 'run-1',
+    ...(opts.flow ? { flow: true } : {}),
   });
   return { agents, decider, orch, sleeps, resolved };
 }

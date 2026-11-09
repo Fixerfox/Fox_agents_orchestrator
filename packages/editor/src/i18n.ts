@@ -1490,6 +1490,7 @@ export const es = {
   'edgeInspect.instructions': 'Instrucciones del agente',
   'edgeInspect.task': 'Tarea del paso',
   'edgeInspect.split': 'Regla de reparto',
+  'edgeInspect.flow': 'Su sitio en el flujo',
   'edgeInspect.noTask': 'sin tarea propia',
   'edgeInspect.knowledge': '{skills} skills · {contexts} contextos · {mcp} MCP',
   'edgeInspect.answers': 'Respuestas previas',

@@ -207,6 +207,8 @@ export interface AgentRequest {
   split?: string;
   /** Memoria de la ejecución: contexto de fondo, no instrucciones [R60.21]. */
   memory?: string;
+  /** Su sitio en el flujo: quién recibe su salida, revisión y vuelta [R80.8]. */
+  flow?: string;
   /** Archivos y carpetas a los que se limita este paso [R60.16]. */
   scope?: string[];
   /** Qué se entregará al final: contrato completo (pasos finales) o una línea de objetivo [R46.4]. */

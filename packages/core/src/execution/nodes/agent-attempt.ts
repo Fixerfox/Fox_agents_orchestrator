@@ -21,6 +21,8 @@ export interface AgentTurn {
   base: number;
   /** Memoria al arrancar el paso: no cambia entre intentos [R72.9]. */
   memory?: string;
+  /** Su sitio en el flujo, fijo durante el paso [R80.8]. */
+  flow?: string;
   /** Tokens de cada bloque y qué se recortó [R72.19]. */
   memoryStats?: MemoryStats;
   /** Límites del paso, si los declaró el Coordinador [R60.16]. */
@@ -101,6 +103,7 @@ async function attemptOnce(step: StepContext, node: DiagramNode, input: Payload,
       ...(node.confirm ? { confirm: true } : {}),
       ...(split ? { split } : {}),
       ...(turn.memory ? { memory: turn.memory } : {}),
+      ...(turn.flow ? { flow: turn.flow } : {}),
       ...(turn.memoryStats ? { memoryStats: turn.memoryStats } : {}),
       ...(turn.scope ? { scope: turn.scope } : {}),
       ...(deliverable ? { deliverable } : {}),
@@ -167,7 +170,7 @@ async function attemptOnce(step: StepContext, node: DiagramNode, input: Payload,
     );
   // En pausa, el paso queda retenido antes de su siguiente herramienta o al acabar su turno [R77.12][R77.13].
   const hold = pauseHold(step, node.id, path, watchdog);
-  const request = { nodeId: node.id, agentId, runId: step.emitter.runId, input, ...(task ? { task } : {}), ...(node.model ? { model: node.model } : {}), ...(node.confirm ? { confirm: true } : {}), ...(split ? { split } : {}), ...(turn.memory ? { memory: turn.memory } : {}), ...(turn.scope ? { scope: turn.scope } : {}), ...(deliverable ? { deliverable } : {}), ...(hasExtra ? { extra } : {}), ...(missing.length > 0 ? { missing } : {}), attempt, ask, previousAnswers: [...answered], ...(turn.previous ? { previousAttempt: turn.previous } : {}), ...(step.space ? { workspace: { dir: step.space.dir } } : {}), ...(turn.projectMemory ? { projectMemory: turn.projectMemory } : {}), ...(limits.maxCostUsd !== undefined ? { maxCostUsd: limits.maxCostUsd } : {}), whilePaused: (tool: string) => hold(tool) };
+  const request = { nodeId: node.id, agentId, runId: step.emitter.runId, input, ...(task ? { task } : {}), ...(node.model ? { model: node.model } : {}), ...(node.confirm ? { confirm: true } : {}), ...(split ? { split } : {}), ...(turn.memory ? { memory: turn.memory } : {}), ...(turn.flow ? { flow: turn.flow } : {}), ...(turn.scope ? { scope: turn.scope } : {}), ...(deliverable ? { deliverable } : {}), ...(hasExtra ? { extra } : {}), ...(missing.length > 0 ? { missing } : {}), attempt, ask, previousAnswers: [...answered], ...(turn.previous ? { previousAttempt: turn.previous } : {}), ...(step.space ? { workspace: { dir: step.space.dir } } : {}), ...(turn.projectMemory ? { projectMemory: turn.projectMemory } : {}), ...(limits.maxCostUsd !== undefined ? { maxCostUsd: limits.maxCostUsd } : {}), whilePaused: (tool: string) => hold(tool) };
 
   // Misma acción seguida sin cambiar archivos [R70.10][R70.11].
   let lastSig = '';

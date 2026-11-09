@@ -1,5 +1,5 @@
 import { splitBranchIds, type DiagramNode } from '../../diagrams';
-import { isCoordinator, type Payload } from '../../shared';
+import { isCoordinator, type Id, type Payload } from '../../shared';
 import { CONFIRM_APPROVE, CONFIRM_QUESTION, composeConfirmInput, isApproval } from '../text/confirm';
 import { composeSplitFix, declaredFiles, describeSplitProblem, parseSplit } from '../text/split';
 import { UNFINISHED_OPTIONS, UNFINISHED_STOP, unfinishedDecision, unfinishedQuestion } from '../text/unfinished';
@@ -7,6 +7,7 @@ import { newTrace } from './agent-attempt';
 import { attemptsOf, type AgentTurn } from './agent-retries';
 import { verifyStep } from './agent-checks';
 import { BUDGET_SPENT } from '../run/budget-tracker';
+import { flowContext } from '../text/flow-context';
 import { errorMessage, failStep, type NodeHandler, type StepContext } from './handler';
 
 /** Veces que se repite un paso que no reparte bien, antes de fallar [R59.8]. */
@@ -18,6 +19,31 @@ function scopeOf(step: StepContext, node: DiagramNode, input: Payload): string[]
   if (!step.supervisor) return undefined;
   const fromCoordinator = step.level.diagram.edges.some((e) => e.to === node.id && isCoordinator(step.nodeById.get(e.from) ?? {}));
   return fromCoordinator ? declaredFiles(input.text) : undefined;
+}
+
+/** Su sitio en el flujo: contenedores por la ruta y vuelta del bucle más cercano [R80.1][R80.6]. */
+function flowOf(step: StepContext, node: DiagramNode, path: readonly Id[]): string | undefined {
+  const levels = step.flow?.levels;
+  if (!levels) return undefined;
+  const containers: DiagramNode[] = [];
+  let loopRound: number | undefined;
+  for (let i = path.length - 1; i >= 0; i--) {
+    const at = path.slice(0, i);
+    const container = levels.get(at.join('/'))?.nodes.find((n) => n.id === path[i]);
+    if (!container) continue;
+    containers.push(container);
+    if (container.kind === 'loop' && loopRound === undefined) {
+      const done = step.emitter.history().filter((e) => e.type === 'loop.iteration' && e.loopId === container.id && (e.nodePath ?? []).join('/') === at.join('/')).length;
+      loopRound = done + 1;
+    }
+  }
+  return flowContext({
+    diagram: step.level.diagram,
+    nodeId: node.id,
+    containers,
+    ...(loopRound !== undefined ? { loopRound } : {}),
+    agentName: (id) => step.describeAgent?.(id)?.name,
+  });
 }
 
 /** Motivo del intento anterior de un paso que se cortó con la ejecución [R74.5]. */
@@ -62,6 +88,9 @@ export const agentHandler: NodeHandler = {
         turn.memory = memory.text;
         turn.memoryStats = memory.stats;
       }
+      // Su sitio en el flujo, también fijo durante el paso [R80.8].
+      const flow = flowOf(step, node, path);
+      if (flow) turn.flow = flow;
       // Y la del proyecto, tal como estaba al lanzar la ejecución [R76.13][R76.14].
       const known = node.agentId && step.projectMemory ? await step.projectMemory(node.agentId) : undefined;
       if (known) turn.projectMemory = known;

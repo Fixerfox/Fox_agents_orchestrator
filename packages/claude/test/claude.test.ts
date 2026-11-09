@@ -380,3 +380,24 @@ describe('SPEC-033 · conocimiento añadido en el adaptador', () => {
     expect(asked.contexts).toEqual(['glosario', 'mundo']);
   });
 });
+
+describe('SPEC-080 · su sitio en el flujo en el prompt', () => {
+  it('[R80.9] va en el mensaje del usuario, después de la memoria y antes de la tarea; el prompt de sistema no cambia', async () => {
+    const { buildUserPrompt } = await import('../src/prompt');
+    const flow = '## Tu sitio en el flujo\n\nDespués de ti, tu salida la recibe:\n- La salida final de la ejecución.';
+    const text = buildUserPrompt({ text: 'x', files: [] }, [], 'Pinta', [], undefined, '- Plan: hecho', flow);
+    expect(text.indexOf('## Memoria de la ejecución')).toBeLessThan(text.indexOf('## Tu sitio en el flujo'));
+    expect(text.indexOf('## Tu sitio en el flujo')).toBeLessThan(text.indexOf('Tu tarea en este paso:'));
+    const systems: unknown[] = [];
+    for (const f of [flow, undefined]) {
+      const seen = { calls: 0 } as { options?: ClaudeQueryOptions; prompt?: string; calls: number };
+      const { query } = fake([ok()], seen);
+      const adapter = new ClaudeAdapter(env(), query);
+      for await (const _ of adapter.run({ nodeId: 'n', agentId: 'pintor', input: { text: 'x', files: [] }, task: 'Pinta', ...(f ? { flow: f } : {}), attempt: 1, ask: async () => '', previousAnswers: [] }, new AbortController().signal)) void _;
+      if (f) expect(seen.prompt).toContain(flow);
+      else expect(seen.prompt).not.toContain('## Tu sitio en el flujo');
+      systems.push(JSON.stringify(seen.options?.systemPrompt));
+    }
+    expect(systems[0]).toBe(systems[1]);
+  });
+});
