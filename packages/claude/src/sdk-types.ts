@@ -8,7 +8,7 @@ export interface SdkMessage {
   is_error?: boolean;
   errors?: string[];
   total_cost_usd?: number;
-  usage?: { input_tokens?: number; output_tokens?: number };
+  usage?: { input_tokens?: number; output_tokens?: number; cache_creation_input_tokens?: number; cache_read_input_tokens?: number };
   /** Mensaje `system`/`init`: herramientas y estado de los servidores MCP [R30.5]. */
   tools?: string[];
   mcp_servers?: { name: string; status: string }[];

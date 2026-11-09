@@ -19,7 +19,7 @@ interface EventBase { runId: Id; seq: number; ts: string; type: string; nodePath
 | `token.stream` | `nodeId, text` | Salida en streaming (por lotes) (la app junta los seguidos de un paso cada 250 ms o 2.000 caracteres, SPEC-077) |
 | `tool.called` | `nodeId, tool, input` | El agente invoca una herramienta |
 | `tool.result` | `nodeId, tool, ok, output?` | Resultado de la herramienta |
-| `agent.usage` | `nodeId, inputTokens, outputTokens, costUsd?` | Consumo |
+| `agent.usage` | `nodeId, inputTokens, outputTokens, cachedTokens?, costUsd?` | Consumo. `inputTokens` incluye lo escrito y leído de la caché; `cachedTokens`, lo leído de la caché (SPEC-083) |
 | `route.decided` | `fromNodeId, chosen: nodeId[], mode: 'ai'\|'rules', reason` | Un nodo de enrutado elige destinos |
 | `edge.traversed` | `edgeId, fromNodeId, toNodeId, input?` | Se recorre una conexión (para resaltar la ruta); `input` es la parte enviada si el origen reparte (SPEC-059) |
 | `split.rejected` | `nodeId, attempt, problems` | El paso no repartió bien su trabajo y se repite (SPEC-059) |

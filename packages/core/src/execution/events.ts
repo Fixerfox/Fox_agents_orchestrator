@@ -113,6 +113,8 @@ export type EventBody =
       nodeId: Id;
       inputTokens: number;
       outputTokens: number;
+      /** Lo leído de la caché, ya incluido en `inputTokens` [R83.2]. */
+      cachedTokens?: number;
       costUsd?: number;
       /** Gasto de una pieza interna, no del paso [R60.30][R34.28]; `decision`: router y bucles [R63.15]. */
       source?: 'supervisor' | 'judge' | 'decision';

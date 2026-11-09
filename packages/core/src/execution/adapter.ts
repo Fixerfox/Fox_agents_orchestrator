@@ -17,7 +17,8 @@ export type AgentStreamEvent =
   | { type: 'git_action'; branch: string; action: 'commit' | 'push' | 'pr' | 'merge' | 'delete' | 'switch'; /** PR o merge request [R58.14]. */ url?: string }
   /** Acción frenada antes de ocurrir [R60.16]. */
   | { type: 'blocked'; detail: string }
-  | { type: 'usage'; inputTokens: number; outputTokens: number; costUsd?: number }
+  /** `cachedTokens`: lo leído de la caché, ya incluido en `inputTokens` [R83.2]. */
+  | { type: 'usage'; inputTokens: number; outputTokens: number; cachedTokens?: number; costUsd?: number }
   /** Archivo creado o modificado por el agente [R31.12]; `change` es opcional para adaptadores que no lo saben. */
   | { type: 'file'; path: string; change?: FileChange; /** Lo cambió un comando (sin copia) [R55.3]. */ via?: FileVia }
   | { type: 'result'; text: string; files?: string[] }

@@ -226,7 +226,7 @@ async function attemptOnce(step: StepContext, node: DiagramNode, input: Payload,
           step.emitter.emit({ type: 'knowledge.unmet', nodeId: node.id, attempt, kind: ev.kind, id: ev.id }, path);
           break;
         case 'usage':
-          step.emitter.emit({ type: 'agent.usage', nodeId: node.id, inputTokens: ev.inputTokens, outputTokens: ev.outputTokens, ...(ev.costUsd !== undefined ? { costUsd: ev.costUsd } : {}) }, path);
+          step.emitter.emit({ type: 'agent.usage', nodeId: node.id, inputTokens: ev.inputTokens, outputTokens: ev.outputTokens, ...(ev.cachedTokens ? { cachedTokens: ev.cachedTokens } : {}), ...(ev.costUsd !== undefined ? { costUsd: ev.costUsd } : {}) }, path);
           step.budget.add(ev.inputTokens, ev.outputTokens, ev.costUsd);
           break;
         case 'file':

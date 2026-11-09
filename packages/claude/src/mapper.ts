@@ -33,7 +33,7 @@ export class MessageMapper {
   /** El uso de un resultado, aunque sea un error: lo gastado cuenta igual [R77.9]. */
   usageOf(msg: SdkMessage): AgentStreamEvent[] {
     if (msg.type !== 'result' || !msg.usage) return [];
-    return [{ type: 'usage', inputTokens: msg.usage.input_tokens ?? 0, outputTokens: msg.usage.output_tokens ?? 0, ...(typeof msg.total_cost_usd === 'number' ? { costUsd: msg.total_cost_usd } : {}) }];
+    return [usageEvent(msg)];
   }
 
   map(msg: SdkMessage): AgentStreamEvent[] {
@@ -68,19 +68,25 @@ export class MessageMapper {
       if (msg.is_error || (msg.subtype && msg.subtype !== 'success')) throw explainResult(msg.subtype, msg.errors, msg.result, this.secret, this.maxBudgetUsd);
       if (typeof msg.result !== 'string') throw new AgentError('Claude terminó sin devolver un resultado.', false);
       const out: AgentStreamEvent[] = [];
-      if (msg.usage) {
-        out.push({
-          type: 'usage',
-          inputTokens: msg.usage.input_tokens ?? 0,
-          outputTokens: msg.usage.output_tokens ?? 0,
-          ...(typeof msg.total_cost_usd === 'number' ? { costUsd: msg.total_cost_usd } : {}),
-        });
-      }
+      if (msg.usage) out.push(usageEvent(msg));
       out.push({ type: 'result', text: scrub(msg.result, this.secret) });
       return out;
     }
     return [];
   }
+}
+
+/** Uso de un resultado: la entrada es todo lo que lee Claude, también lo escrito y leído de la caché [R83.1][R83.2]. */
+function usageEvent(msg: SdkMessage): AgentStreamEvent {
+  const u = msg.usage ?? {};
+  const cached = u.cache_read_input_tokens ?? 0;
+  return {
+    type: 'usage',
+    inputTokens: (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0) + cached,
+    outputTokens: u.output_tokens ?? 0,
+    ...(cached > 0 ? { cachedTokens: cached } : {}),
+    ...(typeof msg.total_cost_usd === 'number' ? { costUsd: msg.total_cost_usd } : {}),
+  };
 }
 
 function asBlocks(content: unknown): Block[] {

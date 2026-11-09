@@ -383,6 +383,7 @@ export const es = {
   'settings.model': 'Modelo por defecto',
   'settings.parallel': 'Agentes en paralelo (1 a 16)',
   'settings.tokens': 'Límite de tokens por defecto (opcional)',
+  'settings.tokens.hint': 'Cuenta todo lo que lee Claude, también lo que sale de la caché, así que sube rápido. Para limitar el gasto, pon un límite de coste en el agente o en el paso.',
   'settings.apikey': 'Clave API',
   'settings.apikey.stored': 'Hay una clave guardada, cifrada en este equipo',
   'settings.apikey.none': 'No hay clave guardada',

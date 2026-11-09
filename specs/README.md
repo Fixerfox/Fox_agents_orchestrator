@@ -16,6 +16,7 @@ El hito indica cuándo debe estar cubierto por tests. `npm run spec:check` exige
 ## Índice
 | Spec | Título | Hito | Estado |
 |---|---|---|---|
+| [083](083-tokens-de-cache.md) | Los tokens de caché cuentan: la entrada incluye lo leído y escrito en caché, y el límite de tokens lo mide | M16b | Implementada |
 | [082](082-modo-prueba-mcp.md) | Modo prueba: la app arrancada con --test-mcp abre un MCP local (token, solo 127.0.0.1, datos aparte) con las acciones del asistente y herramientas para manejar la interfaz, abrir proyectos, responder diálogos, llamar a la API y esperar ejecuciones | M16a | Implementada |
 | [079](079-no-matar-el-orquestador.md) | Un agente no puede cerrar el orquestador: matar por nombre electron, node, claude u orquestador se deniega con cualquier permiso | M15j | Implementada |
 | [078](078-aprobaciones-en-modal.md) | Aprobaciones largas en un modal: confirmaciones y revisiones con quién pregunta siempre a la vista y «Aprobar» fijo abajo | M15i | Implementada |
