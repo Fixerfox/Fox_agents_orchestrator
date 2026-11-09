@@ -83,6 +83,8 @@ export const CHANNELS = {
   assistantSend: 'assistant:send',
   assistantToolResult: 'assistant:tool-result',
   assistantCancel: 'assistant:cancel',
+  assistantTabsLoad: 'assistant:tabs-load',
+  assistantTabsSave: 'assistant:tabs-save',
   terminalStart: 'terminal:start',
   terminalWrite: 'terminal:write',
   terminalResize: 'terminal:resize',

@@ -94,6 +94,7 @@ const handlers = new DesktopHandlers({
   appMcpDir: join(dataDir(), 'config', 'mcp'),
   createAppServer: sdkCreateAppServer,
   assistantProtectedDirs: [dataDir()],
+  assistantTabsDir: join(dataDir(), 'assistant'),
   pushAssistant: (turnId, event) => {
     if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(ASSISTANT_EVENTS_CHANNEL, { turnId, event });
   },

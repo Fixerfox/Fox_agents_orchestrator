@@ -6,6 +6,8 @@
   "answerRun": "run:answer",
   "assistantCancel": "assistant:cancel",
   "assistantSend": "assistant:send",
+  "assistantTabsLoad": "assistant:tabs-load",
+  "assistantTabsSave": "assistant:tabs-save",
   "assistantToolResult": "assistant:tool-result",
   "cancelImport": "import:cancel",
   "clearApiKey": "settings:clear-key",

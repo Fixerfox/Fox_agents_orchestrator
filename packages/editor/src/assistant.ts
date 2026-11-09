@@ -200,6 +200,27 @@ export const ASSISTANT_TOOLS: readonly AssistantToolSpec[] = [
 export const ASSISTANT_SERVER = 'orquestador';
 export const ASSISTANT_MAX_MESSAGES = 30;
 export const ASSISTANT_MAX_TEXT = 20_000;
+/** Pestañas del asistente como mucho, y elementos que se guardan de cada una [R86.3][R86.12]. */
+export const ASSISTANT_MAX_TABS = 8;
+export const ASSISTANT_MAX_SAVED_ITEMS = 200;
+export const ASSISTANT_TAB_TITLE_MAX = 80;
+
+/** Estado de una tarjeta de acción del asistente [R29.5]. */
+export type AssistantToolStatus = 'running' | 'ask' | 'secret' | 'choice' | 'done' | 'error' | 'denied' | 'undone';
+
+/** Elemento de una conversación tal como se guarda: sin funciones [R86.13]. */
+export type SavedChatItem =
+  | { kind: 'user'; id: string; text: string }
+  | { kind: 'assistant'; id: string; text: string }
+  | { kind: 'tool'; id: string; turnId: string; name: string; args: Record<string, unknown>; status: AssistantToolStatus; summary?: string; answer?: string }
+  | { kind: 'read'; id: string; tool: string; target: string; ok: boolean }
+  | { kind: 'error'; id: string; text: string };
+
+/** Pestañas del asistente de un proyecto, tal como se guardan [R86.11]. */
+export interface SavedAssistantTabs {
+  activeId: string;
+  tabs: { id: string; title: string; updatedAt: number; items: SavedChatItem[] }[];
+}
 
 export interface AssistantMessage {
   role: 'user' | 'assistant';

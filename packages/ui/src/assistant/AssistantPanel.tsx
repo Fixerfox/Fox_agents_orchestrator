@@ -2,23 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { ArrowUp, Check, Eye, KeyRound, Loader2, MessageCircleQuestion, Search, ShieldAlert, Sparkles, Square, SquarePen, Undo2, Wand2, Workflow, X } from 'lucide-react';
 import { ASSISTANT_MAX_MESSAGES, t, type AssistantEvent, type AssistantMessage, type MessageKey, type ProjectApi } from '@orquestador/editor';
 import { alwaysConfirms, isDestructive, isInteractive, isReadOnly, runAssistantTool, storeAssistantSecret, type AssistantHost, type ToolOutcome } from './assistantTools';
+import { activeTab, closeTab, needsAnswer, openTab, tabLabel, tabOfItem, tabOfTurn, tabTitle, updateTab, type AssistantTabs, type ChatItem, type ChatTab } from './tabs';
 import { Markdown } from '../common';
 
-/** Un elemento de la conversación: mensaje o tarjeta de acción [R29.5]. */
-export type ChatItem =
-  | { kind: 'user'; id: string; text: string }
-  | { kind: 'assistant'; id: string; text: string }
-  | { kind: 'tool'; id: string; turnId: string; name: string; args: Record<string, unknown>; status: 'running' | 'ask' | 'secret' | 'choice' | 'done' | 'error' | 'denied' | 'undone'; summary?: string; answer?: string; undo?: () => Promise<void> }
-  | { kind: 'read'; id: string; tool: string; target: string; ok: boolean }
-  | { kind: 'error'; id: string; text: string };
-
-/** Conversación del asistente; vive en la aplicación para no perderse al cambiar de sección [R29.5]. */
-export interface ChatState {
-  items: ChatItem[];
-  turnId?: string | undefined;
-  /** Petición ya escrita que se envía en cuanto el panel está libre (p. ej. «Dar de alta un MCP con Claude») [R30.10]. */
-  pending?: string | undefined;
-}
+export type { ChatItem } from './tabs';
 
 let seq = 0;
 const nextId = (p: string) => `${p}-${Date.now().toString(36)}-${++seq}`;
@@ -47,8 +34,9 @@ const SUG_ICON = [MessageCircleQuestion, Wand2, Workflow] as const;
 interface Props {
   api: ProjectApi;
   host: AssistantHost;
-  state: ChatState;
-  setState: (fn: (s: ChatState) => ChatState) => void;
+  /** Todas las pestañas: los turnos de las que no se ven siguen recibiendo sus eventos [R86.10]. */
+  tabs: AssistantTabs;
+  setTabs: (fn: (s: AssistantTabs) => AssistantTabs) => void;
   onClose?: () => void;
   where?: AssistantWhere;
   /** Pedir «Permitir» en lo que borra o ejecuta; con «Sin preguntar nunca», no [R51.3]. */
@@ -70,7 +58,22 @@ export function groupRows(items: ChatItem[]): Row[] {
   return rows;
 }
 
-export function AssistantPanel({ api, host, state, setState, onClose, where = 'diagrams', confirmActions = true }: Props) {
+export function AssistantPanel({ api, host, tabs, setTabs, onClose, where = 'diagrams', confirmActions = true }: Props) {
+  const state = activeTab(tabs);
+  const strip = useRef<HTMLDivElement>(null);
+  // La pestaña activa siempre a la vista, aunque no quepan todas [R86.7].
+  useEffect(() => {
+    strip.current?.querySelector('[aria-selected="true"]')?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+  }, [state.id]);
+  const tabsRef = useRef(tabs);
+  tabsRef.current = tabs;
+  /** Cambia la pestaña que lanzó un turno, se vea o no [R86.10]. */
+  const onTurn = (turnId: string, fn: (tab: ChatTab) => ChatTab) =>
+    setTabs((s) => {
+      const tab = tabOfTurn(s, turnId);
+      return tab ? updateTab(s, tab.id, fn) : s;
+    });
+  const setTab = (id: string, fn: (tab: ChatTab) => ChatTab) => setTabs((s) => updateTab(s, id, fn));
   const [draft, setDraft] = useState('');
   const list = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
@@ -96,32 +99,37 @@ export function AssistantPanel({ api, host, state, setState, onClose, where = 'd
     () =>
       api.onAssistantEvents((turnId, e: AssistantEvent) => {
         if (e.type === 'text') {
-          setState((s) => {
-            if (s.turnId !== turnId) return s;
+          onTurn(turnId, (s) => {
             const last = s.items[s.items.length - 1];
             if (last?.kind === 'assistant') return { ...s, items: [...s.items.slice(0, -1), { ...last, text: last.text + e.text }] };
             return { ...s, items: [...s.items, { kind: 'assistant', id: nextId('a'), text: e.text }] };
           });
         } else if (e.type === 'read') {
           // Una línea discreta por lectura; no va al historial [R29.9].
-          setState((s) => (s.turnId === turnId ? { ...s, items: [...s.items, { kind: 'read', id: nextId('r'), tool: e.tool, target: e.target, ok: e.ok }] } : s));
+          onTurn(turnId, (s) => ({ ...s, items: [...s.items, { kind: 'read', id: nextId('r'), tool: e.tool, target: e.target, ok: e.ok }] }));
         } else if (e.type === 'tool') {
+          // Una pestaña cerrada ya detuvo su turno: no se ejecuta nada [R86.8].
+          if (!tabOfTurn(tabsRef.current, turnId)) return;
           const ask = isDestructive(e.name) && (confirmRef.current || alwaysConfirms(e.name));
           const waits = isInteractive(e.name);
           const status = waits ? (e.name === 'ask_user' ? 'choice' : 'secret') : ask ? 'ask' : 'running';
-          setState((s) => ({ ...s, items: [...s.items, { kind: 'tool', id: e.callId, turnId, name: e.name, args: e.args, status }] }));
+          onTurn(turnId, (s) => ({ ...s, items: [...s.items, { kind: 'tool', id: e.callId, turnId, name: e.name, args: e.args, status }] }));
           if (!ask && !waits) void execute(turnId, e.callId, e.name, e.args);
         } else if (e.type === 'done') {
-          setState((s) => (s.turnId === turnId ? { ...s, turnId: undefined } : s));
+          onTurn(turnId, (s) => ({ ...s, turnId: undefined }));
         } else {
-          setState((s) => (s.turnId === turnId ? { items: [...s.items, { kind: 'error', id: nextId('e'), text: e.message }], turnId: undefined } : s));
+          onTurn(turnId, (s) => ({ ...s, items: [...s.items, { kind: 'error', id: nextId('e'), text: e.message }], turnId: undefined }));
         }
       }),
     [api],
   );
 
+  /** La tarjeta se actualiza en su pestaña, aunque no sea la que se ve [R86.10]. */
   const patchTool = (id: string, patch: Partial<Extract<ChatItem, { kind: 'tool' }>>) =>
-    setState((s) => ({ ...s, items: s.items.map((it) => (it.kind === 'tool' && it.id === id ? { ...it, ...patch } : it)) }));
+    setTabs((s) => {
+      const tab = tabOfItem(s, id);
+      return tab ? updateTab(s, tab.id, (x) => ({ ...x, items: x.items.map((it) => (it.kind === 'tool' && it.id === id ? { ...it, ...patch } : it)) })) : s;
+    });
 
   const execute = async (turnId: string, callId: string, name: string, args: Record<string, unknown>) => {
     patchTool(callId, { status: 'running' });
@@ -151,25 +159,36 @@ export function AssistantPanel({ api, host, state, setState, onClose, where = 'd
     await api.assistantToolResult({ turnId, callId, ok: false, result: 'El usuario no lo ha permitido.' });
   };
 
-  const send = async (text: string) => {
+  /** Envía un mensaje en una pestaña, con el historial de esa pestaña [R86.9]. */
+  const sendIn = async (tabId: string, text: string) => {
     const clean = text.trim();
-    if (!clean || busy) return;
+    const tab = tabsRef.current.tabs.find((x) => x.id === tabId);
+    if (!clean || !tab || tab.turnId !== undefined) return;
     const turnId = nextId('t');
-    const items: ChatItem[] = [...state.items, { kind: 'user', id: nextId('u'), text: clean }];
-    setState(() => ({ items, turnId }));
-    setDraft('');
+    const items: ChatItem[] = [...tab.items, { kind: 'user', id: nextId('u'), text: clean }];
+    const start = (x: ChatTab): ChatTab => ({ ...x, items, turnId, pending: undefined, title: x.title || tabTitle(clean) });
+    // La referencia se adelanta para que los eventos del turno encuentren ya su pestaña.
+    tabsRef.current = updateTab(tabsRef.current, tabId, start);
+    setTab(tabId, start);
     const r = await api.assistantSend({ turnId, messages: historyOf(items) });
-    if (!r.ok) setState((s) => ({ items: [...s.items, { kind: 'error', id: nextId('e'), text: r.error.message }], turnId: undefined }));
+    if (!r.ok) setTab(tabId, (x) => ({ ...x, items: [...x.items, { kind: 'error', id: nextId('e'), text: r.error.message }], turnId: undefined }));
   };
-  // Petición ya escrita desde otro sitio de la app: se envía en cuanto se pueda [R30.10]
+  const send = (text: string) => {
+    if (!text.trim() || busy) return;
+    setDraft('');
+    void sendIn(state.id, text);
+  };
+  // Peticiones ya escritas desde otro sitio de la app: cada pestaña envía la suya en cuanto está libre [R30.10][R86.9].
   useEffect(() => {
-    if (state.pending === undefined || busy) return;
-    const text = state.pending;
-    setState((s) => ({ ...s, pending: undefined }));
-    void send(text);
-  }, [state.pending, busy]);
+    for (const tab of tabs.tabs) if (tab.pending !== undefined && tab.turnId === undefined) void sendIn(tab.id, tab.pending);
+  }, [tabs]);
   const stop = () => {
     if (state.turnId) void api.assistantCancel(state.turnId);
+  };
+  /** Cerrar una pestaña que trabaja detiene su turno [R86.8]. */
+  const close = (tab: ChatTab) => {
+    if (tab.turnId) void api.assistantCancel(tab.turnId);
+    setTabs((s) => closeTab(s, tab.id));
   };
 
   const suggestions = SUGGESTIONS[where === 'agents' || where === 'knowledge' ? where : 'diagrams'];
@@ -240,8 +259,8 @@ export function AssistantPanel({ api, host, state, setState, onClose, where = 'd
           <h2>{t('as.title')}</h2>
           <span className="orq-assist__where">{t(`as.where.${where}` as MessageKey)}</span>
         </div>
-        {state.items.length > 0 && !busy && (
-          <button type="button" className="orq-ib" aria-label={t('as.clear')} title={t('as.clear')} onClick={() => setState(() => ({ items: [] }))}>
+        {state.items.length > 0 && (
+          <button type="button" className="orq-ib" aria-label={t('as.clear')} title={t('as.clear')} onClick={() => setTabs((s) => openTab(s))}>
             <SquarePen size={16} aria-hidden="true" />
           </button>
         )}
@@ -251,6 +270,28 @@ export function AssistantPanel({ api, host, state, setState, onClose, where = 'd
           </button>
         )}
       </header>
+      <div className="orq-assist__tabs" role="tablist" aria-label={t('as.tabs')} ref={strip}>
+        {tabs.tabs.map((tab) => {
+          const label = tabLabel(tab);
+          const selected = tab.id === state.id;
+          return (
+            <div key={tab.id} className={`orq-assist__tab${selected ? ' is-active' : ''}`}>
+              <button type="button" role="tab" aria-selected={selected} className="orq-assist__tabbtn" title={label} onClick={() => setTabs((s) => ({ ...s, activeId: tab.id }))}>
+                {/* Lo que espera a la persona va delante de «trabajando» [R86.7]. */}
+                {!selected && needsAnswer(tab) ? (
+                  <span className="orq-assist__tabdot" role="img" aria-label={t('as.tab.needs')} />
+                ) : tab.turnId !== undefined ? (
+                  <Loader2 size={11} className="orq-spin" aria-label={t('as.tab.busy')} />
+                ) : null}
+                <span className="orq-assist__tablabel">{label}</span>
+              </button>
+              <button type="button" className="orq-assist__tabclose" aria-label={t('as.tab.close', { name: label })} title={t('as.tab.close', { name: label })} onClick={() => close(tab)}>
+                <X size={11} aria-hidden="true" />
+              </button>
+            </div>
+          );
+        })}
+      </div>
       <div className="orq-assist__list" ref={list} role="log" aria-live="polite" aria-label={t('as.log')}>
         {state.items.length === 0 && (
           <div className="orq-assist__empty">

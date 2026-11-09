@@ -35,7 +35,7 @@ export function McpForm({ api, drafts, draftKey, original, servers, agents, just
   onAgentsChanged: () => void;
   busy?: boolean;
   /** Abre el asistente con una petición sobre este servidor [R30.10]. */
-  onAskClaude?: (text: string) => void;
+  onAskClaude?: (text: string, title?: string) => void;
   /** Abre una terminal de Claude Code en la carpeta del proyecto [R30.10][R30.13]. */
   onOpenTerminal?: () => void;
 }) {
@@ -134,7 +134,7 @@ export function McpForm({ api, drafts, draftKey, original, servers, agents, just
   };
   const sendAsk = () => {
     if (!askText.trim() || !onAskClaude) return;
-    onAskClaude(t('mcp.askbox.prompt', { name: draft.name, id: draft.id, text: askText.trim() }));
+    onAskClaude(t('mcp.askbox.prompt', { name: draft.name, id: draft.id, text: askText.trim() }), t('as.tabTitle.mcp', { name: draft.name }));
     setAskText('');
   };
   const runTest = async () => {
@@ -426,7 +426,12 @@ export function McpForm({ api, drafts, draftKey, original, servers, agents, just
                     type="button"
                     className="orq-btn orq-btn--small orq-ai__btn"
                     disabled={busy}
-                    onClick={() => onAskClaude(isNew ? t('as.prompt.mcpNew', { name: draft.name.trim() ? ` («${draft.name.trim()}»)` : '' }) : t('as.prompt.mcpConfig', { name: draft.name, id: draft.id }))}
+                    onClick={() =>
+                      onAskClaude(
+                        isNew ? t('as.prompt.mcpNew', { name: draft.name.trim() ? ` («${draft.name.trim()}»)` : '' }) : t('as.prompt.mcpConfig', { name: draft.name, id: draft.id }),
+                        draft.name.trim() ? t('as.tabTitle.mcp', { name: draft.name.trim() }) : t('as.tabTitle.mcpNew'),
+                      )
+                    }
                   >
                     <Sparkles size={14} strokeWidth={1.5} aria-hidden="true" />
                     {t('mcp.claude')}

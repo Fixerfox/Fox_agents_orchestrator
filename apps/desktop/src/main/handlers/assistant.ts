@@ -1,12 +1,37 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
+import { promises as fsp } from 'node:fs';
+import path from 'node:path';
 import { draftWithClaude, runAssistantTurn } from '@orquestador/claude';
 import { AgentError } from '@orquestador/core';
 import { ASSISTANT_TOOLS, CHANNELS, type AssistantEvent, type AssistantMessage, type DraftRequest } from '@orquestador/editor';
-import { StoreError } from '@orquestador/store';
+import { StoreError, atomicWrite } from '@orquestador/store';
 import { UNHANDLED, requireStore, scrubPaths, type HandlerState } from './state';
+
+/** Archivo de las pestañas del proyecto abierto en la carpeta de datos de la app; nunca sale hacia la interfaz [R86.11]. */
+export function assistantTabsFile(dir: string, root: string, platform: NodeJS.Platform = process.platform): string {
+  const resolved = path.resolve(root);
+  const key = createHash('sha256').update(platform === 'win32' ? resolved.toLowerCase() : resolved).digest('hex').slice(0, 16);
+  return path.join(dir, `${key}.json`);
+}
 
 export async function handleAssistant(h: HandlerState, channel: string, arg: unknown): Promise<unknown> {
   switch (channel) {
+    case CHANNELS.assistantTabsLoad: {
+      if (!h.root || !h.deps.assistantTabsDir) return null;
+      try {
+        return JSON.parse(await fsp.readFile(assistantTabsFile(h.deps.assistantTabsDir, h.root), 'utf8')) as unknown;
+      } catch {
+        // Sin archivo o dañado: se empieza con una pestaña vacía.
+        return null;
+      }
+    }
+    case CHANNELS.assistantTabsSave: {
+      if (!h.root) throw new StoreError('not-found', 'No hay un proyecto abierto');
+      if (!h.deps.assistantTabsDir) return null;
+      await fsp.mkdir(h.deps.assistantTabsDir, { recursive: true });
+      await atomicWrite(assistantTabsFile(h.deps.assistantTabsDir, h.root), JSON.stringify(arg));
+      return null;
+    }
     case CHANNELS.assistantSend: {
       const { turnId, messages } = arg as { turnId: string; messages: AssistantMessage[] };
       const root = h.root;
