@@ -74,7 +74,7 @@ export function RunModalView({ data: d, api, runId, initialTab = 'summary', onCl
           </div>
         </header>
         <div className="orq-run__tabs orq-rmodal__tabs" role="tablist" aria-label={t('runs.btab')}>
-          {BTABS.filter((b) => b !== 'supervisor' || summary?.supervisor).map((b) => {
+          {BTABS.filter((b) => (b !== 'supervisor' || summary?.supervisor) && (b !== 'memory' || (summary?.supervisor && (summary.supervisor.notes.length > 0 || summary.supervisor.branch)))).map((b) => {
             const alerts = b === 'supervisor' ? (summary?.supervisor?.alerts.length ?? 0) : 0;
             return (
               <button key={b} type="button" role="tab" aria-selected={tab === b} className={b === 'supervisor' ? `orq-run__tab-sup${alerts > 0 ? ' has-alerts' : ''}` : undefined} onClick={() => setTab(b)}>

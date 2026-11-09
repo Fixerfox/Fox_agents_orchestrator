@@ -10,6 +10,7 @@ import { NodeDialog } from '../src/runs/NodeDialog';
 import { NodePanel } from '../src/runs/NodePanel';
 import { ResultsPanel } from '../src/runs/ResultsPanel';
 import { QuestionCard } from '../src/runs/QuestionCard';
+import { stepTab, showConversation } from './nav';
 import { createMemoryApi } from '../src/memoryApi';
 
 const AGENTS = [{ id: 'sprites', name: 'Sprites', description: 'Dibuja', model: 'claude-sonnet-5-5' }];
@@ -26,13 +27,14 @@ const transcript = (extra: RunEvent[] = []): RunEvent[] => [
 ];
 
 describe('SPEC-043 · Markdown en los resultados', () => {
-  it('[R43.1] el panel del paso dibuja en Markdown la entrada, el texto, las preguntas y la salida; las herramientas, en monoespaciado', () => {
+  it('[R43.1] el panel del paso dibuja en Markdown la entrada, el texto, las preguntas y la salida; las herramientas, en monoespaciado', async () => {
     const events = transcript([
       ev(6, { type: 'agent.question', nodeId: 'a', questionId: 'q1', text: '¿Uso **rojo**?' }),
       ev(7, { type: 'agent.answer', nodeId: 'a', questionId: 'q1', text: 'sí' }),
       ev(8, { type: 'node.finished', nodeId: 'a', status: 'succeeded', output: { text: MD, files: [] } }),
     ]);
     const { container } = render(<NodePanel events={events} live={deriveLive(events)} nodeId="a" nodePath={[]} label="Sprites" onAnswer={vi.fn()} />);
+    await showConversation();
     expect(screen.getByRole('heading', { name: 'Encargo' })).toBeTruthy();
     expect(screen.getByText('crear', { selector: 'strong' })).toBeTruthy();
     expect(screen.getByText('rojo', { selector: 'strong' })).toBeTruthy();
@@ -99,7 +101,9 @@ describe('SPEC-043 · confirmar antes de terminar (interfaz)', () => {
   it('[R43.8] en «Necesitan tu respuesta» dice qué se confirma y el resumen va en Markdown', async () => {
     const onAnswer = vi.fn();
     render(<QuestionCard item={{ text: MD, options: ['Aprobar'], confirm: { round: 1 } }} from="Sprites" onAnswer={onAnswer} />);
-    const card = within(screen.getByRole('article', { name: 'Confirmar lo que ha hecho Sprites' }));
+    // Una confirmación se revisa en un modal [R78.3].
+    await userEvent.click(within(screen.getByRole('article', { name: 'Confirmar lo que ha hecho Sprites' })).getByRole('button', { name: 'Revisar y responder' }));
+    const card = within(screen.getByRole('dialog', { name: 'Confirmar lo que ha hecho Sprites' }));
     expect(card.getByRole('heading', { name: 'Hecho' })).toBeTruthy();
     await userEvent.click(card.getByRole('button', { name: 'Aprobar' }));
     expect(onAnswer).toHaveBeenCalledWith('Aprobar');
@@ -110,6 +114,7 @@ describe('SPEC-043 · confirmar antes de terminar (interfaz)', () => {
     await userEvent.click(screen.getByRole('button', { name: '+ Agente' }));
     await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Sprites/ }));
     const card = await screen.findByLabelText(/^Agente «sprites»/);
+    await stepTab('Permisos');
     const box = screen.getByRole('checkbox', { name: 'Confirmar antes de terminar' }) as HTMLInputElement;
     expect(box.checked).toBe(false);
     await userEvent.click(box);

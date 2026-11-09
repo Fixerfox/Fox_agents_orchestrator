@@ -1,4 +1,5 @@
 import {
+  feedbackStats,
   MockAgent,
   MockDecider,
   Orchestrator,
@@ -14,6 +15,7 @@ import {
 } from '@orquestador/core';
 import { fail, ok, type ApiResult, type QueuedRunView, type RunSummary } from '@orquestador/editor';
 import type { MemoryApi, MemoryApiOptions, MemoryState, RunEntry } from './types';
+import { memoryProjectMemory } from './project-memory';
 
 function defaultOrchestrator(saved: Map<string, Diagram>): Orchestrator {
   const agents = new Proxy({} as Record<string, never>, {
@@ -33,6 +35,10 @@ function defaultOrchestrator(saved: Map<string, Diagram>): Orchestrator {
 
 /** Ejecuciones: lanzar y controlar, cola, entrada, resultados, correcciones y copias. */
 export function memoryRuns(s: MemoryState, options: MemoryApiOptions) {
+  const memory = memoryProjectMemory(s, (runId, events) => {
+    const r = s.runs.get(runId);
+    if (r?.subscribed) queueMicrotask(() => listeners.forEach((l) => l(runId, events)));
+  });
   const { saved, runs } = s;
   const orchestrator = options.orchestrator ?? defaultOrchestrator(saved);
   const listeners = new Set<(runId: string, events: RunEvent[]) => void>();
@@ -65,8 +71,11 @@ export function memoryRuns(s: MemoryState, options: MemoryApiOptions) {
       },
       { fromSeq: 1 }, // incluye lo emitido antes de suscribirse
     );
-    // Al terminar, arranca el siguiente de la cola de su diagrama [R52.3].
-    const done = () => drainQueue(d.id);
+    // Al terminar, arranca el siguiente de la cola de su diagrama [R52.3] y propone qué recordar [R76.5].
+    const done = () => {
+      memory.proposeFor(handle.runId);
+      drainQueue(d.id);
+    };
     void handle.result.then(done, done);
     return { runId: handle.runId };
   };
@@ -84,6 +93,9 @@ export function memoryRuns(s: MemoryState, options: MemoryApiOptions) {
   const missing = () => fail('not-found', 'No existe esa ejecución en curso');
 
   return {
+    decideMemory: memory.decideMemory,
+    projectMemory: memory.projectMemory,
+    saveMemoryEntry: memory.saveMemoryEntry,
     restored,
     async resumeRun(runId) {
       // Reanudar en otra ejecución que reutiliza lo que terminó bien [R41.1][R41.2].
@@ -137,6 +149,50 @@ export function memoryRuns(s: MemoryState, options: MemoryApiOptions) {
       });
       correctedBy.set(runId, [...(correctedBy.get(runId) ?? []), r.runId]);
       return ok({ runId: r.runId });
+    },
+    async acceptRun({ runId, by, reason }) {
+      // Igual que el almacén: se añade `run.accepted` y la ejecución pasa a terminada bien [R65.5][R65.6].
+      const text = reason.trim();
+      if (text === '' || text.length > 2000) return fail('bad-request', 'Escribe por qué la das por buena (hasta 2000 caracteres).');
+      const live = runs.get(runId);
+      const past = options.pastRuns?.find((p) => p.summary.runId === runId);
+      if (!live && !past) return missing();
+      const events = live?.events ?? past!.events;
+      const end = events.find((e): e is Extract<RunEvent, { type: 'run.finished' }> => e.type === 'run.finished');
+      if (!end) return fail('bad-request', 'Está en marcha: espera a que termine.');
+      if (end.status !== 'failed' || events.some((e) => e.type === 'run.accepted')) return ok(false);
+      const seq = events.reduce((m, e) => Math.max(m, e.seq), 0) + 1;
+      const ts = new Date().toISOString();
+      const event = { runId, seq, ts, type: 'run.accepted', by, reason: text, ...(end.reason !== undefined ? { previousReason: end.reason } : {}) } as RunEvent;
+      events.push(event);
+      if (live) for (const l of listeners) l(runId, [event]);
+      if (past) past.summary = { ...past.summary, status: 'succeeded', reason: text, accepted: { by, reason: text, at: ts, ...(end.reason !== undefined ? { previousReason: end.reason } : {}) } };
+      return ok(true);
+    },
+    async supervisorFeedback({ runId, alertSeq, verdict, note }) {
+      // Como el almacén: se añade `supervisor.feedback` al registro [R75.21].
+      const live = runs.get(runId);
+      const past = options.pastRuns?.find((p) => p.summary.runId === runId);
+      if (!live && !past) return missing();
+      const events = live?.events ?? past!.events;
+      const alert = events.find((e) => e.type === 'supervisor.alert' && e.seq === alertSeq);
+      if (!alert || alert.type !== 'supervisor.alert') return fail('bad-request', 'Ese aviso no existe en esta ejecución');
+      const seq = events.reduce((m, e) => Math.max(m, e.seq), 0) + 1;
+      const event = { runId, seq, ts: new Date().toISOString(), type: 'supervisor.feedback', alertSeq, verdict, ...(note?.trim() ? { note: note.trim() } : {}), ...(alert.nodeId !== undefined ? { nodeId: alert.nodeId } : {}), ...(alert.nodePath ? { nodePath: alert.nodePath } : {}) } as RunEvent;
+      events.push(event);
+      if (live) for (const l of listeners) l(runId, [event]);
+      return ok(true);
+    },
+    async tryCheck(check) {
+      // En memoria no hay comandos que ejecutar: se dice qué pasaría [R75.24].
+      return ok({ checkId: check.id, label: check.label, kind: check.kind, ok: check.kind !== 'command', detail: check.kind === 'command' ? `Se ejecutaría: ${check.run}` : 'Se comprueba al ejecutar el paso', durationMs: 0 });
+    },
+    async supervisorStats(runId) {
+      const live = runs.get(runId);
+      const past = options.pastRuns?.find((p) => p.summary.runId === runId);
+      if (!live && !past) return missing();
+      const all = [...runs.values()].map((r) => r.events).concat((options.pastRuns ?? []).map((p) => p.events));
+      return ok({ run: feedbackStats([live?.events ?? past!.events]), recent: feedbackStats(all.slice(-50)) });
     },
     async dismissRun(runId) {
       const past = options.pastRuns?.find((p) => p.summary.runId === runId);
@@ -217,6 +273,7 @@ export function memoryRuns(s: MemoryState, options: MemoryApiOptions) {
     async listRuns() {
       const list: RunSummary[] = [...runs].map(([runId, r]) => {
         const end = r.events.find((e) => e.type === 'run.finished');
+        const accepted = r.events.find((e): e is Extract<RunEvent, { type: 'run.accepted' }> => e.type === 'run.accepted');
         const usage = { inputTokens: 0, outputTokens: 0, costUsd: 0 };
         for (const e of r.events)
           if (e.type === 'agent.usage') {
@@ -229,8 +286,9 @@ export function memoryRuns(s: MemoryState, options: MemoryApiOptions) {
           diagramId: r.diagramId,
           startedAt: r.events[0]?.ts ?? '',
           ...(end ? { finishedAt: end.ts } : {}),
-          status: end && end.type === 'run.finished' ? end.status : 'running',
-          ...(end && end.type === 'run.finished' && end.reason !== undefined ? { reason: end.reason } : {}),
+          status: accepted ? 'succeeded' : end && end.type === 'run.finished' ? end.status : 'running',
+          ...(accepted ? { reason: accepted.reason } : end && end.type === 'run.finished' && end.reason !== undefined ? { reason: end.reason } : {}),
+          ...(accepted ? { accepted: { by: accepted.by, reason: accepted.reason, at: accepted.ts, ...(accepted.previousReason !== undefined ? { previousReason: accepted.previousReason } : {}) } } : {}),
           usage,
           eventCount: r.events.length,
           order: r.order,

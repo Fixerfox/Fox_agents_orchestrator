@@ -1,3 +1,4 @@
+import { replayedIn } from '../run/replay-decider';
 import { chargeDecision, failStep, nodeStarted, type NodeHandler } from './handler';
 
 /** Bucle: repite su cuerpo un número de veces o hasta que el evaluador diga que basta. */
@@ -11,7 +12,7 @@ export const loopHandler: NodeHandler = {
     const max = cfg.mode === 'count' ? Math.min(cfg.count ?? 1, cfg.maxIterations) : cfg.maxIterations;
     let current = input;
     for (let n = 1; n <= max; n++) {
-      const r = await step.execute(cfg.body, current, [...path, node.id], depth + 1, step.stack);
+      const r = await step.execute(cfg.body, current, [...path, node.id], depth + 1, step.stack, step.space);
       if (r.status === 'cancelled') return { status: 'cancelled' };
       if (r.status === 'failed' || !r.output) return { status: 'failed' };
       current = r.output;
@@ -21,7 +22,7 @@ export const loopHandler: NodeHandler = {
       if (cfg.mode === 'ai-judge') {
         const request = { prompt: cfg.prompt!, output: current, iteration: n };
         const { usage, ...verdict } = await step.decider.judge(request, signal);
-        emitter.emit({ type: 'decision', nodeId: node.id, kind: 'judge', request, response: verdict }, path);
+        emitter.emit({ type: 'decision', nodeId: node.id, kind: 'judge', request, response: verdict, ...(replayedIn(step.decider, 'judge') ? { reused: true } : {}) }, path);
         chargeDecision(step, node, path, usage);
         if (signal.aborted) return { status: 'cancelled' };
         reason = verdict.reason;

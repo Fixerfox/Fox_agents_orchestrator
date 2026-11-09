@@ -1,8 +1,17 @@
 import { Search } from 'lucide-react';
-import { type HistoryGroup, type HistoryRow, historyCounts, filterHistory, t, type MessageKey, formatDuration } from '@orquestador/editor';
+import { HISTORY_MEASURES, HISTORY_SORTS, type HistoryGroup, type HistoryMeasure, type HistoryRow, type HistorySort, historyCounts, filterHistory, sortHistory, t, type MessageKey, formatDuration } from '@orquestador/editor';
 import { statusLabel, diagramLabel, when, money } from './runFormat';
 
 const GROUPS: HistoryGroup[] = ['all', 'active', 'succeeded', 'failed', 'cancelled'];
+
+/** Lo que filtra y ordena el historial [R35.7][R77.19]. */
+export interface HistoryFilterState {
+  group: HistoryGroup;
+  diagramId: string;
+  text: string;
+  measure?: HistoryMeasure;
+  sort?: HistorySort;
+}
 
 /** Historial: tabla de todas las ejecuciones con filtros por estado, diagrama y texto [R35.7]. */
 export function HistorySection({
@@ -13,13 +22,13 @@ export function HistorySection({
   open,
 }: {
   rows: HistoryRow[];
-  filter: { group: HistoryGroup; diagramId: string; text: string };
-  setFilter: (f: { group: HistoryGroup; diagramId: string; text: string }) => void;
+  filter: HistoryFilterState;
+  setFilter: (f: HistoryFilterState) => void;
   names: Record<string, string>;
   open: (runId: string) => void;
 }) {
   const counts = historyCounts(rows);
-  const shown = filterHistory(rows, { group: filter.group, ...(filter.diagramId ? { diagramId: filter.diagramId } : {}), text: filter.text });
+  const shown = sortHistory(filterHistory(rows, { group: filter.group, ...(filter.diagramId ? { diagramId: filter.diagramId } : {}), text: filter.text, ...(filter.measure ? { measure: filter.measure } : {}) }), filter.sort);
   return (
     <div className="orq-runs2__page">
       <header className="orq-runs2__head">
@@ -35,6 +44,27 @@ export function HistorySection({
             {Object.entries(names).map(([id, name]) => (
               <option key={id} value={id}>
                 {name}
+              </option>
+            ))}
+          </select>
+        </label>
+        {/* Por coste, duración y reintentos [R77.19]. */}
+        <label className="orq-runs2__select">
+          {t('runs.history.measure')}
+          <select value={filter.measure ?? 'all'} onChange={(e) => setFilter({ ...filter, measure: e.target.value as HistoryMeasure })}>
+            {HISTORY_MEASURES.map((m) => (
+              <option key={m} value={m}>
+                {t(`runs.measure.${m}` as MessageKey)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="orq-runs2__select">
+          {t('runs.history.sort')}
+          <select value={filter.sort ?? 'recent'} onChange={(e) => setFilter({ ...filter, sort: e.target.value as HistorySort })}>
+            {HISTORY_SORTS.map((s) => (
+              <option key={s} value={s}>
+                {t(`runs.sort.${s}` as MessageKey)}
               </option>
             ))}
           </select>
@@ -65,6 +95,7 @@ export function HistorySection({
                 <th>{t('runs.col.duration')}</th>
                 <th className="is-num">{t('runs.col.tokens')}</th>
                 <th className="is-num">{t('runs.col.cost')}</th>
+                <th className="is-num">{t('runs.col.retries')}</th>
               </tr>
             </thead>
             <tbody>
@@ -95,6 +126,7 @@ export function HistorySection({
                       <td className="orq-mono is-num">{money(r.costUsd)}</td>
                     </>
                   )}
+                  <td className="orq-mono is-num">{r.retries}</td>
                 </tr>
               ))}
             </tbody>

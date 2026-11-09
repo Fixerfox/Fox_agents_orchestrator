@@ -1,4 +1,6 @@
-import { clipMiddle, type Id, type Payload } from '../../shared';
+import { clipMiddle, stops, type AiReviewMode, type CheckResult, type Id, type Payload, type Severity, type StopAt } from '../../shared';
+import type { EvidenceSource } from '../checks-port';
+import type { ReviewEvidence, VerifyFinding } from '../adapter';
 import { pathKey } from '../replay';
 import type { Decider, SupervisorReview, SupervisorVerdict } from '../adapter';
 import type { EventBody, RunEvent } from '../events';
@@ -6,12 +8,10 @@ import type { RunOptions } from '../run-types';
 import type { BudgetTracker } from './budget-tracker';
 import type { RunEmitter } from './run-emitter';
 import { REQUIREMENTS_UNMET } from '../text/unfinished';
-import { applyRules, branchMemoryLine, newBranchMemory, newRuleState, rememberBranch } from './supervisor-rules';
+import { BURN_RATE_USD_PER_MIN, applyRules, newRuleState } from './supervisor-rules';
 
 /** Tiempo que se espera a las revisiones pendientes al terminar [R60.13]. */
 const SETTLE_MS = 10_000;
-/** Tope de la memoria [R60.24]. */
-const MEMORY_MAX = 8000;
 /** Lo que espera un paso a su revisión antes de seguir sin ella [R62.8]. */
 const CHECK_MS = 60_000;
 const RESULT_CHARS = 3000;
@@ -19,21 +19,12 @@ const RESULT_CHARS = 3000;
 const HEAD_ACTIONS = 10;
 const TAIL_ACTIONS = 30;
 const ACTION_CHARS = 160;
-/** Fallos seguidos que apagan la revisión en segundo plano [R63.8]. */
-const MAX_FAILURES = 3;
-
-interface Entry {
-  /** Paso al que pertenece (ruta): una sola entrada por paso [R63.3]. */
-  key: string;
-  label: string;
-  text: string;
-  files: readonly string[];
-}
 
 /** Lo que el Supervisor sabe de un paso mientras trabaja. */
 interface StepTrail {
   nodeId: Id;
   path: readonly Id[];
+  agentId?: Id;
   input: Payload;
   task?: string;
   /** Primeras acciones, últimas y cuántas se omitieron entre ambas [R63.1]. */
@@ -41,8 +32,26 @@ interface StepTrail {
   tail: string[];
   omitted: number;
   files: Set<string>;
+  /** Cómo cambió cada archivo, para la evidencia [R75.7]. */
+  changes: Map<string, { change?: 'created' | 'modified'; via?: string }>;
+  /** Herramientas que fallaron y sus últimos mensajes [R75.7]. */
+  toolErrors: { count: number; last: string[] };
+  checks: CheckResult[];
+  verification?: { met: boolean; findings: VerifyFinding[] };
   /** Ya se revisó antes de cerrarse [R62.1]. */
   checked?: boolean;
+}
+
+/** Tope del diff que ve la revisión [R75.7]. */
+export const EVIDENCE_DIFF_CHARS = 12_000;
+
+/** Cómo se revisa este paso: el modo, si es final y si tiene comprobaciones [R75.11]. */
+export interface CheckMode {
+  mode?: AiReviewMode;
+  final?: boolean;
+  hasChecks?: boolean;
+  /** Archivos declarados para el paso (R60.16) o del entregable: van primero en el diff [R75.7]. */
+  priority?: readonly string[];
 }
 
 export interface SupervisorDeps {
@@ -67,6 +76,20 @@ export interface SupervisorDeps {
   /** Si es una corrección: qué se pidió y lo que ya se había entregado [R62.15][R62.16]. */
   correction?: { text: string; before?: { step: string; text: string; files: string[] }[] };
   checkMs?: number;
+  /** Lo que solo puede comprobar una persona: avisar o fallar [R65.3]. */
+  humanChecks?(): 'warn' | 'fail';
+  /** Dólares por minuto de `burn-rate` [R77.10]. */
+  burnRate?(): number;
+  /** Desde qué gravedad se para y se pregunta; por defecto, «grave» [R75.10]. */
+  stopAt?(): StopAt;
+  /** Si no se puede comprobar el resultado: avisar (por defecto) o hacer fallar [R75.20]. */
+  unverified?(): 'warn' | 'fail';
+  /** El diff de lo que tocó un paso [R75.7]. */
+  evidence?: EvidenceSource;
+  /** Comprobaciones del diagrama, al ir a acabar bien [R75.17]. */
+  runChecks?(): Promise<CheckResult[]>;
+  /** Avisos que la persona marcó como falsos antes, del agente o del diagrama [R76.17]. */
+  falseAlarms?(agentId?: Id): Promise<string[]>;
 }
 
 function pushAction(trail: StepTrail, text: string): void {
@@ -80,31 +103,27 @@ function pushAction(trail: StepTrail, text: string): void {
 
 const actionsOf = (t: StepTrail): string[] => [...t.head, ...(t.omitted > 0 ? [`… (${t.omitted} acciones omitidas) …`] : []), ...t.tail];
 
-const entryLine = (e: Entry, full: boolean): string => {
-  const files = e.files.length > 0 ? ` (archivos: ${e.files.join(', ')})` : '';
-  return full && e.text ? `- ${e.label}: ${e.text}${files}` : `- ${e.label}${files}`;
-};
-
 /** Vigila una ejecución: reglas, revisión con IA y memoria [R60.1][R60.12][R60.18]. */
 export class Supervisor {
   private readonly rules = newRuleState();
   private readonly told = new Set<string>();
   private readonly trails = new Map<string, StepTrail>();
-  private readonly entries: Entry[] = [];
-  private readonly branches = newBranchMemory();
   private readonly pending = new Set<Promise<void>>();
   /** Preguntas sin responder y lo que decidió la persona [R62.17]. */
   private readonly asked = new Map<string, string>();
   private readonly decisions: string[] = [];
   /** Lo que entregó cada paso que acabó bien [R62.9]. */
   private readonly results: { step: string; text: string; files: string[] }[] = [];
-  private reviewsOff = false;
-  private failures = 0;
   private closed = false;
   /** Pasada de cada paso: una vuelta de bucle o un retorno de revisión es otra [R63.11]. */
   private readonly passes = new Map<string, number>();
   /** Consultas en segundo plano, para cancelarlas si no llegan a tiempo [R63.7]. */
   private readonly inflight = new Set<() => void>();
+  /** Gravedad y problemas de cada paso revisado, para la comprobación final [R75.18]. */
+  private readonly reviews: { step: string; severity: Severity; problems: string[] }[] = [];
+  /** Archivos que tocó la ejecución, para la comprobación final [R75.18]. */
+  private readonly touched = new Map<string, { change?: 'created' | 'modified'; via?: string }>();
+  private deliverableItems: { item: string; ok: boolean; detail?: string }[] | undefined;
 
   constructor(private readonly d: SupervisorDeps) {}
 
@@ -115,7 +134,7 @@ export class Supervisor {
       if (e.type === 'run.started') this.started();
       if (e.type === 'agent.question') this.asked.set(e.questionId, e.text);
       if (e.type === 'agent.answer') this.decisions.push(`${(this.asked.get(e.questionId) ?? '').slice(0, 300)} → ${e.text.slice(0, 300)}`);
-      for (const a of applyRules(this.rules, e, this.d.limits)) this.alert(a.nodeId, a.path, a.rule, a.detail);
+      for (const a of applyRules(this.rules, e, this.d.limits, { burnRate: this.d.burnRate?.() ?? BURN_RATE_USD_PER_MIN })) this.alert(a.nodeId, a.path, a.rule, a.detail);
       this.follow(e);
     } catch {
       // El Supervisor nunca rompe una ejecución.
@@ -128,12 +147,12 @@ export class Supervisor {
     this.d.emitter.emit({ type: 'supervisor.started', review, ...(model ? { model } : {}) });
   }
 
-  private alert(nodeId: Id | undefined, path: readonly Id[], rule: string, detail: string): void {
+  private alert(nodeId: Id | undefined, path: readonly Id[], rule: string, detail: string, more: { severity?: 'info' | 'warning'; gravity?: Severity; evidence?: string[] } = {}): void {
     const step = pathKey(path, nodeId ?? '');
     const key = `${rule}|${step}|${this.passes.get(step) ?? 0}`;
     if (this.told.has(key)) return;
     this.told.add(key);
-    this.d.emitter.emit({ type: 'supervisor.alert', ...(nodeId !== undefined ? { nodeId } : {}), rule, severity: 'warning', detail }, path);
+    this.d.emitter.emit({ type: 'supervisor.alert', ...(nodeId !== undefined ? { nodeId } : {}), rule, severity: more.severity ?? 'warning', detail, ...(more.gravity ? { gravity: more.gravity } : {}), ...(more.evidence && more.evidence.length > 0 ? { evidence: more.evidence } : {}) }, path);
   }
 
   private follow(e: RunEvent): void {
@@ -143,16 +162,18 @@ export class Supervisor {
       this.passes.set(step, (this.passes.get(step) ?? 0) + 1);
       return;
     }
-    if (e.type === 'git.branch') {
-      rememberBranch(this.branches, e, this.d.labelOf(e.nodeId, path));
-      return;
-    }
     if (e.type === 'agent.request') {
       const key = pathKey(path, e.nodeId);
-      if (!this.trails.has(key)) this.trails.set(key, { nodeId: e.nodeId, path, input: e.input, ...(e.task ? { task: e.task } : {}), head: [], tail: [], omitted: 0, files: new Set() });
+      // Los pasos internos (verificar, juntar) no son un paso nuevo [R75.14].
+      if (!this.trails.has(key) && e.kind === undefined) this.trails.set(key, { nodeId: e.nodeId, path, agentId: e.agentId, input: e.input, ...(e.task ? { task: e.task } : {}), head: [], tail: [], omitted: 0, files: new Set(), changes: new Map(), toolErrors: { count: 0, last: [] }, checks: [] });
       return;
     }
-    if (e.type !== 'tool.called' && e.type !== 'file.produced' && e.type !== 'node.finished' && e.type !== 'agent.question' && e.type !== 'agent.answer') return;
+    if (e.type === 'deliverable.done') {
+      this.deliverableItems = e.items.map((i) => ({ item: i.title, ok: i.ok, ...(i.error ? { detail: i.error } : {}) }));
+      return;
+    }
+    if (e.type === 'file.produced' && !e.reused) this.touched.set(e.path, { ...(e.change ? { change: e.change } : {}), ...(e.via ? { via: e.via } : {}) });
+    if (e.type !== 'tool.called' && e.type !== 'tool.result' && e.type !== 'check.result' && e.type !== 'verify.result' && e.type !== 'file.produced' && e.type !== 'node.finished' && e.type !== 'agent.question' && e.type !== 'agent.answer') return;
     const key = pathKey(path, e.nodeId);
     const trail = this.trails.get(key);
     if (!trail) return;
@@ -161,8 +182,19 @@ export class Supervisor {
       pushAction(trail, `${e.type === 'agent.question' ? 'Preguntó a la persona' : 'La persona respondió'}: ${e.text.slice(0, ACTION_CHARS * 2)}`);
     } else if (e.type === 'tool.called') {
       pushAction(trail, `${e.tool}: ${JSON.stringify(e.input ?? {}).slice(0, ACTION_CHARS)}`);
+    } else if (e.type === 'tool.result') {
+      if (!e.ok) {
+        trail.toolErrors.count++;
+        trail.toolErrors.last = [...trail.toolErrors.last, `${e.tool}: ${String(e.output ?? '').slice(0, 200)}`].slice(-5);
+      }
+    } else if (e.type === 'check.result') {
+      trail.checks.push({ checkId: e.checkId, label: e.label, kind: e.kind, ok: e.ok, detail: e.detail, durationMs: e.durationMs });
+    } else if (e.type === 'verify.result') {
+      trail.verification = { met: e.met, findings: e.findings };
     } else if (e.type === 'file.produced') {
       trail.files.add(e.path);
+      const prev = trail.changes.get(e.path);
+      trail.changes.set(e.path, { ...(prev?.change === 'created' || e.change === 'created' ? { change: 'created' as const } : e.change ? { change: e.change } : prev?.change ? { change: prev.change } : {}), ...(e.via ? { via: e.via } : {}) });
     } else {
       this.trails.delete(key);
       if (e.status === 'succeeded') this.results.push({ step: this.d.labelOf(trail.nodeId, trail.path), text: clipMiddle(e.output?.text ?? '', RESULT_CHARS), files: [...trail.files] });
@@ -170,43 +202,39 @@ export class Supervisor {
     }
   }
 
-  /** Anota un paso en la memoria; si ya tenía entrada, la nueva la sustituye y pasa al final [R63.3]. */
-  private remember(entry: Entry): void {
-    const i = this.entries.findIndex((x) => x.key === entry.key);
-    if (i >= 0) this.entries.splice(i, 1);
-    this.entries.push(entry);
-  }
-
-  private note(trail: StepTrail, text: string, reviewed = false): void {
-    const label = this.d.labelOf(trail.nodeId, trail.path);
+  /** La nota del paso: la memoria la lee de los eventos [R72.1][R72.10]. */
+  private note(trail: StepTrail, text: string, reviewed = false, decided: string[] = []): void {
     const files = [...trail.files];
-    this.remember({ key: pathKey(trail.path, trail.nodeId), label, text, files });
-    this.d.emitter.emit({ type: 'supervisor.note', nodeId: trail.nodeId, text, files, ...(reviewed ? { reviewed } : {}) }, trail.path);
+    this.d.emitter.emit({ type: 'supervisor.note', nodeId: trail.nodeId, text, files, ...(reviewed ? { reviewed } : {}), ...(decided.length > 0 ? { decided } : {}) }, trail.path);
   }
 
-  private finished(trail: StepTrail, output: Payload): void {
-    const { decider, review, signal } = this.d;
-    // Sin revisión, la entrada sale de lo que se sabe: el paso y sus archivos [R60.20].
-    if (this.reviewsOff || !decider.supervise || !review() || signal.aborted) return this.note(trail, '');
-    this.d.emitter.emit({ type: 'supervisor.reviewing', nodeId: trail.nodeId }, trail.path);
-    const own = this.child();
-    this.inflight.add(own.abort);
-    const job: Promise<void> = decider
-      .supervise(this.request(trail, output), own.signal)
-      .then((verdict) => this.reviewed(trail, verdict))
-      .catch(() => {
-        if (this.closed || signal.aborted) return;
-        this.d.emitter.emit({ type: 'supervisor.skipped', count: 1, reason: 'failed' });
-        // Un fallo suelto no apaga la revisión: solo varios seguidos [R63.8].
-        if (++this.failures >= MAX_FAILURES) this.reviewsOff = true;
-        this.note(trail, '');
-      })
-      .finally(() => {
-        own.dispose();
-        this.inflight.delete(own.abort);
-        this.pending.delete(job);
-      });
-    this.pending.add(job);
+  /**
+   * Un paso que se cierra sin haberse revisado (falló, se canceló o no tocaba revisarlo) deja su nota determinista: no
+   * se gasta revisando fallos [R75.12].
+   */
+  private finished(trail: StepTrail, _output: Payload): void {
+    this.note(trail, '');
+  }
+
+  /** La evidencia del paso: diff, comprobaciones, errores de herramientas y recuento de archivos [R75.7]. */
+  private async evidenceOf(trail: StepTrail, priority: readonly string[], signal: AbortSignal): Promise<ReviewEvidence> {
+    const files = [...trail.changes].map(([path, c]) => ({ path, ...c }));
+    let diff = '';
+    if (this.d.evidence && files.length > 0 && !signal.aborted) {
+      try {
+        diff = (await this.d.evidence.diff({ runId: this.d.emitter.runId, files, priority, maxChars: EVIDENCE_DIFF_CHARS })).diff;
+      } catch {
+        diff = '';
+      }
+    }
+    const created = files.filter((f) => f.change === 'created').length;
+    return {
+      diff,
+      checks: trail.checks.map((c) => ({ label: c.label, ok: c.ok, detail: c.detail })),
+      toolErrors: { count: trail.toolErrors.count, last: [...trail.toolErrors.last] },
+      stats: { created, modified: files.length - created, removed: 0 },
+      ...(trail.verification ? { verification: trail.verification } : {}),
+    };
   }
 
   private request(trail: StepTrail, output: Payload): SupervisorReview {
@@ -241,17 +269,27 @@ export class Supervisor {
     }
   }
 
-  /** Revisa un paso antes de que se cierre; devuelve qué falta si no terminó lo pedido [R62.1][R62.4]. */
-  async check(nodeId: Id, path: readonly Id[], output: Payload, purpose?: string): Promise<string | undefined> {
+  /**
+   * Revisa un paso antes de que se cierre [R62.1]: con la evidencia [R75.7] y, según su gravedad y el umbral, devuelve
+   * qué falta (y se pregunta) o solo avisa [R75.10]. El modo del paso decide si revisa la IA [R75.11].
+   */
+  async check(nodeId: Id, path: readonly Id[], output: Payload, purpose?: string, how: CheckMode = {}): Promise<string | undefined> {
     const { decider, review, signal } = this.d;
     const trail = this.trails.get(pathKey(path, nodeId));
-    if (!trail || !decider.supervise || !review() || signal.aborted) return undefined;
+    if (!trail) return undefined;
+    const mode = how.mode ?? 'always';
+    const skip = mode === 'never' || (mode === 'final-or-checks' && !how.final && !how.hasChecks);
+    if (skip || !decider.supervise || !review() || signal.aborted) return undefined;
     trail.checked = true;
     this.d.emitter.emit({ type: 'supervisor.reviewing', nodeId }, path);
     try {
-      const verdict = await this.limited((s) => decider.supervise!({ ...this.request(trail, output), ...(purpose ? { purpose } : {}) }, s));
-      this.reviewed(trail, verdict);
-      return verdict.ok ? undefined : verdict.reason || 'Lo hecho no corresponde a lo pedido.';
+      const verdict = await this.limited(async (s) => {
+        const falseAlarms = (await this.d.falseAlarms?.(trail.agentId)) ?? [];
+        return decider.supervise!({ ...this.request(trail, output), ...(purpose ? { purpose } : {}), evidence: await this.evidenceOf(trail, how.priority ?? [], s), ...(falseAlarms.length > 0 ? { falseAlarms } : {}) }, s);
+      });
+      const severity = this.reviewed(trail, verdict);
+      if (verdict.ok && !(trail.verification && !trail.verification.met && severity === 'high')) return undefined;
+      return stops(severity, this.d.stopAt?.() ?? 'high') ? verdict.reason || verdict.problems?.[0]?.text || 'Lo hecho no corresponde a lo pedido.' : undefined;
     } catch {
       if (signal.aborted) return undefined;
       this.alert(nodeId, path, 'unchecked', 'No se pudo comprobar si este paso hizo lo pedido.');
@@ -263,7 +301,6 @@ export class Supervisor {
   /** Devuelve a la memoria lo anotado de un paso reutilizado, sin revisarlo ni gastar [R41.8][R41.9]. */
   restore(past: Extract<EventBody, { type: 'supervisor.note' | 'supervisor.alert' }>, path: readonly Id[]): void {
     if (past.type === 'supervisor.alert') return this.alert(past.nodeId, path, past.rule, past.detail);
-    this.remember({ key: pathKey(path, past.nodeId), label: this.d.labelOf(past.nodeId, path), text: past.text, files: past.files });
     this.d.emitter.emit(past, path);
   }
 
@@ -275,35 +312,85 @@ export class Supervisor {
   /** Compara lo pedido con lo conseguido; devuelve el motivo si no se cumple [R62.9][R62.10]. */
   async verify(): Promise<string | undefined> {
     const { decider, review, signal, order, deliverable, correction } = this.d;
-    if (!decider.verifyRun || !review() || signal.aborted) return undefined;
+    if (signal.aborted) return undefined;
+    // Las comprobaciones del diagrama van antes que la IA; si fallan, no se pregunta a nadie [R75.17].
+    const checks = (await this.d.runChecks?.().catch(() => [])) ?? [];
+    const bad = checks.find((c) => !c.ok);
+    if (bad) {
+      const missing = `falló «${bad.label}»: ${bad.detail.split('\n').slice(0, 4).join(' ').slice(0, 400)}`;
+      this.d.emitter.emit({ type: 'supervisor.verified', met: false, detail: missing });
+      this.alert(undefined, [], 'requirements-unmet', missing);
+      return `${REQUIREMENTS_UNMET}: ${missing}`;
+    }
+    if (!decider.verifyRun || !review()) return undefined;
     try {
-      const v = await this.limited((s) => decider.verifyRun!({ order, ...(deliverable ? { deliverable } : {}), ...(correction ? { correction: correction.text, before: correction.before ?? [] } : {}), ...(this.decisions.length > 0 ? { decisions: this.decisions } : {}), steps: this.results }, s));
+      const files = await this.fileLines(signal);
+      const falseAlarms = (await this.d.falseAlarms?.().catch(() => [])) ?? [];
+      const v = await this.limited((s) => decider.verifyRun!({ order, ...(deliverable ? { deliverable } : {}), ...(correction ? { correction: correction.text, before: correction.before ?? [] } : {}), ...(this.decisions.length > 0 ? { decisions: this.decisions } : {}), steps: this.results, ...(files.length > 0 ? { files } : {}), ...(checks.length > 0 ? { checks: checks.map((c) => ({ label: c.label, ok: c.ok, detail: c.detail })) } : {}), ...(this.deliverableItems ? { deliverableItems: this.deliverableItems } : {}), ...(this.reviews.length > 0 ? { reviews: this.reviews } : {}), ...(falseAlarms.length > 0 ? { falseAlarms } : {}) }, s));
       if (v.usage) {
         this.d.budget.track(v.usage.inputTokens, v.usage.outputTokens, v.usage.costUsd);
         // Sale en los eventos como el resto del Supervisor, para que el total cuadre [R63.5].
         if (this.d.outputId !== undefined) this.d.emitter.emit({ type: 'agent.usage', nodeId: this.d.outputId, inputTokens: v.usage.inputTokens, outputTokens: v.usage.outputTokens, ...(v.usage.costUsd !== undefined ? { costUsd: v.usage.costUsd } : {}), source: 'supervisor' });
       }
-      this.d.emitter.emit({ type: 'supervisor.verified', met: v.met, detail: v.missing });
-      if (v.met) return undefined;
-      this.alert(undefined, [], 'requirements-unmet', v.missing);
-      return `${REQUIREMENTS_UNMET}: ${v.missing}`;
+      const forPerson = v.forPerson?.trim() ?? '';
+      const strict = forPerson !== '' && this.d.humanChecks?.() === 'fail';
+      // Con «Hacer fallar», lo que queda para una persona cuenta como falta [R65.3].
+      const met = v.met && !strict;
+      const missing = strict ? [v.missing.trim(), forPerson].filter(Boolean).join(' ') : v.missing;
+      this.d.emitter.emit({ type: 'supervisor.verified', met, detail: missing, ...(forPerson ? { forPerson } : {}) });
+      if (met) {
+        if (forPerson) this.alert(undefined, [], 'needs-person', forPerson);
+        return undefined;
+      }
+      this.alert(undefined, [], 'requirements-unmet', missing);
+      return `${REQUIREMENTS_UNMET}: ${missing}`;
     } catch {
-      if (!signal.aborted) this.alert(undefined, [], 'unchecked', 'No se pudo comprobar si el resultado cumple lo pedido.');
-      return undefined;
+      if (signal.aborted) return undefined;
+      this.alert(undefined, [], 'unchecked', 'No se pudo comprobar si el resultado cumple lo pedido.');
+      // Con «Hacer fallar la ejecución», no poder comprobarlo es no cumplirlo [R75.20].
+      return this.d.unverified?.() === 'fail' ? `${REQUIREMENTS_UNMET}: no se pudo comprobar si el resultado cumple lo pedido` : undefined;
     }
   }
 
-  private reviewed(trail: StepTrail, v: SupervisorVerdict): void {
-    if (this.closed) return;
-    this.failures = 0;
+  /** Archivos que cambió la ejecución, con sus líneas añadidas y quitadas [R75.18]. */
+  private async fileLines(signal: AbortSignal): Promise<{ path: string; added: number; removed: number }[]> {
+    const files = [...this.touched].map(([path, c]) => ({ path, ...c }));
+    if (files.length === 0) return [];
+    if (!this.d.evidence || signal.aborted) return files.map((f) => ({ path: f.path, added: 0, removed: 0 }));
+    try {
+      return (await this.d.evidence.diff({ runId: this.d.emitter.runId, files, priority: [], maxChars: 0 })).lines.slice(0, 200);
+    } catch {
+      return files.map((f) => ({ path: f.path, added: 0, removed: 0 }));
+    }
+  }
+
+  /**
+   * Lo que dijo la revisión: su gasto, sus avisos con gravedad y evidencia, y la nota del paso. Un «no» sin ninguna
+   * evidencia citada cuenta como leve [R75.9]; un «no cumple» grave del verificador, como grave [R75.15].
+   */
+  private reviewed(trail: StepTrail, v: SupervisorVerdict): Severity {
+    if (this.closed) return 'none';
     if (v.usage) {
       // Cuenta en el uso, sin disparar el límite: el Supervisor no corta una ejecución [R60.14].
       this.d.budget.track(v.usage.inputTokens, v.usage.outputTokens, v.usage.costUsd);
       this.d.emitter.emit({ type: 'agent.usage', nodeId: trail.nodeId, inputTokens: v.usage.inputTokens, outputTokens: v.usage.outputTokens, ...(v.usage.costUsd !== undefined ? { costUsd: v.usage.costUsd } : {}), source: 'supervisor' }, trail.path);
     }
-    if (!v.ok) this.alert(trail.nodeId, trail.path, 'ai-review', v.reason || 'Lo hecho no corresponde a lo pedido.');
+    let severity: Severity = v.ok ? 'none' : (v.severity ?? 'high');
+    const cited = (v.problems ?? []).filter((p) => p.evidence.trim() !== '');
+    if (!v.ok && v.severity !== undefined && cited.length === 0) {
+      severity = 'low';
+      this.alert(trail.nodeId, trail.path, 'unsupported-verdict', 'La revisión dijo que no, sin citar ninguna evidencia: no se para por ello.', { severity: 'info' });
+    }
+    const failed = trail.verification && !trail.verification.met && trail.verification.findings.some((f) => f.severity === 'high');
+    if (failed) severity = 'high';
+    if (!v.ok || failed) {
+      const evidence = [...cited.map((p) => `${p.text} — ${p.evidence}`), ...(failed ? trail.verification!.findings.filter((f) => f.severity === 'high').map((f) => `${f.where} — ${f.what}`) : [])];
+      this.alert(trail.nodeId, trail.path, 'ai-review', v.reason || v.problems?.[0]?.text || 'Lo hecho no corresponde a lo pedido.', { gravity: severity, evidence });
+    }
     if (v.outOfScope) this.alert(trail.nodeId, trail.path, 'out-of-scope', v.outOfScope);
-    this.note(trail, v.summary, true);
+    this.reviews.push({ step: this.d.labelOf(trail.nodeId, trail.path), severity, problems: (v.problems ?? []).map((p) => p.text).slice(0, 5) });
+    this.note(trail, v.summary, true, (v.decided ?? []).map((d) => d.trim().slice(0, 160)).filter(Boolean).slice(0, 3));
+    return severity;
   }
 
   /** Espera a las revisiones pendientes, con un tope [R60.13]. */
@@ -321,44 +408,4 @@ export class Supervisor {
     // Lo que no llegó se cancela: no sigue gastando [R63.7].
     for (const abort of this.inflight) abort();
   }
-
-  /** La memoria tal como está ahora: la rama y el diario, que no pasa del tope [R60.23][R60.24][R60.26]. */
-  memory(): string | undefined {
-    const head = branchMemoryLine(this.branches);
-    const diary = this.diary(MEMORY_MAX - (head ? head.length + 1 : 0));
-    return [head, diary].filter(Boolean).join('\n') || undefined;
-  }
-
-  /**
-   * El diario con su tope, de lo más nuevo a lo más antiguo: lo reciente va entero, lo anterior solo con el paso y sus
-   * archivos [R60.24], y lo que ya no cabe se quita entero con un aviso al principio, sin cortar líneas [R63.12].
-   */
-  private diary(max: number): string {
-    const kept: string[] = [];
-    let used = 0;
-    let short = false;
-    let dropped = 0;
-    const note = (n: number) => `(${n} pasos anteriores omitidos)`;
-    const room = max - note(this.entries.length).length - 1;
-    for (let i = this.entries.length - 1; i >= 0; i--) {
-      const e = this.entries[i]!;
-      const full = entryLine(e, true);
-      if (!short && used + full.length + (kept.length > 0 ? 1 : 0) <= room) {
-        kept.unshift(full);
-        used += full.length + (kept.length > 1 ? 1 : 0);
-        continue;
-      }
-      short = true;
-      const brief = entryLine(e, false);
-      if (used + brief.length + (kept.length > 0 ? 1 : 0) <= room) {
-        kept.unshift(brief);
-        used += brief.length + (kept.length > 1 ? 1 : 0);
-        continue;
-      }
-      dropped = i + 1;
-      break;
-    }
-    return [...(dropped > 0 ? [note(dropped)] : []), ...kept].join('\n');
-  }
-
 }

@@ -4,7 +4,7 @@ import { basename, join } from 'node:path';
 import { summarizeFolder } from '@orquestador/claude';
 import { analyzeImport, defaultSettings, folderLabel, type RecentView } from '@orquestador/core';
 import { CHANNELS, installSpecKitInto, type ProjectInfo, type SpecKitTarget, type TerminalStartRequest } from '@orquestador/editor';
-import { RunService, RunSnapshots } from '@orquestador/runtime';
+import { RunService, RunSnapshots, runDefaultsFrom } from '@orquestador/runtime';
 import { StoreError, readFolder, type ProjectStore } from '@orquestador/store';
 import { composeRunPorts, createProject, openProject } from '../composition';
 import { UNHANDLED, disposeHandlers, mcpVaultKey, requireStore, type HandlerState } from './state';
@@ -38,8 +38,15 @@ async function setProject(h: HandlerState, root: string, store: ProjectStore): P
       settings: () => h.settings,
       apiKey: async () => (await h.deps.vault?.read()),
       mcpSecrets: async (id, scope) => (await h.deps.mcpVault?.read(mcpVaultKey(root, id, scope))) ?? {},
-    }), () => ({ maxConcurrency: h.settings.maxParallel }), snapshots);
+    }), () => runDefaultsFrom(h.settings), snapshots);
   h.runs.watch((event, diagram) => h.deps.watchRun?.(event, diagram));
+  h.runs.onMemoryProposals((n) => h.deps.memoryProposals?.(n));
+  // Las interrumpidas recientes se ofrecen para reanudar; nada se reanuda solo [R74.12].
+  const runs = h.runs;
+  void runs
+    .interruptedRecent()
+    .then((list) => h.deps.offerInterrupted?.(list, { resume: (id) => runs.resumeRun(id), dismiss: (id) => runs.dismiss(id) }))
+    .catch(() => undefined);
   store.useAppMcp(h.deps.appMcpDir);
   h.store = store; // como máximo un proyecto abierto: el anterior se sustituye [R19.5]
   h.root = root;

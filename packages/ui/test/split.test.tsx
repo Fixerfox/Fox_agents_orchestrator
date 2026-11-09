@@ -35,8 +35,9 @@ function panel(d: Diagram) {
 }
 
 describe('SPEC-059 · panel del paso', () => {
-  it('[R59.12][R59.17] un paso normal no ofrece repartir, aunque tenga varias salidas', () => {
+  it('[R59.12][R59.17] un paso normal no ofrece repartir, aunque tenga varias salidas', async () => {
     panel(fan());
+    await userEvent.click(screen.getByRole('tab', { name: 'Agente' }));
     expect(screen.queryByRole('radiogroup')).toBeNull();
     expect(screen.queryByText(/Repartir/)).toBeNull();
     expect(screen.getByRole('button', { name: 'Cambiar el agente' })).toBeTruthy();
@@ -56,8 +57,9 @@ describe('SPEC-059 · el Coordinador', () => {
     expect(within(card).getByText('reparte entre 0')).toBeTruthy();
   });
 
-  it('[R59.19] en el panel no se cambia de agente y dice lo que hace', () => {
+  it('[R59.19] en el panel no se cambia de agente y dice lo que hace', async () => {
     panel(fan(COORDINATOR));
+    await userEvent.click(screen.getByRole('tab', { name: 'Agente' }));
     expect(screen.queryByRole('button', { name: 'Cambiar el agente' })).toBeNull();
     expect(screen.getByText('Divide el trabajo entre los pasos siguientes')).toBeTruthy();
   });

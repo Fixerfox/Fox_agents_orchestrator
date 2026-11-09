@@ -6,10 +6,10 @@ import { baseOptions } from './connection';
 import { explainThrown } from './errors';
 import { MessageMapper } from './mapper';
 import { buildSystemPrompt, buildUserPrompt, claudeCodePrompt } from './prompt';
-import type { PermissionResult, QueryFn } from './sdk-types';
+import type { PermissionResult, QueryFn, SdkMcpServer } from './sdk-types';
 import { createMcpPolicy, sdkMcpConfig, type ResolvedMcp } from './mcp';
 import { KnowledgeTracker, describeKnowledge, planKnowledge } from './knowledge';
-import { agentTools, createWritePolicy, withScope, guardedPolicy, summarizeFolder, type WritePolicyDeps } from './workfolder';
+import { agentTools, createWritePolicy, withIsolation, withScope, withSelfProtection, withVerifier, guardedPolicy, summarizeFolder, type WritePolicyDeps } from './workfolder';
 import { CommandWatch } from './changes';
 import { classifyCommand } from './commands';
 
@@ -30,7 +30,13 @@ export interface ClaudeEnvironment {
   loadMcp?(ids: string[], runId?: string): Promise<ResolvedMcp[]>;
   /** Archivos creados, cambiados o denegados, para el registro [R31.7]. */
   onFileEvent?(nodeId: string, event: Parameters<NonNullable<WritePolicyDeps['note']>>[0]): void;
+  /** Servidor MCP en proceso `memoria_proyecto`, de solo lectura, con los ámbitos del paso [R76.15]. */
+  memoryServer?(runId: string | undefined, scopes: readonly string[]): Promise<unknown | undefined>;
 }
+
+/** Nombre del servidor de la memoria del proyecto y prefijo de sus herramientas [R76.15]. */
+export const MEMORY_SERVER = 'memoria_proyecto';
+const MEMORY_TOOL = `mcp__${MEMORY_SERVER}__`;
 
 /** Las herramientas MCP pasan por su política; el resto, por la de escritura [R30.4]. */
 const withMcp =
@@ -70,14 +76,20 @@ export class ClaudeAdapter implements AgentAdapter {
       this.env.apiKey(),
       known.mcpIds && this.env.loadMcp ? this.env.loadMcp(known.mcpIds, request.runId) : Promise.resolve([] as ResolvedMcp[]),
     ]);
-    const mcpServers = sdkMcpConfig(mcp);
+    const mcpServers: Record<string, SdkMcpServer> = sdkMcpConfig(mcp);
+    // La memoria del proyecto, para leer bajo demanda lo que no cabe en el prompt [R76.15].
+    const memoryServer = request.projectMemory && this.env.memoryServer ? await this.env.memoryServer(request.runId, request.projectMemory.scopes ?? ['project']).catch(() => undefined) : undefined;
+    if (memoryServer) mcpServers[MEMORY_SERVER] = memoryServer as SdkMcpServer;
     const mcpPolicy = createMcpPolicy(mcp, request.ask, { noAsk: effectivePermission(agent, this.env.settings()) === 'full' });
     const controller = new AbortController();
     const abort = () => controller.abort();
     if (signal.aborted) return;
     signal.addEventListener('abort', abort, { once: true });
-    const mapper = new MessageMapper(apiKey);
-    const folder = await this.env.workFolder?.();
+    const mapper = new MessageMapper(apiKey, request.maxCostUsd);
+    const chosen = await this.env.workFolder?.();
+    // En una rama en paralelo, el paso trabaja en su espacio y la carpeta original queda fuera [R73.8].
+    const original = request.workspace ? (chosen ?? this.env.projectRoot) : undefined;
+    const folder = request.workspace?.dir ?? chosen;
     const summary = folder ? await summarizeFolder(folder) : undefined;
     let finished = false;
     const root = folder ?? this.env.projectRoot;
@@ -86,8 +98,8 @@ export class ClaudeAdapter implements AgentAdapter {
     const sent = new Set<string>();
     // Lo que cambian los comandos (un script que genera páginas, un build…) también se registra [R55.1].
     const watch = new CommandWatch(root);
-    // Qué rama de git crea o toca el agente [R58.2].
-    const branches = new BranchTracker(root);
+    // Qué rama de git crea o toca el agente [R58.2]; desde un espacio aislado, nada [R73.10].
+    const branches = request.workspace ? silentBranches : new BranchTracker(root);
     /** El agente ha preguntado y tiene respuesta en este intento [R39.4]. */
     let asked = false;
     /** Acciones frenadas, para el Supervisor [R60.16]. */
@@ -106,12 +118,12 @@ export class ClaudeAdapter implements AgentAdapter {
       const level = effectivePermission(agent, settings);
       // La política corre en canUseTool y en el gancho, con una sola decisión por llamada [R50.4].
       const guard = guardedPolicy(
-        watchCommands(
+        withPause(request.whilePaused, withSelfProtection(note, watchCommands(
           watch,
           root,
           withMcp(
-            mcpPolicy,
-            withScope(request.scope, root, note, createWritePolicy({
+            async (tool, input) => (tool.startsWith(MEMORY_TOOL) ? { behavior: 'allow' as const, updatedInput: input } : mcpPolicy(tool, input)),
+            withVerifier(request.verify, note, withIsolation(original, note, withScope(request.scope, root, note, createWritePolicy({
             root,
             level,
             appDirs: [...new Set([path.join(root, '.orquestador'), path.join(this.env.projectRoot, '.orquestador')])],
@@ -123,9 +135,9 @@ export class ClaudeAdapter implements AgentAdapter {
             onAsked: () => {
               asked = true;
             },
-          })),
+          })), root)),
           ),
-        ),
+        ))),
       );
       const options = {
         ...baseOptions({
@@ -135,6 +147,8 @@ export class ClaudeAdapter implements AgentAdapter {
           // El modelo del paso manda sobre el de la ficha [R40.4].
           model: request.model ?? agent.model,
           ...(agent.maxTurns !== undefined ? { maxTurns: agent.maxTurns } : {}),
+          // El tope del paso o de la ficha lo aplica el SDK [R77.9].
+          ...(request.maxCostUsd !== undefined ? { maxBudgetUsd: request.maxCostUsd } : {}),
           controller,
           toolList: agentTools(loadsClaudeConfig(settings)),
           canUseTool: guard.canUseTool,
@@ -146,8 +160,8 @@ export class ClaudeAdapter implements AgentAdapter {
           buildSystemPrompt(agent, contexts, skills, summary ?? { text: '(carpeta del proyecto)' }, plan, {
             ...(request.confirm ? { confirm: true } : {}),
             ...(request.split ? { split: request.split } : {}),
-            ...(request.memory ? { memory: request.memory } : {}),
             ...(request.deliverable ? { deliverable: request.deliverable } : {}),
+            ...(request.projectMemory ? { projectMemory: request.projectMemory.text } : {}),
             level,
           }),
         ),
@@ -156,9 +170,17 @@ export class ClaudeAdapter implements AgentAdapter {
       };
       await branches.start();
       for (const u of tracker.inlined()) yield { type: 'knowledge', kind: u.item.kind, id: u.item.id, via: u.via, required: true };
-      for await (const msg of this.query({ prompt: buildUserPrompt(request.input, request.previousAnswers, request.task, missed.map((i) => `«${i.name}»`)), options })) {
+      for await (const msg of this.query({ prompt: buildUserPrompt(request.input, request.previousAnswers, request.task, missed.map((i) => `«${i.name}»`), request.previousAttempt, request.memory), options })) {
         if (signal.aborted) return;
-        for (const ev of mapper.map(msg)) {
+        let mapped: AgentStreamEvent[];
+        try {
+          mapped = mapper.map(msg);
+        } catch (err) {
+          // Lo gastado en un intento que falla también cuenta [R77.9].
+          yield* mapper.usageOf(msg);
+          throw err;
+        }
+        for (const ev of mapped) {
           if (ev.type === 'tool_call') {
             branches.called(ev.tool, ev.input);
             for (const u of tracker.observe(ev.tool, ev.input)) yield { type: 'knowledge', kind: u.item.kind, id: u.item.id, via: u.via, required: u.item.required };
@@ -171,7 +193,7 @@ export class ClaudeAdapter implements AgentAdapter {
             }
             // Terminó sin consultar: la app pregunta por él antes de seguir [R39.4].
             if (agent.askFirst && !asked) {
-              const answer = (await request.ask({ text: askFirstGate(agent.name), options: [ASK_FIRST_OK, ASK_FIRST_REDO], kind: 'gate' })).trim();
+              const answer = (await request.ask({ text: askFirstGate(agent.name), options: [ASK_FIRST_OK, ASK_FIRST_REDO], kind: 'gate', fallback: ASK_FIRST_REDO })).trim();
               if (answer !== ASK_FIRST_OK) throw new AgentError(answer === ASK_FIRST_REDO || answer === '' ? 'El usuario pide que lo rehaga consultándole antes.' : `El usuario pide que lo rehaga: ${answer}`, true);
             }
             finished = true;
@@ -252,6 +274,14 @@ const watchCommands =
     return r;
   };
 
+/** Seguimiento de ramas que no registra nada (rama en paralelo) [R73.10]. */
+const silentBranches: Pick<BranchTracker, 'start' | 'called' | 'settled' | 'finished'> = {
+  start: async () => undefined,
+  called: () => undefined,
+  settled: async function* () {},
+  finished: async function* () {},
+};
+
 /** Segundos que el SDK espera al gancho de permisos: un día [R50.4]. */
 export const HOOK_TIMEOUT_S = 24 * 60 * 60;
 
@@ -259,3 +289,12 @@ export const ASK_FIRST_OK = 'Dar por bueno';
 export const ASK_FIRST_REDO = 'Que lo rehaga';
 /** Pregunta que hace la app cuando un agente que debía consultar no lo ha hecho [R39.4]. */
 export const askFirstGate = (name: string) => `«${name}» ha terminado sin consultarte. ¿Doy por bueno su resultado?`;
+
+/** En pausa, la herramienta espera a que se reanude antes de decidir nada: no empieza ninguna nueva [R77.12]. */
+export function withPause<P extends (tool: string, input: Record<string, unknown>, id?: string) => Promise<PermissionResult>>(whilePaused: ((tool: string) => Promise<void>) | undefined, policy: P): P {
+  if (!whilePaused) return policy;
+  return (async (tool: string, input: Record<string, unknown>, id?: string) => {
+    await whilePaused(tool);
+    return policy(tool, input, id);
+  }) as P;
+}

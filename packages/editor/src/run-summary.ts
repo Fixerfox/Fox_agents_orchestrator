@@ -1,4 +1,5 @@
 import { supervisorView } from './supervisor-view';
+import { memoryCards, type MemoryCard } from './memory-cards';
 import { describeSplitProblem, pathKey, type DeliverableItemResult, type NodeStatus, type RunEvent } from '@orquestador/core';
 import { branchesOf } from './branches';
 import { t } from './i18n';
@@ -44,7 +45,7 @@ export interface RunSummaryView {
   /** Ramas de git en las que se actuó y qué pasos lo hicieron [R58.10]. */
   branches: { name: string; created: boolean; deleted: boolean; prUrl?: string; steps: { label: string; actions: string[] }[] }[];
   /** Lo que vio y anotó el Supervisor, si estaba activo [R60.10]. */
-  supervisor?: { final?: { met: boolean; detail: string }; alerts: { label: string; detail: string; rule?: string; key?: string }[]; notes: { label: string; text: string; files: string[] }[]; skipped?: { count: number; reason: 'timeout' | 'failed' }; /** [R60.36] */ balance?: { reviewed: number; costUsd: number; model?: string }; branch?: string };
+  supervisor?: { final?: { met: boolean; detail: string; /** [R65.4] */ forPerson?: string }; alerts: { label: string; detail: string; rule?: string; key?: string }[]; notes: MemoryCard[]; skipped?: { count: number; reason: 'timeout' | 'failed' }; /** [R60.36] */ balance?: { reviewed: number; costUsd: number; model?: string }; branch?: string };
   /** Repartos rechazados: quién y por qué [R59.14]. */
   splitRejections: { label: string; problems: string[] }[];
   errors: { label: string; message: string }[];
@@ -53,6 +54,10 @@ export interface RunSummaryView {
   failedAt?: string;
   /** Frase que lo cuenta todo de un vistazo. */
   headline: string;
+  /** Dada por buena tras fallar: quién, por qué y por qué había fallado [R65.7]. */
+  accepted?: { by: 'user' | 'assistant'; reason: string; previousReason?: string };
+  /** Al reanudar: lo que se reutilizó de la anterior y lo que eso ahorró [R74.13]. */
+  reused?: { steps: number; decisions: number; answers: number; savedUsd: number };
   /** Entregable pedido y, si se compuso, cómo quedó [R46.12]. */
   deliverable?: { done?: { ok: boolean; fileName: string; markdown: string; items: DeliverableItemResult[] } };
 }
@@ -75,6 +80,7 @@ export function summarizeRun(events: readonly RunEvent[], labelOf: (nodeId: stri
   const usage = { inputTokens: 0, outputTokens: 0, costUsd: 0 };
   let status: RunSummaryView['status'] = 'running';
   let reason: string | undefined;
+  let accepted: RunSummaryView['accepted'];
   let input: string | undefined;
   let finalOutput: string | undefined;
   let finishedAt: string | undefined;
@@ -101,6 +107,11 @@ export function summarizeRun(events: readonly RunEvent[], labelOf: (nodeId: stri
         status = e.status;
         reason = e.reason;
         finishedAt = e.ts;
+        break;
+      case 'run.accepted':
+        // Dada por buena: cuenta como terminada bien, sin olvidar por qué falló [R65.7].
+        status = 'succeeded';
+        accepted = { by: e.by, reason: e.reason, ...(e.previousReason !== undefined ? { previousReason: e.previousReason } : {}) };
         break;
       case 'node.started':
         if (e.nodeId === 'entry' && !e.nodePath?.length) input = e.input?.text;
@@ -131,10 +142,10 @@ export function summarizeRun(events: readonly RunEvent[], labelOf: (nodeId: stri
         watched().alerts.push({ label: e.nodeId !== undefined ? labelOf(e.nodeId, e.nodePath ?? []) : '', detail: e.detail, rule: e.rule, ...(e.nodeId !== undefined ? { key: pathKey(e.nodePath ?? [], e.nodeId) } : {}) });
         break;
       case 'supervisor.note':
-        watched().notes.push({ label: labelOf(e.nodeId, e.nodePath ?? []), text: e.text, files: e.files });
+        watched();
         break;
       case 'supervisor.verified':
-        watched().final = { met: e.met, detail: e.detail };
+        watched().final = { met: e.met, detail: e.detail, ...(e.forPerson ? { forPerson: e.forPerson } : {}) };
         break;
       case 'supervisor.skipped':
         watched().skipped = { count: e.count, reason: e.reason };
@@ -181,7 +192,11 @@ export function summarizeRun(events: readonly RunEvent[], labelOf: (nodeId: stri
       ? t('rsum.head.interrupted', { what: parts.join(', ') })
       : status === 'running'
       ? t('rsum.head.running', { what: parts.join(', ') })
-      : status === 'succeeded'
+      : accepted
+        ? t(accepted.by === 'assistant' ? 'rsum.head.acceptedAssistant' : 'rsum.head.accepted', { reason: accepted.reason })
+        : status === 'succeeded' && supervisor?.final?.forPerson
+        ? t('rsum.head.forPerson', { what: parts.join(', ') })
+        : status === 'succeeded'
         ? t('rsum.head.ok', { what: parts.join(', ') })
         : status === 'cancelled'
           ? t('rsum.head.cancelled', { what: parts.join(', ') })
@@ -202,11 +217,29 @@ export function summarizeRun(events: readonly RunEvent[], labelOf: (nodeId: stri
     files,
     branches: branchesOf(events).list.map((b) => ({ name: b.name, created: b.created, deleted: b.deleted, ...(b.prUrl ? { prUrl: b.prUrl } : {}), steps: b.steps.map((s) => ({ label: labelOf(s.nodeId, s.nodePath), actions: s.actions })) })),
     splitRejections,
-    ...(watch || supervisor ? { supervisor: { ...(supervisor ?? { alerts: [], notes: [] }), ...(watch ? { balance: { reviewed: watch.reviewed, costUsd: watch.costUsd, ...(watch.model ? { model: watch.model } : {}) } } : {}), ...(watch?.branch ? { branch: watch.branch } : {}) } } : {}),
+    ...(watch || supervisor ? { supervisor: { ...(supervisor ?? { alerts: [], notes: [] }), notes: memoryCards(events, labelOf), ...(watch ? { balance: { reviewed: watch.reviewed, costUsd: watch.costUsd, ...(watch.model ? { model: watch.model } : {}) } } : {}), ...(watch?.branch ? { branch: watch.branch } : {}) } } : {}),
     errors,
     ...(finalOutput !== undefined ? { finalOutput: cut(finalOutput, maxText * 10) } : {}),
     ...(failed ? { failedAt: failed.label } : {}),
     headline,
     ...(deliverable ? { deliverable } : {}),
+    ...(accepted ? { accepted } : {}),
+    ...reusedOf(events),
   };
+}
+
+/** Pasos, decisiones y respuestas reutilizados de la ejecución que se reanudó, y lo que costaron entonces [R74.13]. */
+function reusedOf(events: readonly RunEvent[]): Pick<RunSummaryView, 'reused'> {
+  let steps = 0;
+  let decisions = 0;
+  let answers = 0;
+  let savedUsd = 0;
+  for (const e of events) {
+    if (e.type === 'node.reused') {
+      steps++;
+      savedUsd += e.costUsd ?? 0;
+    } else if (e.type === 'decision' && e.reused) decisions++;
+    else if (e.type === 'agent.answer' && e.reused) answers++;
+  }
+  return steps + decisions + answers > 0 ? { reused: { steps, decisions, answers, savedUsd } } : {};
 }

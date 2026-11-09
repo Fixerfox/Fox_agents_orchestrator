@@ -9,6 +9,7 @@ import { NodePanel } from '../src/runs/NodePanel';
 import { AuditPanel } from '../src/runs/AuditPanel';
 import { FileViewer, ProjectChanges } from '../src/runs/RunFiles';
 import { Gantt, RunStory, axisTicks } from '../src/runs/Timeline';
+import { showConversation } from './nav';
 import { createMemoryApi } from '../src/memoryApi';
 
 const T0 = Date.parse('2026-11-05T16:52:00.000Z');
@@ -41,6 +42,7 @@ describe('SPEC-045 · ficheros en el panel del paso', () => {
     const events = run();
     const open = vi.fn();
     render(<NodePanel events={events} live={deriveLive(events)} nodeId="spec" nodePath={[]} label="Especificador" onAnswer={() => undefined} onOpenFile={open} />);
+    await showConversation();
     const block = within(screen.getByRole('region', { name: 'Ficheros de este paso' }));
     expect(block.getByText('specs/001/spec.md')).toBeTruthy();
     expect(block.getByText('Nuevo')).toBeTruthy();
@@ -52,7 +54,7 @@ describe('SPEC-045 · ficheros en el panel del paso', () => {
     await userEvent.click(screen.getByRole('tab', { name: 'Ficheros (1)' }));
     expect(screen.getByText(/Solo lo que tocó este paso/)).toBeTruthy();
     expect(screen.queryByText('Spec lista')).toBeNull();
-    await userEvent.click(screen.getByRole('tab', { name: 'Mensajes' }));
+    await userEvent.click(screen.getByRole('tab', { name: /^Conversación/ }));
     expect(screen.getByText('Spec lista')).toBeTruthy();
   });
 

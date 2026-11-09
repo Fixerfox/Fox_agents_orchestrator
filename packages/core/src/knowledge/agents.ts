@@ -1,4 +1,4 @@
-import { DEFAULT_MODEL, type FieldProblem, type Id, LIMITS, MODELS, PERMISSION_LEVELS, type PermissionLevel, isRelativeInside, isSafeId } from '../shared';
+import { DEFAULT_MODEL, type FieldProblem, type Id, LIMITS, MODELS, PERMISSION_LEVELS, type PermissionLevel, isRelativeInside, isSafeId, limitProblems, checkProblems, type StepCheck, type StepLimits } from '../shared';
 
 export const AGENT_SCHEMA_VERSION = 1;
 
@@ -19,6 +19,10 @@ export interface AgentDefinition {
   /** Servidores MCP del proyecto asignados [R30.3]. */
   mcpIds?: Id[];
   maxTurns?: number;
+  /** Límites de tiempo y presupuesto en todos sus pasos [R70.7][R77.9]. */
+  limits?: StepLimits;
+  /** Comprobaciones que valen en todos sus pasos [R75.2]. */
+  checks?: StepCheck[];
   /** Pregunta siempre antes de implementar o decidir [R39.1]. */
   askFirst?: boolean;
   /** Permisos propios; sin valor, los del proyecto [R47.10]. */
@@ -116,6 +120,8 @@ export function validateAgent(a: unknown, existing: { contextIds: ReadonlySet<Id
   if (a.maxTurns !== undefined && !(Number.isInteger(a.maxTurns) && (a.maxTurns as number) >= 1 && (a.maxTurns as number) <= LIMITS.maxTurns)) {
     out.push({ field: 'maxTurns', message: `El máximo de turnos va de 1 a ${LIMITS.maxTurns}` });
   }
+  out.push(...limitProblems(a.limits));
+  for (const message of checkProblems(a.checks)) out.push({ field: 'checks', message });
   return out;
 }
 

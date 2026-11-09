@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { EditorSession, createDiagram, t, type ProjectApi } from '@orquestador/editor';
+import { isolatesBranches } from '@orquestador/core';
 import { DraftStore, type LibraryTarget, type OpenLibrary } from '../common';
 import type { AssistantHost, ChatState } from '../assistant';
 import { useDesigner, useDesignerSelection, useDiagramDocument, useProjectCatalog, useSession, type AgentOption } from '../diagrams';
@@ -84,6 +85,8 @@ export function useApp({ api, agents: builtIn = [], confirm = (m) => window.conf
   const lib = useProjectCatalog(api, project, builtIn);
   const doc = useDiagramDocument({ api, session, snap, project, projectRef, confirm, fail, guard, clearSelection: sel.clearSelection, goDiagrams });
   const config = useAppSettings(api, project, section, fail);
+  // Sin aislar las ramas en paralelo, los abanicos avisan [R73.21].
+  useEffect(() => session.setSharedFans(config.settings !== undefined && !isolatesBranches(config.settings)), [session, config.settings]);
   const launcher = useRunLauncher({ api, session, project, client, save: doc.save, fail, setMessage, refreshRuns: runsIndex.refresh, goRuns, setRunsNav });
 
   const [libOpen, setLibOpen] = useState<LibraryTarget>();

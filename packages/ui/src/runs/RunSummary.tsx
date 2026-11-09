@@ -11,7 +11,7 @@ import { Markdown, PrLink } from '../common';
 import { money } from './runFormat';
 
 /** Lienzo de solo lectura con el diagrama de la ejecución y el estado de cada paso [R35.9]. */
-export function RunCanvas({ diagram, live, events, agentNames, onSelect, onOpenFile, previewCard, label, onSupervisor }: { label?: (id: string, path: readonly string[]) => string; onSupervisor?: (key?: string) => void; diagram: Diagram; live: LiveView; events: readonly RunEvent[]; agentNames: Readonly<Record<string, string>>; onSelect: (key: string) => void; onOpenFile?: (key: string, path: string) => void; previewCard?: (key: string, path: string) => ReactNode }) {
+export function RunCanvas({ diagram, live, events, agentNames, onSelect, onOpenFile, previewCard, label, onSupervisor, onMemory }: { label?: (id: string, path: readonly string[]) => string; onSupervisor?: (key?: string) => void; /** «Ver las N entradas» de la memoria [R69.4]. */ onMemory?: () => void; diagram: Diagram; live: LiveView; events: readonly RunEvent[]; agentNames: Readonly<Record<string, string>>; onSelect: (key: string) => void; onOpenFile?: (key: string, path: string) => void; previewCard?: (key: string, path: string) => ReactNode }) {
   const session = useMemo(() => {
     const s = new EditorSession(diagram);
     s.setReadOnly(true);
@@ -29,7 +29,7 @@ export function RunCanvas({ diagram, live, events, agentNames, onSelect, onOpenF
         live={live}
         events={events}
         readOnly
-        {...(watch ? { overlay: (path: readonly string[]) => <SupervisorOverlay view={watch} path={path} onOpen={onSupervisor} /> } : {})}
+        {...(watch ? { overlay: (path: readonly string[]) => <SupervisorOverlay view={watch} path={path} onOpen={onSupervisor} onMemory={onMemory} /> } : {})}
         agentNames={agentNames}
         extras={extras}
         onReject={() => {}}
@@ -96,6 +96,13 @@ export function SummaryBody({ summary: s, onPick, wide = false, onOpenDeliverabl
         {icon(s.status)}
         <strong>{s.headline}</strong>
       </p>
+      {/* Lo reutilizado al reanudar y lo que ahorró [R74.13]. */}
+      {s.reused && (
+        <p className="orq-rsum__reused" role="note">
+          {t('rsum.reusedFrom', { steps: s.reused.steps, decisions: s.reused.decisions, answers: s.reused.answers })}
+          {s.reused.savedUsd > 0 && ` ${t('rsum.reusedFrom.saved', { usd: s.reused.savedUsd.toFixed(2) })}`}
+        </p>
+      )}
       {s.branches.length > 0 && (
         <section className="orq-rsum__branches" aria-label={t('rsum.branches')}>
           <h3>{t('rsum.branches')}</h3>

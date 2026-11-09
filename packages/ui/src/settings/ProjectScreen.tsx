@@ -4,6 +4,7 @@ import { mcpFromImport, newContext, projectPermission, slugify, type AgentDefini
 import { t, type LiveView, type MessageKey, type ProjectApi, type WorkFolderInspection, type WorkFolderView } from '@orquestador/editor';
 import { MarkdownField } from '../common';
 import { permissionName } from '../common';
+import { ProjectMemoryPanel } from './ProjectMemoryPanel';
 
 interface Props {
   api: ProjectApi;
@@ -14,10 +15,12 @@ interface Props {
   onChanged: () => void;
   onGoDiagrams: () => void;
   onOpenSettings: () => void;
+  /** Abre la ejecución de la que salió una entrada de la memoria [R76.21]. */
+  onOpenRun?: (runId: string) => void;
 }
 
 /** Proyecto (prototipo «Carpeta 3»): la carpeta conectada, sus agentes, lo último que se tocó y el acceso [R32.17]. */
-export function ProjectScreen({ api, live, startWizard, onWizardShown, onChanged, onGoDiagrams, onOpenSettings }: Props) {
+export function ProjectScreen({ api, live, startWizard, onWizardShown, onChanged, onGoDiagrams, onOpenSettings, onOpenRun }: Props) {
   const [folder, setFolder] = useState<WorkFolderView | null>();
   const [agents, setAgents] = useState<AgentDefinition[]>([]);
   const [level, setLevel] = useState<ProjectPermission>('auto');
@@ -131,6 +134,8 @@ export function ProjectScreen({ api, live, startWizard, onWizardShown, onChanged
               {t('proj.access.change')}
             </button>
           </section>
+          {/* Lo que el proyecto ha aprendido [R76.21]. */}
+          <ProjectMemoryPanel api={api} {...(onOpenRun ? { onOpenRun } : {})} />
         </div>
       )}
     </section>

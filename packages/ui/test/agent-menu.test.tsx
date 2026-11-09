@@ -7,7 +7,7 @@ import { newAgent, newContext, newSkill, type AgentDefinition } from '@orquestad
 import { createDiagram } from '@orquestador/editor';
 import { App } from '../src/App';
 import { createMemoryApi, type MemoryApiOptions } from '../src/memoryApi';
-import { goLib } from './nav';
+import { goLib, stepTab } from './nav';
 
 const agent = (id: string, name: string, patch: Partial<AgentDefinition> = {}): AgentDefinition => ({ ...newAgent(id, name), ...patch });
 const OPTIONS: MemoryApiOptions = {
@@ -27,13 +27,13 @@ async function mount(options: MemoryApiOptions = OPTIONS) {
 const menu = () => within(screen.getByRole('menu'));
 
 describe('SPEC-032 · agentes a mano', () => {
-  it('[R32.34] el botón derecho sobre un agente del lienzo lleva a editarlo, cambiarlo y a sus skills y contextos', async () => {
+  it('[R32.34][R64.2] el botón derecho sobre un agente del lienzo lleva a editarlo, cambiarlo y a sus skills y contextos', async () => {
     await mount();
     await userEvent.click(screen.getByRole('button', { name: 'Añadir «Pixelador» al diagrama' }));
     const node = await screen.findByLabelText(/^Agente «pix»/);
     fireEvent.contextMenu(node);
     const items = menu().getAllByRole('menuitem').map((b) => b.textContent);
-    expect(items.slice(0, 2)).toEqual(['Editar el agente', 'Cambiar el agente…']);
+    expect(items.slice(0, 3)).toEqual(['Configurar…', 'Editar el agente', 'Cambiar el agente…']);
     expect(items).toContain('Paleta');
     expect(items).toContain('Glosario');
     expect(items[items.length - 1]).toBe('Eliminar');
@@ -50,6 +50,7 @@ describe('SPEC-032 · agentes a mano', () => {
     await userEvent.click(menu().getByRole('menuitem', { name: 'Cambiar el agente…' }));
     await userEvent.click(within(screen.getByRole('dialog', { name: 'Elige un agente' })).getByRole('button', { name: /Revisor/ }));
     expect(await screen.findByLabelText(/^Agente «pix»/)).toBeTruthy();
+    await stepTab('Agente');
     expect(within(screen.getByRole('group', { name: 'Quién lo hace' })).getByText('Revisor', { selector: 'strong' })).toBeTruthy();
   });
 

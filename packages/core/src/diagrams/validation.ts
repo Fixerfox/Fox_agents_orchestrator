@@ -1,4 +1,4 @@
-import { type Id, type KnowledgeExtra, MAX_EXTRA_ITEMS, MODELS, isCoordinator } from '../shared';
+import { AI_REVIEW_MODES, type Id, type KnowledgeExtra, MAX_EXTRA_ITEMS, MODELS, checkProblems, isCoordinator, limitProblems, type VerifySettings } from '../shared';
 import { deliverableProblems } from './deliverable-spec';
 import { correctionCandidates, returnEdges, segmentShapeOk, splitBranchIds } from './graph';
 import { CURRENT_SCHEMA_VERSION, type Diagram, type DiagramNode, type Edge, MAX_REVIEW_ROUNDS, MAX_TASK_LENGTH, REVIEW_PORTS } from './model';
@@ -62,6 +62,9 @@ export function validateDiagram(diagram: Diagram, path: Id[] = []): ValidationIs
   // Se marcan en el nodo Salida, que es donde se edita.
   const outId = diagram.nodes.find((n) => n.kind === 'output')?.id;
   if (diagram.deliverable !== undefined) for (const p of deliverableProblems(diagram.deliverable)) add(p.code, p.message, outId);
+  // Comprobaciones y verificador de la ejecución [R75.17][R75.13].
+  const badRunCheck = checkProblems(diagram.checks)[0] ?? verifyProblem(diagram.verify);
+  if (badRunCheck) add('diagram-checks-invalid', badRunCheck);
 
   const nodes = new Map<Id, DiagramNode>();
   for (const node of diagram.nodes) {
@@ -79,6 +82,15 @@ export function validateDiagram(diagram: Diagram, path: Id[] = []): ValidationIs
     }
     // Confirmar antes de terminar: solo en agentes [R43.2].
     if (node.confirm !== undefined && node.kind !== 'agent') add('node-confirm-not-agent', `${node.label ?? node.id}: solo los pasos de agente confirman antes de terminar`, node.id);
+    // Límites y reintentos solo en pasos de agente, y con valores válidos [R70.7][R71.10].
+    if ((node.limits !== undefined || node.onRetry !== undefined) && node.kind !== 'agent') add('node-limits-not-agent', `${node.label ?? node.id}: solo los pasos de agente tienen límites de tiempo y reintentos`, node.id);
+    const badLimit = limitProblems(node.limits)[0];
+    if (badLimit) add('node-limits-invalid', `${node.label ?? node.id}: ${badLimit.message}`, node.id);
+    if (node.onRetry !== undefined && node.onRetry !== 'keep' && node.onRetry !== 'restore') add('node-limits-invalid', `${node.label ?? node.id}: «Al reintentar» no es válido`, node.id);
+    // Comprobaciones, revisión y verificador: solo en pasos de agente y bien escritos [R75.1][R75.11][R75.13].
+    if ((node.checks !== undefined || node.aiReview !== undefined || node.verify !== undefined) && node.kind !== 'agent') add('node-checks-not-agent', `${node.label ?? node.id}: solo los pasos de agente tienen comprobaciones y verificador`, node.id);
+    const badCheck = checkProblems(node.checks)[0] ?? (node.aiReview !== undefined && !AI_REVIEW_MODES.includes(node.aiReview) ? '«Revisar con IA» no es válido' : undefined) ?? verifyProblem(node.verify);
+    if (badCheck) add('node-checks-invalid', `${node.label ?? node.id}: ${badCheck}`, node.id);
     // Un Coordinador necesita al menos dos ramas [R59.3].
     if (isCoordinator(node) && splitBranchIds(diagram, node.id).length < 2) add('node-split-needs-two', `${node.label ?? node.id}: para repartir hacen falta al menos 2 ramas`, node.id);
   }
@@ -290,4 +302,14 @@ export function agentsOfDiagram(d: Diagram, out = new Set<string>()): Set<string
     if (n.kind === 'loop' && n.loop) agentsOfDiagram(n.loop.body, out);
   }
   return out;
+}
+
+/** Lo que no vale de «Verificar con un agente» [R75.13]. */
+export function verifyProblem(v: VerifySettings | undefined): string | undefined {
+  if (v === undefined) return undefined;
+  if (typeof v !== 'object' || v === null) return '«Verificar con un agente» no es válido';
+  if (v.maxCostUsd !== undefined && !(typeof v.maxCostUsd === 'number' && v.maxCostUsd > 0 && v.maxCostUsd <= 50)) return 'el presupuesto de la verificación va de 0 a 50 $';
+  if (v.maxMinutes !== undefined && !(Number.isInteger(v.maxMinutes) && v.maxMinutes >= 1 && v.maxMinutes <= 120)) return 'el tiempo de la verificación va de 1 a 120 min';
+  if (v.agentId !== undefined && (typeof v.agentId !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(v.agentId))) return 'el agente de la verificación no es válido';
+  return undefined;
 }

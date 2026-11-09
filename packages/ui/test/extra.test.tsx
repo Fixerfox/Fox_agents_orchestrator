@@ -6,6 +6,7 @@ import userEvent from '@testing-library/user-event';
 import { newAgent, newContext, newSkill } from '@orquestador/core';
 import { createDiagram } from '@orquestador/editor';
 import { App } from '../src/App';
+import { stepTab } from './nav';
 import { createMemoryApi } from '../src/memoryApi';
 
 async function mount() {
@@ -29,6 +30,8 @@ describe('SPEC-033 · conocimiento añadido en la interfaz', () => {
     const api = await mount();
     fireEvent.click(screen.getByRole('button', { name: 'Insertar un paso entre «Entrada» y «Salida»' }));
     await userEvent.click(within(screen.getByRole('dialog', { name: 'Insertar paso' })).getByRole('button', { name: /Pixelador/ }));
+    await screen.findByRole('tab', { name: 'Conocimiento' });
+    await stepTab('Conocimiento');
     const box = within(await screen.findByRole('group', { name: 'Solo en este paso' }));
     await userEvent.click(box.getByRole('button', { name: /Skill/ }));
     const picker = within(screen.getByRole('dialog', { name: /^Skills · Solo en este paso/ }));

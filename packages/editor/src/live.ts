@@ -1,6 +1,6 @@
 import { branchesOf, type RunBranches } from './branches';
 import type { KnowledgeState } from './knowledge';
-import { pathKey, type Id, type NodeStatus, type Payload, type ReviewQuestion, type RunEvent, type RunStatus, type QuestionKind } from '@orquestador/core';
+import { describePreviousAttempt, pathKey, type Id, type NodeStatus, type Payload, type ReviewQuestion, type RunEvent, type RunStatus, type QuestionKind, type ConflictQuestion } from '@orquestador/core';
 
 export interface PendingItem {
   questionId: string;
@@ -65,8 +65,35 @@ export interface LiveView {
   gitLinks: RunBranches['links'];
   /** Avisos del Supervisor de cada paso [R60.9]. */
   alerts: Record<string, string[]>;
+  /** Pasos sin señales de vida (minutos) o cortados por el motor y a punto de reintentarse [R70.20]. */
+  health: Record<string, StepHealth>;
+  /** Ramas en paralelo: «aislada» en sus pasos y, al juntarse, «fusionada» o «conflicto» en lo que las junta [R73.20]. */
+  isolation: Record<string, 'isolated' | 'merged' | 'conflict'>;
   needsAttention: boolean;
+  /** Pasos esperando hueco en toda la app (agentes trabajando) y cómo van en la pausa [R77.3][R77.13]. */
+  waits: Record<string, StepWait>;
+  /** El proveedor pidió esperar hasta esa hora [R77.5]. */
+  cooldown?: { provider: string; untilTs: string };
+  /** Se pasó del 80 % del presupuesto [R77.6]. */
+  budgetWarning?: { limit: 'tokens' | 'cost'; used: number; max: number };
 }
+
+/** Por qué está quieto un paso que ya empezó [R77.3][R77.13]. */
+export interface StepWait {
+  /** Esperando hueco: agentes trabajando en toda la app. */
+  queuedBehind?: number;
+  /** En pausa: terminando lo que hace, o ya retenido. */
+  pause?: 'pausing' | 'paused';
+}
+
+/** Cómo va un paso en marcha: sin actividad desde hace N minutos, o cortado y a punto de reintentarse [R70.20]. */
+export interface StepHealth {
+  stalledMinutes?: number;
+  cut?: 'idle' | 'tool' | 'total' | 'loop';
+}
+
+/** Eventos que dicen que un paso sigue vivo [R70.1]. */
+const ALIVE = new Set<RunEvent['type']>(['token.stream', 'tool.called', 'tool.result', 'file.produced', 'agent.usage', 'knowledge.used', 'knowledge.unmet', 'agent.answer']);
 
 export const EMPTY_LIVE: LiveView = {
   knowledge: {},
@@ -84,7 +111,10 @@ export const EMPTY_LIVE: LiveView = {
   gitActions: {},
   gitLinks: {},
   alerts: {},
+  health: {},
+  isolation: {},
   needsAttention: false,
+  waits: {},
 };
 
 const textOf = (p: Payload | undefined): string | undefined => (p ? p.text : undefined);
@@ -92,7 +122,9 @@ const textOf = (p: Payload | undefined): string | undefined => (p ? p.text : und
 /** Estado visible de una ejecución, reconstruido solo con sus eventos (vivo o replay). */
 export function deriveLive(events: readonly RunEvent[]): LiveView {
   if (events.length === 0) return EMPTY_LIVE;
-  const v: LiveView = { ...EMPTY_LIVE, knowledge: {}, status: 'running', nodeStatus: {}, edges: new Set(), loops: {}, reviews: {}, exhausted: [], usage: { inputTokens: 0, outputTokens: 0, costUsd: 0 }, pending: [], produced: [], alerts: {} };
+  const v: LiveView = { ...EMPTY_LIVE, knowledge: {}, status: 'running', nodeStatus: {}, edges: new Set(), loops: {}, reviews: {}, exhausted: [], usage: { inputTokens: 0, outputTokens: 0, costUsd: 0 }, pending: [], produced: [], alerts: {}, health: {}, isolation: {}, waits: {} };
+  const agentSteps = new Set<string>();
+  let held = new Set<string>();
   const open = new Map<string, PendingItem>();
   // Orden en que empezó cada paso y se recorrió cada conexión, para reiniciar la vuelta al volver atrás [R38.18].
   const startedAt = new Map<string, number>();
@@ -103,6 +135,7 @@ export function deriveLive(events: readonly RunEvent[]): LiveView {
   for (const e of events) {
     idx++;
     const np = e.nodePath ?? [];
+    if (ALIVE.has(e.type) && 'nodeId' in e && e.nodeId !== undefined) delete v.health[pathKey(np, e.nodeId)];
     switch (e.type) {
       case 'run.finished':
         v.status = e.status;
@@ -111,9 +144,20 @@ export function deriveLive(events: readonly RunEvent[]): LiveView {
         break;
       case 'run.paused':
         v.paused = true;
+        held = new Set();
         break;
       case 'run.resumed':
         v.paused = false;
+        held = new Set();
+        break;
+      case 'node.paused':
+        held.add(pathKey(np, e.nodeId));
+        break;
+      case 'provider.cooldown':
+        if (!v.cooldown || v.cooldown.untilTs < e.untilTs) v.cooldown = { provider: e.provider, untilTs: e.untilTs };
+        break;
+      case 'run.budget_warning':
+        v.budgetWarning = { limit: e.limit, used: e.used, max: e.max };
         break;
       case 'run.budget_reached':
         v.budgetReached = { limit: e.limit, used: e.used, max: e.max };
@@ -121,6 +165,16 @@ export function deriveLive(events: readonly RunEvent[]): LiveView {
       case 'agent.request':
         // Cada intento empieza de cero: lo que se ve es el estado del último [R36.18].
         v.knowledge[pathKey(np, e.nodeId)] = {};
+        agentSteps.add(pathKey(np, e.nodeId));
+        // Ya tiene hueco en toda la app [R77.3].
+        if (v.waits[pathKey(np, e.nodeId)]?.queuedBehind !== undefined) {
+          delete v.waits[pathKey(np, e.nodeId)];
+          if (v.nodeStatus[pathKey(np, e.nodeId)] === 'queued') v.nodeStatus[pathKey(np, e.nodeId)] = 'running';
+        }
+        delete v.health[pathKey(np, e.nodeId)];
+        break;
+      case 'node.timeout':
+        v.health[pathKey(np, e.nodeId)] = { cut: e.kind };
         break;
       case 'knowledge.used':
         (v.knowledge[pathKey(np, e.nodeId)] ??= {})[`${e.kind}:${e.id}`] = e.via === 'inline' ? 'included' : 'used';
@@ -130,6 +184,7 @@ export function deriveLive(events: readonly RunEvent[]): LiveView {
         break;
       case 'node.queued':
         v.nodeStatus[pathKey(np, e.nodeId)] = 'queued';
+        if (e.others !== undefined) v.waits[pathKey(np, e.nodeId)] = { queuedBehind: e.others };
         break;
       case 'node.started':
         v.nodeStatus[pathKey(np, e.nodeId)] = 'running';
@@ -138,6 +193,8 @@ export function deriveLive(events: readonly RunEvent[]): LiveView {
       case 'node.finished':
         if (sentBack.delete(pathKey(np, e.nodeId)) && e.status === 'succeeded') delete v.nodeStatus[pathKey(np, e.nodeId)];
         else v.nodeStatus[pathKey(np, e.nodeId)] = e.status;
+        delete v.health[pathKey(np, e.nodeId)];
+        delete v.waits[pathKey(np, e.nodeId)];
         if (np.length === 0 && e.nodeId === 'output') {
           const t = textOf(e.output);
           if (t !== undefined) v.finalOutput = t;
@@ -191,13 +248,27 @@ export function deriveLive(events: readonly RunEvent[]): LiveView {
       case 'file.produced':
         v.produced.push({ nodeId: e.nodeId, path: e.path, nodePath: [...np] });
         break;
+      case 'workspace.opened':
+        for (const id of e.branchNodeIds) v.isolation[pathKey(np, id)] = 'isolated';
+        break;
+      case 'workspace.merged':
+        if (e.regionId !== undefined && v.isolation[pathKey(np, e.nodeId)] !== 'conflict') v.isolation[pathKey(np, e.nodeId)] = 'merged';
+        break;
       case 'workspace.conflict':
         v.needsAttention = true;
+        for (const id of e.nodeIds) v.isolation[pathKey(np, id)] = 'conflict';
+        break;
+      case 'workspace.resolved':
+        for (const id of e.nodeIds) v.isolation[pathKey(np, id)] = 'merged';
+        v.needsAttention = false;
         break;
       case 'supervisor.alert':
         if (e.nodeId !== undefined) {
           const key = pathKey(np, e.nodeId);
           v.alerts[key] = [...(v.alerts[key] ?? []), e.detail];
+          // «Sin actividad desde hace N min» [R70.20].
+          const m = e.rule === 'stalled' ? /(\d+) min/.exec(e.detail) : null;
+          if (m) v.health[key] = { stalledMinutes: Number(m[1]) };
         }
         break;
       default:
@@ -205,6 +276,11 @@ export function deriveLive(events: readonly RunEvent[]): LiveView {
     }
   }
   v.pending = [...open.values()];
+  // En pausa, los pasos de agente en marcha terminan lo que hacen y quedan retenidos [R77.13].
+  if (v.paused && v.status === 'running') {
+    for (const k of agentSteps) if (v.nodeStatus[k] === 'running') v.waits[k] = { ...v.waits[k], pause: held.has(k) ? 'paused' : 'pausing' };
+  }
+  if (v.status !== 'running') delete v.cooldown;
   const git = branchesOf(events);
   v.branches = git.byStep;
   v.gitActions = git.actions;
@@ -243,13 +319,17 @@ export function budgetRemaining(live: LiveView, limits: BudgetLimits): { tokens?
 
 export type TranscriptItem =
   /** `pass` solo aparece cuando el nodo se ejecutó más de una vez [R15.14]. */
-  | { kind: 'input'; attempt: number; pass?: number; agentId: Id; text: string; config?: unknown; model?: string; /** La memoria que recibió [R60.37]. */ memory?: string }
+  | { kind: 'input'; attempt: number; pass?: number; agentId: Id; text: string; config?: unknown; model?: string; /** La memoria que recibió [R60.37]. */ memory?: string; /** Lo que se le contó del intento anterior [R71.15]. */ previous?: string; /** Bloques de la memoria que se recortaron [R72.23]. */ memoryTrimmed?: string[]; /** Entradas de la memoria del proyecto que recibió [R76.22]. */ projectMemory?: string[] }
   /** Empieza la pasada `n` (≥ 2); `by` y `reason`, si la devolvió una revisión [R15.14]. */
   | { kind: 'pass'; n: number; by?: Id; reason?: string }
   | { kind: 'text'; text: string }
   | { kind: 'tool'; tool: string; input?: unknown; ok?: boolean; output?: string }
-  | { kind: 'question'; questionId: string; text: string; options?: string[]; answer?: string; /** Confirmación del paso [R43.9]. */ confirm?: { round: number }; /** Tipo de pregunta [R45.3]. */ ask?: QuestionKind; /** Revisión humana [R53.15]. */ review?: ReviewQuestion }
-  | { kind: 'retry'; attempt: number; max: number; message: string }
+  | { kind: 'question'; questionId: string; text: string; options?: string[]; answer?: string; /** Confirmación del paso [R43.9]. */ confirm?: { round: number }; /** Tipo de pregunta [R45.3]. */ ask?: QuestionKind; /** Revisión humana [R53.15]. */ review?: ReviewQuestion; /** Conflicto al juntar ramas [R73.16]. */ conflict?: ConflictQuestion }
+  /** Nota que el paso dejó a los siguientes [R72.24]. */
+  | { kind: 'note'; text: string }
+  /** Comprobaciones seguidas del paso, en una fila que se despliega [R75.25]. */
+  | { kind: 'checks'; results: { label: string; ok: boolean; detail: string }[] }
+  | { kind: 'retry'; attempt: number; max: number; message: string; /** Por qué [R71.15]. */ cause?: 'error' | 'timeout' | 'loop' }
   | { kind: 'error'; message: string }
   | { kind: 'usage'; inputTokens: number; outputTokens: number; costUsd: number }
   | { kind: 'output'; status: NodeStatus; text?: string };
@@ -285,8 +365,18 @@ export function transcriptItems(events: readonly RunEvent[], nodeId: Id, nodePat
         returned = undefined;
         break;
       case 'agent.request':
-        items.push({ kind: 'input', attempt: e.attempt, pass: Math.max(1, pass), agentId: e.agentId, text: e.input.text, ...(e.snapshot ? { config: e.snapshot } : {}), ...(e.model ? { model: e.model } : {}), ...(e.memory ? { memory: e.memory } : {}) });
+        items.push({ kind: 'input', attempt: e.attempt, pass: Math.max(1, pass), agentId: e.agentId, text: e.input.text, ...(e.snapshot ? { config: e.snapshot } : {}), ...(e.model ? { model: e.model } : {}), ...(e.memory ? { memory: e.memory } : {}), ...(e.previousAttempt ? { previous: describePreviousAttempt(e.previousAttempt) } : {}), ...(e.memoryStats && e.memoryStats.trimmed.length > 0 ? { memoryTrimmed: [...e.memoryStats.trimmed] } : {}), ...(e.projectMemory && e.projectMemory.length > 0 ? { projectMemory: [...e.projectMemory] } : {}) });
         break;
+      case 'memory.note':
+        items.push({ kind: 'note', text: e.text });
+        break;
+      case 'check.result': {
+        const last = items.at(-1);
+        const r = { label: e.label, ok: e.ok, detail: e.detail };
+        if (last?.kind === 'checks') last.results.push(r);
+        else items.push({ kind: 'checks', results: [r] });
+        break;
+      }
       case 'token.stream': {
         const last = items[items.length - 1];
         if (last?.kind === 'text') last.text += e.text;
@@ -305,7 +395,7 @@ export function transcriptItems(events: readonly RunEvent[], nodeId: Id, nodePat
         break;
       }
       case 'agent.question':
-        items.push({ kind: 'question', questionId: e.questionId, text: e.text, ...(e.options ? { options: e.options } : {}), ...(e.confirm ? { confirm: e.confirm } : {}), ...(e.kind ? { ask: e.kind } : {}), ...(e.review ? { review: e.review } : {}) });
+        items.push({ kind: 'question', questionId: e.questionId, text: e.text, ...(e.options ? { options: e.options } : {}), ...(e.confirm ? { confirm: e.confirm } : {}), ...(e.kind ? { ask: e.kind } : {}), ...(e.review ? { review: e.review } : {}), ...(e.conflict ? { conflict: e.conflict } : {}) });
         break;
       case 'agent.answer': {
         const q = items.find((i) => i.kind === 'question' && i.questionId === e.questionId);
@@ -313,7 +403,7 @@ export function transcriptItems(events: readonly RunEvent[], nodeId: Id, nodePat
         break;
       }
       case 'node.retrying':
-        items.push({ kind: 'retry', attempt: e.attempt, max: e.max, message: e.message });
+        items.push({ kind: 'retry', attempt: e.attempt, max: e.max, message: e.message, ...(e.cause ? { cause: e.cause } : {}) });
         break;
       case 'error':
         items.push({ kind: 'error', message: e.message });
@@ -344,3 +434,53 @@ export function transcriptItems(events: readonly RunEvent[], nodeId: Id, nodePat
   }
   return items;
 }
+
+/** Lo esencial de un paso para la tarjeta de estado del panel [R68.4]. */
+export interface StepOverview {
+  status?: NodeStatus;
+  /** De que empieza a que termina; sin valor si no ha terminado. */
+  durationMs?: number;
+  /** Entrada más salida, en todas sus pasadas. */
+  tokens: number;
+  costUsd: number;
+  /** Si hubo algún uso que contar. */
+  hasUsage: boolean;
+  /** La última salida del paso, si la hay. */
+  output?: string;
+}
+
+/** Estado, duración, tokens, coste y última salida de un paso, desde sus eventos [R68.4]. */
+export function stepOverview(events: readonly RunEvent[], nodeId: Id, nodePath: readonly Id[] = []): StepOverview {
+  const key = pathKey(nodePath, nodeId);
+  const items = transcriptItems(events, nodeId, nodePath);
+  let tokens = 0;
+  let costUsd = 0;
+  let hasUsage = false;
+  let output: string | undefined;
+  let status: NodeStatus | undefined;
+  for (const it of items) {
+    if (it.kind === 'usage') {
+      hasUsage = true;
+      tokens += it.inputTokens + it.outputTokens;
+      costUsd += it.costUsd;
+    }
+    if (it.kind === 'output') {
+      status = it.status;
+      if (it.text !== undefined) output = it.text;
+    }
+  }
+  let started: number | undefined;
+  let finished: number | undefined;
+  for (const e of events) {
+    if (!('nodeId' in e) || e.nodeId !== nodeId || pathKey(e.nodePath, nodeId) !== key) continue;
+    if (e.type === 'node.started' && started === undefined) started = Date.parse(e.ts);
+    if (e.type === 'node.finished') finished = Date.parse(e.ts);
+  }
+  const out: StepOverview = { tokens, costUsd, hasUsage };
+  if (status) out.status = status;
+  if (output !== undefined) out.output = output;
+  if (started !== undefined && finished !== undefined && finished >= started) out.durationMs = finished - started;
+  return out;
+}
+
+export { conversationBlocks, toolTarget, type ConversationBlock } from './live-blocks';

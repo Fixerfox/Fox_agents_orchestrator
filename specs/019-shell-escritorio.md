@@ -17,4 +17,5 @@ La app de escritorio aloja la interfaz y le da acceso, de forma **mínima y vali
 - **R19.9** [M8f] La app ocupa siempre la ventana entera y nunca se desplaza como un todo (ni al enfocar o hacer visible algo): solo se desplazan los paneles. La vista de una ejecución reparte el alto entre el lienzo y las pestañas de abajo para caber en ventanas bajas.
 - **R19.10** [M12] Un error al pintar no deja la ventana vacía: en su sitio sale qué ha pasado y «Reintentar», y el rail y la barra siguen. Las ejecuciones no se ven afectadas.
 - **R19.11** [M12] Si se cae el proceso de la interfaz, la ventana se recarga sola y queda anotado en `logs/crash.log`, en la carpeta de datos de la app, igual que si deja de responder.
+- **R19.12** [M15j] Ese aviso tiene «Detalles» con la traza del error y los componentes en los que estaba, y «Copiar detalles». También queda anotado en `logs/crash.log`. La interfaz se empaqueta conservando los nombres de las funciones (`keepNames`), para que la traza diga dónde falló.
 - **R19.12** [M12] Al recargarse, la interfaz vuelve al proyecto abierto (`currentProject`) sin abrirlo otra vez, para no perder las ejecuciones en marcha.

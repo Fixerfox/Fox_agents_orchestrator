@@ -1,7 +1,9 @@
-import { closeSync, mkdirSync, openSync, writeSync } from 'node:fs';
+import { closeSync, fsyncSync, mkdirSync, openSync, writeSync } from 'node:fs';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import {
+  diagramLabelOf,
+  memoryFiles,
   redactString,
   type Diagram,
   type EventBus,
@@ -10,6 +12,7 @@ import {
   type RunEvent,
   type RunHandle,
   type RunOptions,
+  type RunAcceptance,
   type RunMeta,
   type RunResult,
 } from '@orquestador/core';
@@ -32,6 +35,9 @@ export class RunLogWriter {
   /** Se cumple cuando la ejecución ha terminado y los archivos están cerrados. */
   readonly done: Promise<void> = new Promise((r) => (this.resolveDone = r));
   private readonly meta: RunMeta;
+  /** Para sacar la memoria de la ejecución de sus eventos [R72.20]. */
+  private bus: EventBus | undefined;
+  private labelOf: (nodeId: string, path: readonly string[]) => string = (id) => id;
 
   private constructor(
     private readonly runDir: string,
@@ -60,6 +66,8 @@ export class RunLogWriter {
     init: { diagramId: string; order?: string; diagram?: Diagram },
   ): RunLogWriter {
     const writer = new RunLogWriter(runDir, { runId: bus.runId, ...init });
+    writer.bus = bus;
+    writer.labelOf = diagramLabelOf(init.diagram);
     // fromSeq 1: también recoge lo emitido antes de engancharse.
     const off = bus.subscribe((e) => writer.onEvent(e), { fromSeq: 1 });
     if (writer.finalized) off();
@@ -71,10 +79,32 @@ export class RunLogWriter {
     atomicWriteSync(path.join(this.runDir, 'meta.json'), `${JSON.stringify(this.meta, null, 2)}\n`);
   }
 
+  /** Pasadas de cada paso, para su clave [R74.11]. */
+  private readonly passes = new Map<string, number>();
+
   private onEvent(e: RunEvent): void {
     if (this.fd === undefined) return;
     writeSync(this.fd, `${JSON.stringify(e)}\n`);
     this.meta.eventCount++;
+    // Lo que se reutiliza al reanudar llega al disco antes de seguir [R74.10].
+    if ((e.type === 'node.finished' && e.status === 'succeeded') || e.type === 'decision' || e.type === 'agent.answer') {
+      try {
+        fsyncSync(this.fd);
+      } catch {
+        /* sin fsync (p. ej. un sistema de archivos que no lo admite) se sigue igual */
+      }
+    }
+    if (e.type === 'node.retrying') this.meta.retries = (this.meta.retries ?? 0) + 1;
+    if (e.type === 'node.started') {
+      const k = [...(e.nodePath ?? []), e.nodeId].join('/');
+      this.passes.set(k, (this.passes.get(k) ?? 0) + 1);
+    }
+    if (e.type === 'node.finished' && e.status === 'succeeded') {
+      const k = [...(e.nodePath ?? []), e.nodeId].join('/');
+      this.meta.lastStepKey = `${k}#${this.passes.get(k) ?? 1}`;
+      this.meta.stepsDone = (this.meta.stepsDone ?? 0) + 1;
+      this.writeMeta();
+    }
     if (e.type === 'run.started') {
       this.meta.startedAt = e.ts;
       if (e.resumedFrom) this.meta.resumedFrom = e.resumedFrom;
@@ -88,11 +118,26 @@ export class RunLogWriter {
       this.writeMeta();
     }
     if (e.type === 'deliverable.done') this.writeDeliverable(e);
+    // La memoria se guarda al terminar cada paso y al terminar la ejecución [R72.20].
+    if (e.type === 'node.finished' || e.type === 'run.finished') this.writeMemory();
     if (e.type === 'run.finished') {
       this.meta.status = e.status;
       this.meta.finishedAt = e.ts;
       if (e.reason !== undefined) this.meta.reason = e.reason;
       this.close();
+    }
+  }
+
+  /** `memory.json` y `memory.md`, con escritura atómica; un fallo no rompe el registro [R72.20]. */
+  private writeMemory(): void {
+    if (!this.bus) return;
+    try {
+      const files = memoryFiles(this.bus.history(), this.labelOf);
+      if (files.memory.steps.length === 0 && files.memory.decisions.length === 0 && !files.memory.branch) return;
+      atomicWriteSync(path.join(this.runDir, 'memory.json'), files.json);
+      atomicWriteSync(path.join(this.runDir, 'memory.md'), files.markdown);
+    } catch {
+      // La memoria siempre se puede sacar otra vez de events.jsonl.
     }
   }
 
@@ -236,6 +281,54 @@ export async function markCorrectedBy(runDir: string, newRunId: string): Promise
   atomicWriteSync(path.join(runDir, 'meta.json'), `${JSON.stringify({ ...meta, correctedBy: list }, null, 2)}\n`);
 }
 
+/** Añade un evento al final del registro de una ejecución cerrada. */
+async function appendEvent(runDir: string, runId: string, body: Record<string, unknown>, ts: string): Promise<void> {
+  const { events } = await readRunLog(runDir);
+  const seq = events.reduce((m, e) => Math.max(m, e.seq), 0) + 1;
+  const event = { runId, seq, ts, ...body } as RunEvent;
+  const file = path.join(runDir, 'events.jsonl');
+  // Si el último registro quedó a medias (cierre inesperado), el nuevo va en su propia línea.
+  const text = await fs.readFile(file, 'utf8');
+  await fs.appendFile(file, `${text === '' || text.endsWith('\n') ? '' : '\n'}${JSON.stringify(event)}\n`);
+}
+
+/**
+ * Da por buena una ejecución fallida: añade `run.accepted` a su registro (sin tocar lo anterior) y la marca terminada
+ * bien en `meta.json`, guardando el motivo del fallo [R65.5]. Una que no falló no se toca.
+ */
+export async function acceptRun(runDir: string, acceptance: RunAcceptance, now: Date = new Date()): Promise<boolean> {
+  const meta = await readRunMeta(runDir);
+  if (meta.status !== 'failed') return false;
+  const ts = now.toISOString();
+  const previous = meta.reason !== undefined ? { previousReason: meta.reason } : {};
+  await appendEvent(runDir, meta.runId, { type: 'run.accepted', by: acceptance.by, reason: acceptance.reason, ...previous }, ts);
+  const accepted = { by: acceptance.by, reason: acceptance.reason, at: ts, ...previous };
+  atomicWriteSync(path.join(runDir, 'meta.json'), `${JSON.stringify({ ...meta, status: 'succeeded', reason: acceptance.reason, accepted, eventCount: meta.eventCount + 1 }, null, 2)}\n`);
+  return true;
+}
+
+/** Un evento más al final del registro de una ejecución terminada, con su meta al día [R76.8]. */
+export async function appendRunEvent(runDir: string, body: Record<string, unknown>, now: Date = new Date()): Promise<void> {
+  const meta = await readRunMeta(runDir);
+  await appendEvent(runDir, meta.runId, body, now.toISOString());
+  const usage = body['usage'] as { inputTokens?: number; outputTokens?: number; costUsd?: number } | undefined;
+  const next = { ...meta, eventCount: meta.eventCount + 1, ...(usage ? { usage: { inputTokens: meta.usage.inputTokens + (usage.inputTokens ?? 0), outputTokens: meta.usage.outputTokens + (usage.outputTokens ?? 0), costUsd: meta.usage.costUsd + (usage.costUsd ?? 0) } } : {}) };
+  atomicWriteSync(path.join(runDir, 'meta.json'), `${JSON.stringify(next, null, 2)}\n`);
+}
+
+/** Lo que dijo la persona de un aviso en una ejecución ya terminada [R75.21]. */
+export async function addFeedback(runDir: string, body: { alertSeq: number; verdict: 'false-alarm' | 'confirmed'; note?: string; nodeId?: string }, now: Date = new Date()): Promise<void> {
+  const meta = await readRunMeta(runDir);
+  await appendEvent(runDir, meta.runId, { type: 'supervisor.feedback', ...body }, now.toISOString());
+  atomicWriteSync(path.join(runDir, 'meta.json'), `${JSON.stringify({ ...meta, eventCount: meta.eventCount + 1 }, null, 2)}\n`);
+}
+
+/** Un caso de referencia más en `supervisor/cases.jsonl` [R75.23]. */
+export async function appendSupervisorCase(file: string, c: unknown): Promise<void> {
+  await fs.mkdir(path.dirname(file), { recursive: true });
+  await fs.appendFile(file, `${JSON.stringify(c)}\n`);
+}
+
 export const DISMISS_REASON = 'Se interrumpió y la cancelaste';
 
 /**
@@ -245,14 +338,8 @@ export const DISMISS_REASON = 'Se interrumpió y la cancelaste';
 export async function dismissInterruptedRun(runDir: string, now: Date = new Date()): Promise<boolean> {
   const meta = await readRunMeta(runDir);
   if (meta.status !== 'running') return false;
-  const { events } = await readRunLog(runDir);
-  const seq = events.reduce((m, e) => Math.max(m, e.seq), 0) + 1;
   const ts = now.toISOString();
-  const event = { runId: meta.runId, seq, ts, type: 'run.finished', status: 'cancelled', reason: DISMISS_REASON } as RunEvent;
-  const file = path.join(runDir, 'events.jsonl');
-  // Si el último registro quedó a medias (cierre inesperado), el nuevo va en su propia línea.
-  const text = await fs.readFile(file, 'utf8');
-  await fs.appendFile(file, `${text === '' || text.endsWith('\n') ? '' : '\n'}${JSON.stringify(event)}\n`);
+  await appendEvent(runDir, meta.runId, { type: 'run.finished', status: 'cancelled', reason: DISMISS_REASON }, ts);
   atomicWriteSync(path.join(runDir, 'meta.json'), `${JSON.stringify({ ...meta, status: 'cancelled', finishedAt: ts, reason: DISMISS_REASON, eventCount: meta.eventCount + 1 }, null, 2)}\n`);
   return true;
 }

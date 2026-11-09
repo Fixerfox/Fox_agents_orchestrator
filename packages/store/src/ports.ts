@@ -2,8 +2,8 @@ import path from 'node:path';
 import type { LibraryReader, RunRepository } from '@orquestador/core';
 import type { ProjectStore } from './project';
 import { MAX_INPUT_FILES } from './project-files';
-import { findPreview, snapshotStep } from './previews';
-import { dismissInterruptedRun, listRuns, markCorrectedBy, markResumedBy, readRunDiagram, readRunLog, startLoggedRun } from './run-log';
+import { findConflict, findPreview, snapshotStep } from './previews';
+import { acceptRun, addFeedback, appendRunEvent, appendSupervisorCase, dismissInterruptedRun, listRuns, markCorrectedBy, markResumedBy, readRunDiagram, readRunLog, startLoggedRun } from './run-log';
 
 /** El proyecto como `RunRepository` [R56.5]. */
 export function runRepositoryOf(store: ProjectStore): RunRepository {
@@ -17,8 +17,13 @@ export function runRepositoryOf(store: ProjectStore): RunRepository {
     markResumedBy: (runId, by) => markResumedBy(dir(runId), by),
     markCorrectedBy: (runId, by) => markCorrectedBy(dir(runId), by),
     dismissInterrupted: (runId) => dismissInterruptedRun(dir(runId)),
+    acceptRun: (runId, acceptance) => acceptRun(dir(runId), acceptance),
+    addFeedback: (runId, body) => addFeedback(dir(runId), body),
+    appendEvent: (runId, body) => appendRunEvent(dir(runId), body),
+    addSupervisorCase: (c) => appendSupervisorCase(store.paths.supervisorCasesFile, c),
     snapshotStep: ({ runId, ...args }) => snapshotStep({ runDir: dir(runId), ...args }),
     findPreview: (runId, key, rel) => findPreview(dir(runId), key, rel),
+    findConflict: (runId, rel) => findConflict(dir(runId), rel),
     outputFolder: (runId) => path.join(dir(runId), 'output'),
     workRoot: async () => (await store.getWorkFolder()) ?? store.paths.root,
     inputFiles: (rels) => store.inputFiles(rels),
@@ -35,5 +40,6 @@ export function libraryReaderOf(store: ProjectStore): LibraryReader {
     mcp: () => store.listMcp(),
     diagram: (id) => store.diagrams.load(id),
     diagramIds: () => store.diagrams.list(),
+    projectMemory: () => store.loadProjectMemory(),
   };
 }

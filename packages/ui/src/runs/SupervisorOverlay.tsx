@@ -1,18 +1,13 @@
-import { useState } from 'react';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { BookOpen, Maximize2 } from 'lucide-react';
 import { MODELS } from '@orquestador/core';
-import { Panel, useReactFlow, useStore } from '@xyflow/react';
+import { ViewportPortal, useReactFlow, useStore } from '@xyflow/react';
 import { t, type MessageKey, type SupervisorView } from '@orquestador/editor';
 import { money } from './runFormat';
 
-/** Dónde acaba la tarjeta, desde arriba del lienzo: de ahí sale el haz. */
-const CARD_BOTTOM = 132;
-const EDGE = 16;
-const SCOPE = 12;
-/** Distancia a la que el haz rodea lo que se interpone. */
-const DETOUR = 36;
+/** Distancia entre la tarjeta y el paso más alto, en coordenadas del lienzo [R69.3]. */
+const GAP = 120;
 
-export interface ScreenRect {
+export interface FlowRect {
   x: number;
   y: number;
   width: number;
@@ -26,27 +21,20 @@ export function targetNode(key: string, path: readonly string[]): string | undef
   return parts[path.length];
 }
 
-const clamp = (n: number, min: number, max: number): number => Math.min(Math.max(n, min), Math.max(min, max));
+/** Dónde va el pie de la tarjeta: centrada sobre los pasos y por encima del más alto [R69.3]. */
+export function supervisorAnchor(rects: readonly FlowRect[]): { x: number; y: number } {
+  if (rects.length === 0) return { x: 0, y: 0 };
+  const left = Math.min(...rects.map((r) => r.x));
+  const right = Math.max(...rects.map((r) => r.x + r.width));
+  const top = Math.min(...rects.map((r) => r.y));
+  return { x: (left + right) / 2, y: top - GAP };
+}
 
-/** Haz desde la tarjeta hasta el paso; fuera de la vista, hasta el borde. Rodea lo que se interponga [R60.33][R60.34]. */
-export function beamTo(rect: ScreenRect, view: { width: number; height: number }, others: readonly ScreenRect[] = []): { d: string; end: { x: number; y: number }; offscreen: boolean } {
-  const offscreen = rect.x + rect.width < 0 || rect.x > view.width || rect.y + rect.height < 0 || rect.y > view.height;
-  const start = { x: view.width / 2, y: CARD_BOTTOM };
-  const left = Math.min(start.x, rect.x);
-  const right = Math.max(start.x, rect.x + rect.width);
-  const inTheWay = others.filter((o) => o.y + o.height > start.y && o.y + o.height <= rect.y && o.x < right && o.x + o.width > left);
-  if (!offscreen && inTheWay.length > 0) {
-    // Por el lado con menos que rodear; entra por ese lado del paso.
-    const toRight = Math.max(...inTheWay.map((o) => o.x + o.width)) - start.x <= start.x - Math.min(...inTheWay.map((o) => o.x));
-    const sign = toRight ? 1 : -1;
-    const end = { x: toRight ? rect.x + rect.width + SCOPE : rect.x - SCOPE, y: rect.y + rect.height / 2 };
-    const clear = toRight ? Math.max(...inTheWay.map((o) => o.x + o.width), end.x) : Math.min(...inTheWay.map((o) => o.x), end.x);
-    const lane = clear + sign * DETOUR;
-    return { d: `M${start.x} ${start.y} C${start.x} ${start.y + 50}, ${lane} ${start.y + 10}, ${lane} ${start.y + 70} L${lane} ${end.y - 24} Q${lane} ${end.y}, ${end.x} ${end.y}`, end, offscreen };
-  }
-  const end = { x: clamp(rect.x + rect.width / 2, EDGE, view.width - EDGE), y: clamp(rect.y - SCOPE, EDGE, view.height - EDGE) };
-  const bend = Math.max(40, Math.abs(end.y - start.y) / 2);
-  return { d: `M${start.x} ${start.y} C${start.x} ${start.y + bend}, ${end.x} ${end.y - bend}, ${end.x} ${end.y}`, end, offscreen };
+/** Línea de la tarjeta a lo alto de un paso, en coordenadas del lienzo [R69.3]. */
+export function lineTo(from: { x: number; y: number }, rect: FlowRect): string {
+  const end = { x: rect.x + rect.width / 2, y: rect.y - 6 };
+  const bend = Math.max(30, (end.y - from.y) / 2);
+  return `M${from.x} ${from.y} C${from.x} ${from.y + bend}, ${end.x} ${end.y - bend}, ${end.x} ${end.y}`;
 }
 
 /** «1 paso revisado», «2 pasos revisados». */
@@ -70,7 +58,7 @@ function headline(v: SupervisorView): string {
   return t(`sup.head.${v.status}` as MessageKey);
 }
 
-/** Tarjeta fija del Supervisor: no es un nodo y no se mueve con el lienzo [R60.32]. */
+/** Tarjeta del Supervisor: estado, pasos revisados, avisos, gasto, modelo y rama [R69.3]. */
 export function SupervisorCard({ view: v, onOpen }: { view: SupervisorView; onOpen?: ((key?: string) => void) | undefined }) {
   const metrics = `${reviewedText(v.reviewed)} · ${alertsText(v.alerts)} · ${money(v.costUsd)}`;
   return (
@@ -98,105 +86,80 @@ export function SupervisorCard({ view: v, onOpen }: { view: SupervisorView; onOp
   );
 }
 
-/** La memoria de la ejecución a la vista, la última entrada primero [R60.35]. */
-export function SupervisorMemory({ view: v }: { view: SupervisorView }) {
-  const [open, setOpen] = useState(true);
+/** Orden y nombre corto de cada bloque en la línea plegada [R69.4]. */
+const SHORT_BLOCKS = ['decisions', 'agreements', 'notes', 'alerts', 'route', 'steps'] as const;
+
+/** «2 decisiones · 1 nota · 3 pasos»: cuántas entradas tiene cada bloque [R69.4]. */
+export function memoryCounts(memory: SupervisorView['memory']): string {
+  const count = (b: string) => memory.filter((m) => (m.block ?? 'steps') === b).length;
+  return SHORT_BLOCKS.map((b) => ({ b, n: count(b) }))
+    .filter((x) => x.n > 0)
+    .map((x) => t(`sup.memory.count.${x.b}.${x.n === 1 ? 'one' : 'many'}` as MessageKey, { n: x.n }))
+    .join(' · ');
+}
+
+/** El botón «Memoria» bajo la tarjeta: lo que hay por bloque; abre la memoria completa en un modal. Sin nada anotado no se muestra [R69.4]. */
+export function SupervisorMemory({ view: v, onAll }: { view: SupervisorView; onAll?: (() => void) | undefined }) {
+  if (v.memory.length === 0 && !v.branch) return null;
+  const counts = memoryCounts(v.memory) || v.branch;
   return (
-    <section className="orq-supmem" aria-label={t('rsum.sup.memory')}>
-      <header className="orq-supmem__head">
-        <h3>{t('rsum.sup.memory')}</h3>
-        <button type="button" className="orq-supmem__fold" aria-expanded={open} aria-label={t(open ? 'sup.memory.fold' : 'sup.memory.unfold')} onClick={() => setOpen(!open)}>
-          {open ? <ChevronUp size={14} aria-hidden="true" /> : <ChevronDown size={14} aria-hidden="true" />}
-        </button>
-      </header>
-      {open && (
-        <div className="orq-supmem__body">
-          {v.branch && <p className="orq-supmem__branch">{v.branch}</p>}
-          {v.memory.length === 0 ? (
-            <p className="orq-hint">{t('sup.memory.empty')}</p>
-          ) : (
-            <ol>
-              {[...v.memory].reverse().map((m, i) => (
-                <li key={v.memory.length - i}>
-                  <strong>{m.label}</strong>
-                  {m.text ? `: ${m.text}` : ''}
-                  {m.files.length > 0 && <span className="orq-hint"> ({m.files.join(', ')})</span>}
-                </li>
-              ))}
-            </ol>
-          )}
-        </div>
-      )}
-    </section>
+    <button type="button" className="orq-supmem" aria-label={t('sup.memory.open', { counts: counts ?? '' })} onClick={() => onAll?.()}>
+      <span className="orq-supmem__head">
+        <BookOpen size={13} aria-hidden="true" />
+        <span className="orq-supmem__title">{t('sup.memory.short')}</span>
+        <span className="orq-supmem__counts">{counts}</span>
+        <Maximize2 size={13} aria-hidden="true" />
+      </span>
+    </button>
   );
 }
 
-/** Tarjeta, memoria y haz sobre el lienzo de una ejecución; va dentro de React Flow [R60.32]–[R60.35]. */
-export function SupervisorOverlay({ view, path, onOpen }: { view: SupervisorView; path: readonly string[]; onOpen?: ((key?: string) => void) | undefined }) {
+/** El Supervisor dentro del diagrama: en sus coordenadas, se mueve y hace zoom con él, con líneas a los pasos en revisión [R69.3]. */
+export function SupervisorOverlay({ view, path, onOpen, onMemory }: { view: SupervisorView; path: readonly string[]; onOpen?: ((key?: string) => void) | undefined; onMemory?: (() => void) | undefined }) {
   const flow = useReactFlow();
-  const [tx, ty, zoom] = useStore((s) => s.transform);
-  const width = useStore((s) => s.width);
-  const height = useStore((s) => s.height);
-  const seen = new Set<string>();
-  const screen = (id: string): ScreenRect | undefined => {
-    const node = flow.getInternalNode(id);
-    if (!node?.measured.width || !node.measured.height) return undefined;
+  // Vuelve a dibujarse cuando los pasos se miden o se mueven.
+  useStore((s) => {
+    let sig = '';
+    s.nodeLookup?.forEach((n) => {
+      sig += `${n.id}:${n.measured?.width ?? 0}x${n.measured?.height ?? 0}@${n.internals.positionAbsolute.x},${n.internals.positionAbsolute.y};`;
+    });
+    return sig;
+  });
+  const rects = new Map<string, FlowRect>();
+  for (const n of flow.getNodes()) {
+    if (n.type !== 'orq') continue;
+    const node = flow.getInternalNode(n.id);
+    if (!node?.measured.width || !node.measured.height) continue;
     const at = node.internals.positionAbsolute;
-    return { x: at.x * zoom + tx, y: at.y * zoom + ty, width: node.measured.width * zoom, height: node.measured.height * zoom };
-  };
-  const steps = flow.getNodes().filter((n) => n.type === 'orq');
-  const beams = view.targets.flatMap((target) => {
+    rects.set(n.id, { x: at.x, y: at.y, width: node.measured.width, height: node.measured.height });
+  }
+  const anchor = supervisorAnchor([...rects.values()]);
+  const seen = new Set<string>();
+  const lines = view.targets.flatMap((target) => {
     const id = targetNode(target.key, path);
-    const rect = id !== undefined && !seen.has(id) ? screen(id) : undefined;
+    const rect = id !== undefined && !seen.has(id) ? rects.get(id) : undefined;
     if (!id || !rect) return [];
     seen.add(id);
-    const others = steps.filter((n) => n.id !== id).flatMap((n) => screen(n.id) ?? []);
-    return [{ id, key: target.key, warn: target.warn, rect, ...beamTo(rect, { width, height }, others) }];
+    return [{ id, key: target.key, warn: target.warn, rect, d: lineTo(anchor, rect) }];
   });
   return (
-    <>
-      <div className="orq-sup__layer" aria-hidden="true">
-        <svg width={width} height={height}>
-          {beams.map((b) => (
-            <g key={b.id} className={b.warn ? 'is-warn' : undefined}>
-              <path className="orq-sup__glow" d={b.d} />
-              <path className="orq-sup__beam" d={b.d} />
-            </g>
-          ))}
-        </svg>
-        {beams.map((b) => (
-          <span key={b.id} className={`orq-sup__pulse${b.warn ? ' is-warn' : ''}`} style={{ offsetPath: `path('${b.d}')` }} />
+    <ViewportPortal>
+      <svg className="orq-sup__lines" aria-hidden="true">
+        {lines.map((l) => (
+          <path key={l.id} className={l.warn ? 'is-warn' : undefined} d={l.d} />
         ))}
-        {beams
-          .filter((b) => !b.offscreen)
-          .map((b) => (
-            <div key={b.id} className={`orq-sup__scope${b.warn ? ' is-warn' : ''}`} style={{ left: b.rect.x - SCOPE, top: b.rect.y - SCOPE, width: b.rect.width + SCOPE * 2, height: b.rect.height + SCOPE * 2 }}>
-              <i />
-              <i />
-              <i />
-              <i />
-              {!b.warn && <span>{t('sup.tag.review')}</span>}
-            </div>
-          ))}
-      </div>
-      {beams
-        .filter((b) => b.warn && !b.offscreen)
-        .map((b) => (
-          <button key={b.id} type="button" className="orq-sup__tag" style={{ left: b.rect.x + b.rect.width + SCOPE, top: b.rect.y - SCOPE - 26 }} onClick={() => onOpen?.(b.key)}>
+      </svg>
+      {lines
+        .filter((l) => l.warn)
+        .map((l) => (
+          <button key={l.id} type="button" className="orq-sup__tag nodrag nopan" style={{ transform: `translate(${l.rect.x + l.rect.width}px, ${l.rect.y - 8}px) translate(-100%, -100%)` }} onClick={() => onOpen?.(l.key)}>
             {t('sup.tag.alert')}
           </button>
         ))}
-      {beams
-        .filter((b) => b.offscreen)
-        .map((b) => (
-          <button key={b.id} type="button" className={`orq-sup__goto${b.warn ? ' is-warn' : ''}`} style={{ left: b.end.x, top: b.end.y }} aria-label={t('sup.goto')} title={t('sup.goto')} onClick={() => void flow.fitView({ nodes: [{ id: b.id }], duration: 300, maxZoom: 1 })} />
-        ))}
-      <Panel position="top-center" className="orq-sup__panel">
+      <div className="orq-sup__anchor nodrag nopan nowheel" style={{ transform: `translate(${anchor.x}px, ${anchor.y}px) translate(-50%, -100%)` }}>
         <SupervisorCard view={view} onOpen={onOpen} />
-      </Panel>
-      <Panel position="top-right" className="orq-sup__panel">
-        <SupervisorMemory view={view} />
-      </Panel>
-    </>
+        <SupervisorMemory view={view} onAll={onMemory} />
+      </div>
+    </ViewportPortal>
   );
 }

@@ -1,5 +1,5 @@
-import { deliverableProblems, isRelativeInside } from '@orquestador/core';
-import type { DeliverableSpec, Diagram, Id, PendingQuestion, RunEvent } from '@orquestador/core';
+import { checkProblems, deliverableProblems, isRelativeInside, memoryEntryProblems, readUnanswered } from '@orquestador/core';
+import type { CheckResult, DeliverableSpec, Diagram, Id, MemoryEntry, MemoryKind, PendingQuestion, RuleStats, RunEvent, StepCheck, UnansweredPolicy } from '@orquestador/core';
 import { UNHANDLED, isObject, safeId, type RequestCheck } from './check';
 import { CHANNELS } from './contract';
 import type { ApiResult } from './result';
@@ -17,6 +17,8 @@ export interface StartRunRequest {
   attachments?: string[];
   /** Si ya hay otra de este diagrama en marcha: a la vez (por defecto) o en cola [R52.3]. */
   whenBusy?: 'parallel' | 'queue';
+  /** Qué hacer si nadie responde a una pregunta de esta ejecución [R70.19]. */
+  unanswered?: UnansweredPolicy;
 }
 
 /** Lo que devuelve lanzar: la ejecución, o el lanzamiento en cola [R52.4]. */
@@ -67,6 +69,10 @@ export interface RunSummary {
   /** Ejecución que esta corrige, y las que la corrigieron [R53.14]. */
   correctedFrom?: string;
   correctedBy?: string[];
+  /** Dada por buena tras fallar [R65.7]. */
+  accepted?: { by: 'user' | 'assistant'; reason: string; at: string; previousReason?: string };
+  /** Reintentos de la ejecución [R77.19]. */
+  retries?: number;
 }
 /** Vista previa de un archivo que hizo un paso [R54.4]. */
 export interface FilePreview {
@@ -121,6 +127,20 @@ export interface RunsApi {
   resumeRun(runId: string): Promise<ApiResult<{ runId: string }>>;
   /** Cierra como cancelada una ejecución interrumpida [R41.3]. */
   dismissRun(runId: string): Promise<ApiResult<boolean>>;
+  /** «Dar por bueno» una ejecución fallida que no está en marcha [R65.6]. */
+  acceptRun(req: { runId: string; by: 'user' | 'assistant'; reason: string }): Promise<ApiResult<boolean>>;
+  /** «No era un problema» o «Sí lo era» en un aviso del Supervisor [R75.21]. */
+  supervisorFeedback(req: { runId: string; alertSeq: number; verdict: 'false-alarm' | 'confirmed'; note?: string }): Promise<ApiResult<boolean>>;
+  /** Avisos por regla y cuántos se marcaron, en la ejecución y en las últimas 50 [R75.22]. */
+  supervisorStats(runId: string): Promise<ApiResult<{ run: RuleStats[]; recent: RuleStats[] }>>;
+  /** «Ejecutar ahora» una comprobación desde el lateral del paso [R75.24]. */
+  tryCheck(check: StepCheck): Promise<ApiResult<CheckResult>>;
+  /** «Guardar», «Editar y guardar» o «Descartar» una propuesta de memoria [R76.10]. */
+  decideMemory(req: { runId: string; proposalId: string; decision: 'save' | 'discard'; edited?: { title?: string; text?: string } }): Promise<ApiResult<MemoryEntry[]>>;
+  /** La memoria del proyecto [R76.21]. */
+  projectMemory(): Promise<ApiResult<MemoryEntry[]>>;
+  /** Añadir, editar, archivar o restaurar una entrada [R76.21]. */
+  saveMemoryEntry(entry: { id?: string; kind: MemoryKind; scope: string; title: string; text: string; status?: 'active' | 'archived'; by?: 'user' | 'assistant' }): Promise<ApiResult<MemoryEntry[]>>;
   /** Pasos que se pueden corregir de una ejecución que no está en marcha y cuál propone el asistente [R53.12]. */
   proposeCorrection(req: { runId: string; text: string; prefer?: string }): Promise<ApiResult<CorrectionProposal>>;
   /** Vista previa de un archivo que hizo el paso `key` (`ruta/id`) en una ejecución [R54.4]. */
@@ -167,7 +187,8 @@ export function parseRunsRequest(channel: string, payload: unknown, { bad, exact
       return undefined;
     case CHANNELS.startRun: {
       if (!isObject(payload)) throw bad('se esperaba un objeto');
-      exact(payload, ['diagramId', 'order', 'maxTokens', 'maxCostUsd', 'deliverable', 'files', 'attachments', 'whenBusy']);
+      exact(payload, ['diagramId', 'order', 'maxTokens', 'maxCostUsd', 'deliverable', 'files', 'attachments', 'whenBusy', 'unanswered']);
+      if (payload.unanswered !== undefined && !readUnanswered(payload.unanswered)) throw bad('unanswered no válido');
       if (payload.whenBusy !== undefined && payload.whenBusy !== 'parallel' && payload.whenBusy !== 'queue') throw bad('whenBusy no válido');
       // Archivos de la entrada: rutas relativas y adjuntos ya guardados [R48.6].
       const files = payload.files ?? [];
@@ -198,6 +219,58 @@ export function parseRunsRequest(channel: string, payload: unknown, { bad, exact
     case CHANNELS.unqueue:
       if (!safeId(payload)) throw bad('runId no válido');
       return payload;
+    case CHANNELS.acceptRun: {
+      if (!isObject(payload)) throw bad('se esperaba un objeto');
+      exact(payload, ['runId', 'by', 'reason']);
+      if (!safeId(payload.runId)) throw bad('runId no válido');
+      if (payload.by !== 'user' && payload.by !== 'assistant') throw bad('by no válido');
+      str(payload.reason, 'reason', 2000, 1);
+      return payload;
+    }
+    case CHANNELS.supervisorFeedback: {
+      if (!isObject(payload)) throw bad('se esperaba un objeto');
+      exact(payload, ['runId', 'alertSeq', 'verdict', 'note']);
+      if (!safeId(payload.runId)) throw bad('runId no válido');
+      if (!Number.isInteger(payload.alertSeq) || (payload.alertSeq as number) < 1) throw bad('alertSeq no válido');
+      if (payload.verdict !== 'false-alarm' && payload.verdict !== 'confirmed') throw bad('verdict no válido');
+      if (payload.note !== undefined) str(payload.note, 'note', 1000);
+      return payload;
+    }
+    case CHANNELS.supervisorStats:
+      if (!safeId(payload)) throw bad('runId no válido');
+      return payload;
+    case CHANNELS.decideMemory: {
+      if (!isObject(payload)) throw bad('se esperaba un objeto');
+      exact(payload, ['runId', 'proposalId', 'decision', 'edited']);
+      if (!safeId(payload.runId)) throw bad('runId no válido');
+      if (!safeId(payload.proposalId)) throw bad('proposalId no válido');
+      if (payload.decision !== 'save' && payload.decision !== 'discard') throw bad('decision no válida');
+      if (payload.edited !== undefined) {
+        if (!isObject(payload.edited)) throw bad('edited no válido');
+        exact(payload.edited, ['title', 'text']);
+        if (payload.edited.title !== undefined) str(payload.edited.title, 'title', 80);
+        if (payload.edited.text !== undefined) str(payload.edited.text, 'text', 600);
+      }
+      return payload;
+    }
+    case CHANNELS.projectMemory:
+      if (payload !== undefined && payload !== null) throw bad('no admite argumentos');
+      return undefined;
+    case CHANNELS.saveMemoryEntry: {
+      if (!isObject(payload)) throw bad('se esperaba un objeto');
+      exact(payload, ['id', 'kind', 'scope', 'title', 'text', 'status', 'by']);
+      if (payload.by !== undefined && payload.by !== 'user' && payload.by !== 'assistant') throw bad('by no válido');
+      if (payload.id !== undefined && !safeId(payload.id)) throw bad('id no válido');
+      const problems = memoryEntryProblems(payload as Partial<MemoryEntry>);
+      if (problems.length > 0 && payload.status !== 'archived') throw bad(problems[0]!);
+      if (payload.status !== undefined && payload.status !== 'active' && payload.status !== 'archived') throw bad('status no válido');
+      return payload;
+    }
+    case CHANNELS.tryCheck: {
+      const problems = checkProblems([payload]);
+      if (problems.length > 0) throw bad(problems[0]!);
+      return payload;
+    }
     case CHANNELS.proposeCorrection: {
       if (!isObject(payload)) throw bad('se esperaba un objeto');
       exact(payload, ['runId', 'text', 'prefer']);

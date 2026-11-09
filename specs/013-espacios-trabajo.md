@@ -2,6 +2,8 @@
 
 **Estado:** Implementada (gestor; integración con el orquestador en M4) · **Hito:** M3b · **Paquete:** `workspace`
 
+> **Nota (08/11/2026):** el gestor nunca llegó a conectarse al orquestador. La integración, y los cambios a R13.1–R13.3, están en [SPEC-073](073-ramas-aisladas-y-fusion.md).
+
 ## Propósito
 Evitar que agentes en paralelo se pisen los archivos del proyecto, fusionar al terminar y conservar instantáneas por iteración de bucle.
 

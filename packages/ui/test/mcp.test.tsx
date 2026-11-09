@@ -7,7 +7,7 @@ import { newAgent, newMcpServer } from '@orquestador/core';
 import { createDiagram } from '@orquestador/editor';
 import { App } from '../src/App';
 import { createMemoryApi, type MemoryApiOptions } from '../src/memoryApi';
-import { goLib } from './nav';
+import { goLib, stepTab } from './nav';
 
 async function mount(options: MemoryApiOptions = {}) {
   const api = createMemoryApi([createDiagram('principal', 'Principal')], { agents: [{ ...newAgent('pintor', 'Pintor'), description: 'Pinta' }], ...options });
@@ -72,6 +72,8 @@ describe('SPEC-030 · MCP en la interfaz', () => {
     const rail = within(screen.getByRole('navigation', { name: 'Secciones' }));
     await userEvent.click(rail.getByRole('button', { name: 'Diseñador' }));
     await userEvent.click(screen.getByRole('button', { name: 'Añadir «Pintor» al diagrama' }));
+    await screen.findByRole('tab', { name: 'Conocimiento' });
+    await stepTab('Conocimiento');
     expect(within(await screen.findByRole('group', { name: 'Solo en este paso' })).getByRole('button', { name: /MCP/ })).toBeTruthy();
   });
 });

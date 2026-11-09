@@ -37,7 +37,7 @@ describe('SPEC-044 · la ejecución en un modal', () => {
     await userEvent.click(rail().getByRole('button', { name: 'Trabajos' }));
     await userEvent.click(screen.getByRole('button', { name: 'Ver resumen de la ejecución' }));
     const m = modal();
-    expect(m.getAllByRole('tab').map((x) => x.textContent)).toEqual(['Resumen', 'Cronograma', 'Historial', 'Resultado', 'Archivos', 'Auditoría']);
+    expect(m.getAllByRole('tab').map((x) => x.textContent)).toEqual(['Resumen', 'Cronograma', 'Historial', 'Resultado', 'Archivos', 'Auditoría', 'Rendimiento']);
     expect(m.getByRole('tab', { name: 'Resumen' }).getAttribute('aria-selected')).toBe('true');
     expect(m.getByRole('region', { name: 'Lo que se pidió' })).toBeTruthy();
     expect(m.getByRole('button', { name: 'Abrir en Ejecuciones' })).toBeTruthy();
@@ -66,7 +66,7 @@ describe('SPEC-044 · la ejecución en un modal', () => {
     await userEvent.click(rail().getByRole('button', { name: /Ejecuc/ }));
     await userEvent.click(await screen.findByRole('button', { name: 'Ver resumen' }));
     const m = modal();
-    expect(m.getAllByRole('tab')).toHaveLength(6);
+    expect(m.getAllByRole('tab')).toHaveLength(7);
     expect(m.queryByRole('button', { name: 'Abrir en Ejecuciones' })).toBeNull();
     await userEvent.click(m.getByRole('tab', { name: 'Archivos' }));
     expect(m.getByRole('tabpanel', { name: 'Archivos' })).toBeTruthy();

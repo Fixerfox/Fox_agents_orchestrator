@@ -6,8 +6,9 @@ import { execFile, spawn } from 'node:child_process';
 import { ASSISTANT_EVENTS_CHANNEL, CHANNELS, OPEN_RUN_CHANNEL, RUN_EVENTS_CHANNEL, TERMINAL_EVENTS_CHANNEL } from '@orquestador/editor';
 import { sdkCreateAppServer, sdkQuery } from '@orquestador/claude';
 import { ApiKeyVault, McpSecretVault, RecentStore, SettingsStore } from '@orquestador/store';
+import { crashLine } from './crash';
 import { Background } from './background';
-import { composeOrchestrator } from './composition';
+import { cleanupSpaces, composeOrchestrator } from './composition';
 import { DesktopHandlers } from './handlers';
 import { TerminalService, type SpawnPty } from './terminal';
 import { parseWindowTone, secureWebContents, titleBarOverlay, windowOptions, TITLEBAR, WINDOW_TONE_CHANNEL } from './window';
@@ -17,6 +18,7 @@ import { APP_USER_MODEL_ID, appIdRegistration } from './windows-app-id';
 if (!app.requestSingleInstanceLock()) app.exit(0);
 let mainWindow: BrowserWindow | undefined;
 let tray: Tray | undefined;
+let trayBase: { open(): void; quit(): void } | undefined;
 /** Electron suelta el aviso si nadie lo guarda, y entonces pulsarlo no hace nada [R61.11]. */
 const notices = new Set<Notification>();
 const ICON = join(__dirname, 'icon.png');
@@ -71,7 +73,8 @@ const handlers = new DesktopHandlers({
     if (err) throw new Error(err);
   },
   claudeQuery: sdkQuery,
-  createOrchestrator: (ctx) => composeOrchestrator(ctx, sdkQuery),
+  // Los espacios de las ramas en paralelo, en los datos de la app [R73.6].
+  createOrchestrator: (ctx) => composeOrchestrator({ ...ctx, spacesRoot: join(dataDir(), 'spaces'), createAppServer: sdkCreateAppServer }, sdkQuery),
   preinstallSpecKit: true,
   settings: new SettingsStore(join(dataDir(), 'config')),
   recents: new RecentStore(join(dataDir(), 'config')),
@@ -87,6 +90,8 @@ const handlers = new DesktopHandlers({
     if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(RUN_EVENTS_CHANNEL, { runId, events });
   },
   watchRun: (event, diagram) => background.onRunEvent(event, diagram),
+  offerInterrupted: (runs, act) => background.offerInterrupted(runs, act),
+  memoryProposals: (n) => background.memoryProposals(n),
   async pickSkillFiles(kind) {
     const res = await dialog.showOpenDialog({
       title: kind === 'folder' ? 'Elige la carpeta de referencia' : 'Elige los archivos de referencia',
@@ -125,8 +130,15 @@ const background = new Background({
   createTray({ open, quit }) {
     tray = new Tray(nativeImage.createFromPath(ICON).resize({ width: process.platform === 'win32' ? 16 : 24 }));
     tray.setToolTip('Orquestador');
+    trayBase = { open, quit };
     tray.setContextMenu(Menu.buildFromTemplate([{ label: 'Abrir Orquestador', click: open }, { type: 'separator' }, { label: 'Salir', click: quit }]));
     tray.on('click', open);
+  },
+  // Las interrumpidas, con «Reanudar» y «Descartar» [R74.12].
+  setTrayRuns(items) {
+    if (!tray || !trayBase) return;
+    const runs = items.map((i) => ({ label: i.label, submenu: [{ label: 'Reanudar', click: i.resume }, { label: 'Descartar', click: i.dismiss }] }));
+    tray.setContextMenu(Menu.buildFromTemplate([{ label: 'Abrir Orquestador', click: trayBase.open }, ...(runs.length > 0 ? [{ type: 'separator' as const }, ...runs] : []), { type: 'separator' }, { label: 'Salir', click: trayBase.quit }]));
   },
   notify({ title, body }, onClick) {
     if (!Notification.isSupported()) return;
@@ -175,6 +187,11 @@ function createWindow(): void {
     if (details.reason !== 'clean-exit' && !win.isDestroyed()) win.reload();
   });
   win.on('unresponsive', () => noteCrash('la interfaz no responde'));
+  // Un error al pintar también se apunta, con su traza [R19.12].
+  win.webContents.on('console-message', (...args: unknown[]) => {
+    const message = crashLine(args);
+    if (message) noteCrash(message);
+  });
   // Sin menú del sistema (File, Edit…) en Windows y Linux [R19.8].
   if (process.platform !== 'darwin') win.removeMenu();
   void win.loadURL(indexUrl);
@@ -200,6 +217,8 @@ app.whenReady().then(() => {
     return abs ? net.fetch(pathToFileURL(abs).toString()) : new Response('No encontrado', { status: 404 });
   });
   createWindow();
+  // Espacios de ramas que quedaron de un cierre inesperado [R73.18].
+  void new RecentStore(join(dataDir(), 'config')).list().then((recent) => cleanupSpaces(join(dataDir(), 'spaces'), recent.map((r) => r.root)));
   // La bandeja es para Windows y Linux, los sistemas de la app.
   if (process.platform !== 'darwin') background.start();
   app.on('activate', () => {

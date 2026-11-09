@@ -17,7 +17,8 @@ vi.mock('@xyflow/react', async (original) => ({
   ...(await original<typeof import('@xyflow/react')>()),
   Handle: () => null,
   Panel: ({ children }: { children: ReactNode }) => <div>{children}</div>,
-  useStore: (pick: (s: { transform: number[]; width: number; height: number }) => unknown) => pick({ transform: [0, 0, 1], width: 1000, height: 800 }),
+  ViewportPortal: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  useStore: (pick: (s: { transform: number[]; width: number; height: number; nodeLookup: Map<string, unknown> }) => unknown) => pick({ transform: [0, 0, 1], width: 1000, height: 800, nodeLookup: new Map() }),
   useReactFlow: () => ({
     getNodes: () => [{ id: 'a', type: 'orq' }],
     getInternalNode: () => ({ measured: { width: 200, height: 80 }, internals: { positionAbsolute: { x: 300, y: 300 } } }),
@@ -175,5 +176,45 @@ describe('pestaña Supervisor [R60.38]', () => {
     await userEvent.click(screen.getByRole('button', { name: /Terminó sin dejar nada/ }));
     expect(screen.getByRole('tab', { name: /Supervisor/ }).getAttribute('aria-selected')).toBe('true');
     expect(screen.getByText('Terminó sin dejar nada').closest('details')!.open).toBe(true);
+  });
+});
+
+describe('SPEC-069 · memoria en tarjetas y su pestaña', () => {
+  const note = (nodeId: string, text: string, files: string[] = []) => ev({ type: 'supervisor.note', nodeId, text, files });
+
+  it('[R69.6] el modal tiene «Memoria» junto a «Supervisor» cuando hay memoria, y no sin ella', async () => {
+    modal([started, note('a', 'Creó la spec')]);
+    const tabs = screen.getAllByRole('tab').map((x) => x.textContent);
+    expect(tabs.slice(-2)).toEqual(['Memoria', 'Supervisor']);
+    await userEvent.click(screen.getByRole('tab', { name: 'Memoria' }));
+    expect(screen.getByRole('tabpanel', { name: 'Memoria' }).textContent).toContain('Creó la spec');
+    document.body.innerHTML = '';
+    modal([started]);
+    expect(screen.queryByRole('tab', { name: 'Memoria' })).toBeNull();
+  });
+
+  it('[R69.5] tarjetas, la última primero, con marca de avisos, ficheros «+N» y filtro «Con avisos»', async () => {
+    modal([started, note('b', 'Planificó', ['a.md', 'b.md', 'c.md']), branch, note('a', 'Especificó')], { initialTab: 'memory' });
+    // El aviso abierto va en su bloque; los pasos, en el suyo, el último primero [R72.22].
+    expect(screen.getByRole('region', { name: 'Avisos abiertos' })).toBeTruthy();
+    const cards = [...screen.getByRole('region', { name: 'Lo que hizo cada paso' }).querySelectorAll('.orq-memcard')];
+    expect(cards.map((c) => c.querySelector('strong')!.textContent)).toEqual(['Especificador', 'Planificador']);
+    expect(cards[0]!.classList.contains('is-warn')).toBe(true);
+    expect(cards[1]!.classList.contains('is-warn')).toBe(false);
+    expect(cards[1]!.textContent).toContain('+1');
+    await userEvent.click(screen.getByRole('button', { name: 'Con avisos · 2' }));
+    expect([...document.querySelectorAll('.orq-memcard strong')].map((x) => x.textContent)).toEqual(['Especificador', 'Especificador']);
+    await userEvent.click(screen.getByRole('button', { name: 'Todas · 3' }));
+    expect(document.querySelectorAll('.orq-memcard')).toHaveLength(3);
+  });
+
+  it('[R69.3] en el diagrama: líneas a los pasos en revisión y «Con aviso» en los que tienen aviso', () => {
+    const events = [started, ev({ type: 'node.started', nodeId: 'a' }), branch, ev({ type: 'supervisor.reviewing', nodeId: 'a' })];
+    const { container } = render(<SupervisorOverlay view={supervisorView(events, true, labels)!} path={[]} />);
+    const paths = container.querySelectorAll('.orq-sup__lines path');
+    expect(paths).toHaveLength(1);
+    expect(paths[0]!.getAttribute('class')).toBe('is-warn');
+    expect(container.querySelector('.orq-sup__anchor')!.classList.contains('nodrag')).toBe(true);
+    expect(screen.getByRole('button', { name: 'Con aviso' })).toBeTruthy();
   });
 });

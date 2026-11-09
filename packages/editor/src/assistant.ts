@@ -8,6 +8,8 @@ export interface AssistantToolSpec {
   params: Record<string, AssistantParam>;
   /** Necesita «Permitir» del usuario antes de hacerse [R29.3]. */
   destructive?: boolean;
+  /** Pide «Permitir» siempre, aunque el proyecto no pida confirmar acciones [R65.9]. */
+  alwaysConfirm?: boolean;
   /** Solo consulta: no cambia nada. */
   readOnly?: boolean;
   /** Espera a que el usuario escriba algo en la tarjeta (un secreto) [R30.12]. */
@@ -44,6 +46,23 @@ export const ASSISTANT_TOOLS: readonly AssistantToolSpec[] = [
     description: 'Reanuda una ejecución interrumpida, fallida o cancelada (canResume en list_runs): arranca otra que reutiliza lo que ya terminó bien y sigue desde donde se quedó. Gasta tokens: pide permiso al usuario.',
     params: { runId: s('Id de la ejecución que reanudar') },
     destructive: true,
+  },
+  {
+    name: 'accept_run',
+    description:
+      'Da por buena una ejecución fallida (status failed): queda como terminada bien y aceptada por el asistente, y se guarda por qué había fallado. Úsala SOLO cuando la persona te lo pida expresamente (p. ej. «dala por buena», «el fallo no importa»), nunca por iniciativa propia. reason: por qué se acepta, con las palabras de la persona. Pide permiso siempre.',
+    params: { runId: s('Id de la ejecución fallida (de list_runs)'), reason: s('Por qué se da por buena') },
+    destructive: true,
+    alwaysConfirm: true,
+  },
+  { name: 'list_memory', description: 'Lista la memoria del proyecto: lo que se aprendió en ejecuciones anteriores (id, tipo, ámbito, título, texto, estado).', params: { query: s('Texto que buscar', true) }, readOnly: true },
+  {
+    name: 'save_memory',
+    description:
+      'Guarda o cambia una entrada de la memoria del proyecto, que reciben los agentes en los pasos siguientes. Solo lo que la persona dijo o pidió recordar, general para el proyecto. kind: convention, preference, lesson o false-alarm. scope: project, diagram:<id> o agent:<id>. Sin id crea una; con id la cambia; status archived la archiva. Pide permiso siempre.',
+    params: { id: s('Id de la entrada que cambiar', true), kind: s('Tipo'), scope: s('Ámbito'), title: s('Título (80 caracteres como mucho)'), text: s('Qué hay que recordar (600 como mucho)'), status: s('active o archived', true) },
+    destructive: true,
+    alwaysConfirm: true,
   },
   { name: 'get_diagram', description: 'Describe el diagrama abierto: pasos (id, tipo, nombre, agente, tarea) y conexiones.', params: {}, readOnly: true },
   {

@@ -11,6 +11,7 @@ import { NodePanel } from '../src/runs/NodePanel';
 import { ResultsPanel } from '../src/runs/ResultsPanel';
 import { RunDialog } from '../src/runs/RunDialog';
 import { Toolbar } from '../src/shell/Toolbar';
+import { showConversation } from './nav';
 import { createMemoryApi } from '../src/memoryApi';
 
 const AGENTS = [{ id: 'creador', name: 'Creador' }, { id: 'revisor', name: 'Revisor' }];
@@ -228,6 +229,7 @@ describe('aplicación en vivo [R15.1][R15.5][R15.8][R18.12][R18.13]', () => {
     await screen.findByLabelText(/^Agente «creador».*correcto/);
     await lastRunOf(/^Agente «creador»/);
     const panel = await screen.findByRole('region', { name: 'Ejecución de «creador»' });
+    await showConversation(within(panel));
     expect(within(panel).getByText('haz un juego')).toBeTruthy();
     expect(within(panel).getAllByText('salida de creador').length).toBeGreaterThan(0);
     expect(screen.getByText(/tokens · .* \$/, { selector: '.orq-usage' })).toBeTruthy();

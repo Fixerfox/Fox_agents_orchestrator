@@ -3,7 +3,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import type { AgentQuestion } from '@orquestador/core';
 import type { PermissionLevel } from '@orquestador/core';
-import { allowCommandForRun, classifyCommand, grantKey, sensitiveCommand } from './commands';
+import { APP_KILL_DENY, ISOLATED_GIT_DENY, allowCommandForRun, killsAppProcess, classifyCommand, grantKey, sensitiveCommand, writesGit } from './commands';
 import { AUTO_TOOLS } from './connection';
 import type { CanUseTool, PermissionResult, PreToolUseHook } from './sdk-types';
 
@@ -190,6 +190,75 @@ export function withScope(scope: readonly string[] | undefined, root: string, no
   };
 }
 
+/** Motivo al escribir desde el verificador [R75.14]. */
+export const VERIFIER_DENY = 'Eres el verificador: puedes leer y ejecutar comandos, pero no editar archivos. Cuenta lo que haya que arreglar en tu informe.';
+
+/** El verificador no edita archivos; los comandos sí se ejecutan [R75.14]. */
+export function withVerifier(on: boolean | undefined, note: WritePolicyDeps['note'], inner: (tool: string, input: Record<string, unknown>) => Promise<PermissionResult>): (tool: string, input: Record<string, unknown>) => Promise<PermissionResult> {
+  if (!on) return inner;
+  return async (tool, input) => {
+    if ((WRITE_TOOLS as readonly string[]).includes(tool)) {
+      note?.({ kind: 'denied', path: pathOf(input) ?? '', reason: 'verificador' });
+      return deny(VERIFIER_DENY);
+    }
+    return inner(tool, input);
+  };
+}
+
+/** Motivo al escribir en la carpeta de trabajo desde una rama en paralelo [R73.8]. */
+export const ISOLATED_DENY =
+  'Este paso trabaja en una copia aislada de la carpeta porque corre en paralelo con otros: escribe en tu carpeta actual, no en la original. Lo tuyo se junta con lo de las otras ramas al terminar.';
+
+/** Ningún agente cierra la app matando por nombre sus procesos, con ningún permiso [R79.2]. */
+export function withSelfProtection<P extends (tool: string, input: Record<string, unknown>, id?: string) => Promise<PermissionResult>>(note: WritePolicyDeps['note'], inner: P): P {
+  return (async (tool: string, input: Record<string, unknown>, id?: string) => {
+    const command = tool === 'Bash' && typeof input['command'] === 'string' ? (input['command'] as string) : undefined;
+    if (command !== undefined && killsAppProcess(command)) {
+      note?.({ kind: 'denied', path: command, reason: APP_KILL_DENY });
+      return deny(APP_KILL_DENY);
+    }
+    return inner(tool, input, id);
+  }) as P;
+}
+
+/**
+ * Rama en paralelo [R73.8][R73.9]: nunca se escribe en la carpeta original (también con «Sin preguntar nunca») ni se
+ * cambia git. Lo demás, como siempre.
+ */
+/**
+ * Si el comando nombra la carpeta: en Windows también escrita con `/` y sin distinguir mayúsculas,
+ * porque Bash acepta `C:/…` igual que `C:\…` [R73.8].
+ */
+export function namesFolder(command: string, folder: string, platform: NodeJS.Platform = process.platform): boolean {
+  if (platform !== 'win32') return command.includes(folder);
+  const text = command.toLowerCase().replaceAll('\\', '/');
+  return text.includes(folder.toLowerCase().replaceAll('\\', '/'));
+}
+
+export function withIsolation(original: string | undefined, note: WritePolicyDeps['note'], inner: (tool: string, input: Record<string, unknown>) => Promise<PermissionResult>, root: string): (tool: string, input: Record<string, unknown>) => Promise<PermissionResult> {
+  if (original === undefined) return inner;
+  return async (tool, input) => {
+    const target = (WRITE_TOOLS as readonly string[]).includes(tool) ? pathOf(input) : undefined;
+    if (target !== undefined && sameOrInside(path.resolve(root, target), original)) {
+      note?.({ kind: 'denied', path: target, reason: 'carpeta original de una rama en paralelo' });
+      return deny(ISOLATED_DENY);
+    }
+    if (tool === 'Bash' && typeof input['command'] === 'string') {
+      const command = input['command'] as string;
+      if (writesGit(command)) {
+        note?.({ kind: 'denied', path: command, reason: ISOLATED_GIT_DENY });
+        return deny(ISOLATED_GIT_DENY);
+      }
+      // Un comando que nombra la carpeta original y no solo lee también rompería el aislamiento.
+      if (namesFolder(command, original) && !(await classifyCommand(command, original, original, { readOnly: true })).safe) {
+        note?.({ kind: 'denied', path: command, reason: 'carpeta original de una rama en paralelo' });
+        return deny(ISOLATED_DENY);
+      }
+    }
+    return inner(tool, input);
+  };
+}
+
 /**
  * Política de herramientas [R31.11][R47.9]: leer siempre; nada se escribe fuera de la carpeta [R31.5]; crear archivos
  * nuevos dentro, siempre. Lo demás depende del nivel: en solo lectura no se escribe ni se ejecuta más que lo sencillo
@@ -204,7 +273,7 @@ export function createWritePolicy(deps: WritePolicyDeps): (tool: string, input: 
 
   const confirmModify = async (rel: string): Promise<boolean | string> => {
     if (deps.level === 'auto' || deps.level === 'full' || allowedThisRun) return true;
-    const answer = (await deps.ask({ text: `¿Puedo modificar ${rel}?`, options: [ALLOW_ONCE, ALLOW_RUN, DENY], kind: 'permission' })).trim();
+    const answer = (await deps.ask({ text: `¿Puedo modificar ${rel}?`, options: [ALLOW_ONCE, ALLOW_RUN, DENY], kind: 'permission', fallback: DENY })).trim();
     if (answer === ALLOW_ONCE) return true;
     if (answer === ALLOW_RUN) {
       allowedThisRun = true;
@@ -294,7 +363,7 @@ export function createWritePolicy(deps: WritePolicyDeps): (tool: string, input: 
       if (key !== null && deps.commandGrants?.has(key)) return allow(input);
       const forRun = key !== null && deps.commandGrants ? allowCommandForRun(key) : undefined;
       const text = danger === null ? `¿Puedo ejecutar este comando?\n${command}` : `¿Puedo ejecutar este comando? (${danger})\n${command}`;
-      const answer = (await deps.ask({ text, options: [ALLOW_ONCE, ...(forRun ? [forRun] : []), DENY], kind: 'permission' })).trim();
+      const answer = (await deps.ask({ text, options: [ALLOW_ONCE, ...(forRun ? [forRun] : []), DENY], kind: 'permission', fallback: DENY })).trim();
       if (answer === ALLOW_ONCE) return allow(input);
       if (forRun && answer === forRun) {
         deps.commandGrants!.add(key!);

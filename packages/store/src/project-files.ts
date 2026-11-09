@@ -191,10 +191,10 @@ export async function readRunFile(project: ProjectFiles, runId: Id, rel: string,
   };
 }
 
-/** Devuelve un archivo a su estado anterior a la ejecución [R31.6]. */
-export async function restoreBackup(project: ProjectFiles, runId: Id, rel: string): Promise<boolean> {
+/** Devuelve un archivo a su estado anterior a la ejecución [R31.6]; `dir`, otra carpeta (el espacio de una rama) [R73.8]. */
+export async function restoreBackup(project: ProjectFiles, runId: Id, rel: string, dir?: string): Promise<boolean> {
   if (!isRelativeInside(rel)) throw new StoreError('outside-root', 'Ruta de copia no válida');
-  const folder = await project.getWorkFolder();
+  const folder = dir ?? (await project.getWorkFolder());
   if (!folder) throw new StoreError('not-found', 'No hay carpeta de trabajo');
   const from = path.join(project.paths.backupsDir(runId), ...rel.split('/'));
   const to = path.join(folder, ...rel.split('/'));

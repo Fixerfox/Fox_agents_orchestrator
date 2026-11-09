@@ -26,6 +26,8 @@ export interface RunsScreenProps {
   onAnswerMain: (questionId: string, text: string) => void;
   agentNames: Readonly<Record<string, string>>;
   onExport: (runId: string, jsonl: string) => void;
+  /** «Hablar con el asistente» de una ejecución terminada [R65.10]. */
+  onAskAssistant?: (text: string) => void;
   /** Reloj inyectable para los tests. */
   now?: () => number;
 }

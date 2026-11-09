@@ -7,7 +7,7 @@ import { newAgent, newContext, newSkill, type AgentDefinition } from '@orquestad
 import { createDiagram } from '@orquestador/editor';
 import { App } from '../src/App';
 import { createMemoryApi, type MemoryApiOptions } from '../src/memoryApi';
-import { content, goLib, settingsSaved } from './nav';
+import { content, goLib, settingsSaved, stepTab } from './nav';
 
 const enc = new TextEncoder();
 const agent = (id: string, name: string, patch: Partial<AgentDefinition> = {}): AgentDefinition => ({ ...newAgent(id, name), ...patch });
@@ -183,18 +183,22 @@ describe('SPEC-032 · M7b carpeta del proyecto', () => {
 });
 
 describe('SPEC-032 · M7b panel del nodo, inicio y ajustes', () => {
-  it('[R32.22][R52.8] el panel del nodo es «Paso», sin «Última ejecución», con conocimiento del agente, enlace a editarlo y Duplicar', async () => {
+  it('[R32.22][R52.8][R64.4] el panel del nodo es «Paso», sin «Última ejecución», con conocimiento del agente, enlace a editarlo y Duplicar', async () => {
     await mount({ agents: [agent('pix', 'Pixelador', { skillIds: ['k'], contextIds: ['c'] })], skills: [{ ...newSkill('k', 'pixel-art'), description: 'x' }], contexts: [{ ...newContext('c', 'Paleta'), value: 'r' }] });
     await userEvent.click(await screen.findByRole('button', { name: 'Añadir «Pixelador» al diagrama' }));
     await screen.findByLabelText(/^Agente «pix»/);
     expect(screen.getByText('Paso', { selector: '.orq-side__title' })).toBeTruthy();
     expect(screen.queryByRole('tab', { name: 'Última ejecución' })).toBeNull();
+    await stepTab('Conocimiento');
     const know = within(screen.getByRole('group', { name: 'Conocimiento' }));
     expect(know.getByText('pixel-art')).toBeTruthy();
     expect(know.getByText('Paleta')).toBeTruthy();
     await userEvent.click(screen.getByRole('button', { name: 'Duplicar' }));
     expect(await screen.findAllByLabelText(/^Agente «pix/)).toHaveLength(2);
+    await stepTab('Agente');
     await userEvent.click(screen.getByRole('button', { name: 'Editar el agente' }));
+    // abre «Configurar» en «El agente»; desde ahí se llega a Agentes
+    await userEvent.click(within(screen.getByRole('dialog', { name: /^Configurar «/ })).getByRole('button', { name: 'Abrir en Agentes' }));
     const s = content();
     expect(screen.getByRole('region', { name: 'Agentes' })).toBeTruthy();
     expect((s.getByLabelText('Nombre') as HTMLInputElement).value).toBe('Pixelador');
@@ -204,9 +208,11 @@ describe('SPEC-032 · M7b panel del nodo, inicio y ajustes', () => {
     await mount();
     await userEvent.click(screen.getByRole('button', { name: '+ Router' }));
     await screen.findByText('Paso', { selector: '.orq-side__title' });
+    expect(screen.getByRole('complementary', { name: 'Propiedades' })).toBeTruthy();
     await userEvent.click(screen.getByRole('button', { name: 'Cerrar el panel' }));
     await waitFor(() => expect(screen.queryByText('Paso', { selector: '.orq-side__title' })).toBeNull());
-    expect(screen.getByText('Selecciona un nodo o una conexión')).toBeTruthy();
+    // Sin selección el panel derecho no se ve [R33.6].
+    expect(screen.queryByRole('complementary', { name: 'Propiedades' })).toBeNull();
   });
 
   it('[R32.24] el inicio pregunta qué orquestar, ofrece tres caminos y los recientes como tabla', async () => {
@@ -231,7 +237,8 @@ describe('SPEC-032 · M7b panel del nodo, inicio y ajustes', () => {
     render(<App api={api} confirm={() => true} />);
     await userEvent.click(screen.getByRole('button', { name: 'Ajustes' }));
     const page = within(await screen.findByRole('region', { name: 'Ajustes' }));
-    expect(page.getAllByRole('link').map((a) => a.textContent)).toEqual(['Claude', 'Reglas de los agentes', 'Presupuesto', 'Supervisor', 'Apariencia']);
+    await page.findByRole('heading', { name: 'Claude' });
+    expect([...document.querySelectorAll('.orq-setnav__title')].map((a) => a.textContent)).toEqual(['Claude', 'Permisos de los agentes', 'Supervisor', 'Ejecución y presupuesto', 'Límites de tiempo', 'Memoria', 'Apariencia']);
     expect(page.getByText(/Los cambios se guardan al momento/)).toBeTruthy();
     await userEvent.click(await page.findByRole('radio', { name: /Claude \(real\)/ }));
     await settingsSaved();

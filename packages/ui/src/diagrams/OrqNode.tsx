@@ -47,6 +47,8 @@ export interface OrqNodeData extends Record<string, unknown> {
   prUrl?: string;
   /** Avisos del Supervisor [R60.9]. */
   alerts?: readonly string[];
+  /** Rama en paralelo: aislada, o lo que la junta, fusionada o con conflicto [R73.20]. */
+  isolation?: 'isolated' | 'merged' | 'conflict';
   /** Abre los avisos de este paso [R60.40]. */
   onAlerts?: () => void;
   /** «Ampliar»: la vista previa en grande [R54.2]. */
@@ -65,7 +67,7 @@ function AlertCount({ n }: { n: number }) {
   );
 }
 
-const KIND_ICON = { entry: Play, output: Square, agent: Bot, router: GitFork, loop: Repeat2, review: ShieldCheck, subdiagram: Boxes, transform: Braces } as const;
+export const KIND_ICON = { entry: Play, output: Square, agent: Bot, router: GitFork, loop: Repeat2, review: ShieldCheck, subdiagram: Boxes, transform: Braces } as const;
 
 /** Salidas de la revisión con su símbolo, de arriba abajo; ✗ abajo para que el retorno no cruce las otras [R34.20]. */
 const REVIEW_PORTS = [
@@ -176,6 +178,7 @@ export function OrqNode({ data, selected }: NodeProps<OrqFlowNode>) {
               <AlertCount n={data.alerts.length} />
             </span>
           ))}
+        {data.isolation && <span className={`orq-node__iso is-${data.isolation}`}>{t(`node.iso.${data.isolation}` as MessageKey)}</span>}
         {data.gitActions && (
           <span className="orq-node__git">
             {data.gitActions.map((a) => {

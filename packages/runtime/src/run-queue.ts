@@ -34,6 +34,8 @@ export class RunQueue {
     private readonly orchestrator: Orchestrator,
     private readonly snapshots: RunSnapshots | undefined,
     private readonly onStepFiles: StepFilesHandler,
+    /** Al cerrarse el registro de una ejecución (propuestas de memoria) [R76.5]. */
+    private readonly onFinished?: (runId: string, diagram: Diagram) => void,
   ) {}
 
   /**
@@ -66,6 +68,7 @@ export class RunQueue {
     );
     const done = () => {
       live.finished = true;
+      this.onFinished?.(handle.runId, diagram);
       this.live.prune();
       this.snapshots?.delete(handle.runId);
       this.drain(diagram.id);

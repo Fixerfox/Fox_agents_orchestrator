@@ -101,3 +101,13 @@ export async function findPreview(runDir: string, key: string, rel: string): Pro
   const stat = await fs.stat(real).catch(() => undefined);
   return stat?.isFile() ? real : undefined;
 }
+
+/** Una de las dos versiones guardadas de un conflicto al juntar ramas [R73.16]. */
+export async function findConflict(runDir: string, rel: string): Promise<string | undefined> {
+  if (!safePreviewPath(rel)) return undefined;
+  const dir = path.join(runDir, 'conflicts');
+  const real = await inside(dir, path.join(dir, ...rel.split('/')));
+  if (!real) return undefined;
+  const stat = await fs.stat(real).catch(() => undefined);
+  return stat?.isFile() ? real : undefined;
+}

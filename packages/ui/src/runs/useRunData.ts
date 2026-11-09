@@ -36,8 +36,9 @@ export function useDiagrams(api: ProjectApi, ids: readonly string[]): Record<str
  * Todo lo que se ve de una ejecución, a partir de sus eventos: lo comparten la vista de la ejecución y su modal
  * [R35.8][R44.1]. `ready` es falso mientras se carga.
  */
-export function useRunData(api: ProjectApi, runId: string, main: RunSnapshot, row: HistoryRow | undefined, listLoaded: boolean, now: () => number) {
-  const isMain = runId === main.runId;
+export function useRunData(api: ProjectApi, runId: string, main: RunSnapshot, row: HistoryRow | undefined, listLoaded: boolean, now: () => number, version = 0) {
+  // Tras «Dar por bueno» se vuelve a leer del disco: el evento nuevo no llega por el bus de una ejecución cerrada [R65.8].
+  const isMain = runId === main.runId && version === 0;
   // Un cliente propio para ejecuciones que no son la que se sigue en vivo: así no se deja de seguir aquella [R35.12].
   const [viewSnap, setViewSnap] = useState<RunSnapshot | undefined>(undefined);
   useEffect(() => {
@@ -50,13 +51,14 @@ export function useRunData(api: ProjectApi, runId: string, main: RunSnapshot, ro
       void viewer.detach();
       viewer.dispose();
     };
-  }, [api, runId, isMain]);
+  }, [api, runId, isMain, version]);
   const snap = isMain ? main : viewSnap;
   const events = snap?.events ?? [];
   const rawLive = snap?.live;
   // Si sigue en marcha lo decide quien la ejecuta (la que se sigue en vivo o la lista), nunca solo sus eventos [R35.13].
   const running = isMain ? rawLive?.status === 'running' : row?.status === 'running';
   const finishedEv = events.find((e): e is Extract<RunEvent, { type: 'run.finished' }> => e.type === 'run.finished');
+  const acceptedEv = events.find((e): e is Extract<RunEvent, { type: 'run.accepted' }> => e.type === 'run.accepted');
   // Con eventos pero sin `run.finished` y sin nadie que la ejecute: se interrumpió [R35.13].
   const interrupted = !running && events.length > 0 && !finishedEv;
   const live = useMemo(() => (rawLive && !running ? settleLive(rawLive) : rawLive), [rawLive, running]);
@@ -79,10 +81,11 @@ export function useRunData(api: ProjectApi, runId: string, main: RunSnapshot, ro
   const startTs = events[0]?.ts;
   const endTs = finishedEv?.ts ?? (running ? undefined : events[events.length - 1]?.ts);
   const duration = startTs ? Math.max(0, ((endTs ? Date.parse(endTs) : nowValue) - Date.parse(startTs)) / 1000) : 0;
-  const status = interrupted ? 'interrupted' : running ? 'running' : (finishedEv?.status ?? live?.status ?? 'running');
-  const reason = finishedEv?.reason ?? row?.reason;
+  const status = interrupted ? 'interrupted' : running ? 'running' : acceptedEv ? 'succeeded' : (finishedEv?.status ?? live?.status ?? 'running');
+  const reason = acceptedEv?.reason ?? finishedEv?.reason ?? row?.reason;
+  const accepted = acceptedEv ? { by: acceptedEv.by, reason: acceptedEv.reason, ...(acceptedEv.previousReason !== undefined ? { previousReason: acceptedEv.previousReason } : {}) } : undefined;
   const title = diagram?.name ?? diagramLabel(row);
-  return { snap, events, live, running, diagram, old, timeline, label, ready, measured, tokens, usageText, input, duration, status, reason, title };
+  return { snap, events, live, running, diagram, old, timeline, label, ready, measured, tokens, usageText, input, duration, status, reason, title, accepted };
 }
 
 export type RunData = ReturnType<typeof useRunData>;

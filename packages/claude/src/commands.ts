@@ -377,3 +377,82 @@ export function sensitiveCommand(command: string, root: string, cwd: string = ro
   }
   return null;
 }
+
+/** Subcomandos de git que cambian el historial, las ramas o el remoto [R73.9]. */
+const GIT_WRITES = new Set(['commit', 'checkout', 'switch', 'merge', 'rebase', 'reset', 'stash', 'push', 'pull', 'tag', 'cherry-pick', 'revert', 'am', 'apply', 'restore', 'worktree', 'clean', 'rm', 'mv', 'add']);
+/** Opciones globales de git que llevan un valor detrás. */
+const GIT_GLOBAL_WITH_VALUE = new Set(['-C', '-c', '--git-dir', '--work-tree', '--namespace']);
+const WRAPPERS = new Set(['sudo', 'env', 'time', 'nice', 'command', 'nohup', 'xargs']);
+
+/**
+ * ¿Escribe en git este comando? Busca `git` en cada tramo (también tras `;`, `|`, `&&` o en `$(...)`), salta sus
+ * opciones globales y mira el subcomando; `branch` solo cuenta si crea, borra o mueve [R73.9].
+ */
+export function writesGit(command: string): boolean {
+  const pieces = command.split(/&&|\|\||[;|&\n`]|\$\(|\)/);
+  for (const piece of pieces) {
+    const words = tokenize(piece.trim()) ?? piece.trim().split(/\s+/);
+    // El programa del tramo: tras las variables (A=1) y los envoltorios (sudo, env, time…).
+    let i = 0;
+    while (i < words.length && (/^[A-Za-z_][A-Za-z0-9_]*=/.test(words[i]!) || WRAPPERS.has(programOf(words[i]!)))) i++;
+    {
+      if (i >= words.length || programOf(words[i]!) !== 'git') continue;
+      let j = i + 1;
+      while (j < words.length && words[j]!.startsWith('-')) j += GIT_GLOBAL_WITH_VALUE.has(words[j]!) ? 2 : 1;
+      const sub = words[j];
+      if (!sub) continue;
+      if (GIT_WRITES.has(sub)) return true;
+      if (sub === 'branch') {
+        const rest = words.slice(j + 1);
+        if (rest.some((a) => GIT_BRANCH_CHANGE.has(a) || a.startsWith('--set-upstream') || !a.startsWith('-'))) return true;
+      }
+    }
+  }
+  return false;
+}
+
+/** Motivo al denegar git en una rama en paralelo [R73.9]. */
+export const ISOLATED_GIT_DENY = 'En una rama en paralelo no se cambia git: el commit se hace después de juntar las ramas.';
+
+/** Procesos de los que depende la app: matarlos por nombre la cierra [R79.1]. */
+const APP_PROCESS = /^(electron|node|claude|orquestador)(\.exe)?$/i;
+
+/**
+ * ¿Mata por nombre un proceso de la app? `taskkill /IM`, `killall`, `pkill`, `Stop-Process -Name`,
+ * `Get-Process <nombre> | Stop-Process` y `wmic … delete`, en cualquier tramo del comando [R79.1].
+ */
+export function killsAppProcess(command: string): boolean {
+  const unquote = (s: string) => s.replace(/^['"]|['"]$/g, '');
+  const names = (s: string) => unquote(s).split(',').some((n) => APP_PROCESS.test(n.trim()));
+  // Get-Process electron | Stop-Process: el nombre va en el tramo de antes.
+  if (/stop-process/i.test(command)) {
+    const get = /get-process\s+(?:-name\s+)?(['"]?[\w.,-]+['"]?)/i.exec(command);
+    if (get && names(get[1]!)) return true;
+  }
+  if (/wmic\b[^;&|]*process\b[^;&|]*name\s*=\s*['"]?([\w.-]+)['"]?[^;&|]*\b(delete|terminate)\b/i.test(command)) {
+    const m = /name\s*=\s*['"]?([\w.-]+)/i.exec(command);
+    if (m && names(m[1]!)) return true;
+  }
+  for (const piece of command.split(/&&|\|\||[;|&\n`]|\$\(|\)/)) {
+    const words = tokenize(piece.trim()) ?? piece.trim().split(/\s+/);
+    // Un comando entre comillas (powershell -Command "…", bash -c '…') se mira por dentro.
+    if (words.some((w) => /\s/.test(w) && killsAppProcess(w))) return true;
+    let i = 0;
+    while (i < words.length && (/^[A-Za-z_][A-Za-z0-9_]*=/.test(words[i]!) || WRAPPERS.has(programOf(words[i]!)) || words[i] === 'timeout' || /^\d+$/.test(words[i]!))) i++;
+    const prog = words[i] ? programOf(words[i]!).toLowerCase() : '';
+    const args = words.slice(i + 1);
+    if (prog === 'taskkill' || prog === 'taskkill.exe') {
+      for (let j = 0; j < args.length - 1; j++) if (/^(\/\/?|-)im$/i.test(args[j]!) && names(args[j + 1]!)) return true;
+    }
+    if (prog === 'killall' || prog === 'pkill') {
+      if (args.filter((a) => !a.startsWith('-')).some((a) => names(a) || (prog === 'pkill' && /(^|[/\s])(electron|claude|orquestador)/i.test(unquote(a))))) return true;
+    }
+    if (prog === 'stop-process' || prog === 'spps') {
+      for (let j = 0; j < args.length - 1; j++) if (/^-(name|processname)$/i.test(args[j]!) && names(args[j + 1]!)) return true;
+    }
+  }
+  return false;
+}
+
+/** Motivo al denegarlo [R79.2]. */
+export const APP_KILL_DENY = 'Ese comando cerraría todos los procesos con ese nombre, y con ellos el Orquestador y esta ejecución. Cierra solo lo que lanzaste, por su PID (taskkill /PID <pid> /T /F o kill <pid>).';

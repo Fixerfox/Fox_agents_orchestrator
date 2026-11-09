@@ -3,8 +3,12 @@ export class PauseGate {
   private paused = false;
   private waiters: (() => void)[] = [];
 
+  /** Cuántas veces se ha pausado: para decir una vez por pausa que un paso quedó retenido [R77.13]. */
+  epoch = 0;
+
   pause(): void {
     this.paused = true;
+    this.epoch++;
   }
 
   resume(): void {

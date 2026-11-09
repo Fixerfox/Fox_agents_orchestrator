@@ -1,4 +1,4 @@
-import { DEFAULT_MODEL, DEFAULT_PERMISSION, type FieldProblem, LIMITS, MODELS, PROJECT_PERMISSIONS, type PermissionLevel, type ProjectPermission } from '../shared';
+import { DEFAULT_MODEL, DEFAULT_PERMISSION, type FieldProblem, LIMITS, MODELS, PROJECT_PERMISSIONS, STOP_AT, type StopAt, type PermissionLevel, type ProjectPermission, type StepLimits, type UnansweredPolicy, limitProblems, readUnanswered } from '../shared';
 
 /** v2: el nivel de permisos pasa a «Sin preguntar nunca» al migrar [R51.1]. */
 export const SETTINGS_SCHEMA_VERSION = 2;
@@ -27,7 +27,53 @@ export interface AppSettings {
   supervisorReview?: boolean;
   /** Modelo del Supervisor; sin valor, el rápido y barato [R60.14]. */
   supervisorModel?: string;
+  /** Lo que solo puede comprobar una persona: avisar (por defecto) o hacer fallar la ejecución [R65.2]. */
+  supervisorHumanChecks?: HumanChecks;
+  /** Desde qué gravedad para y pregunta la revisión; por defecto, «grave» [R75.10]. */
+  supervisorStopAt?: StopAt;
+  /** Modelo de la comprobación final; por defecto, uno más capaz que el de cada paso [R75.19]. */
+  supervisorVerifyModel?: string;
+  /** Si no se puede comprobar el resultado: avisar (por defecto) o hacer fallar [R75.20]. */
+  supervisorUnverified?: HumanChecks;
+  /** «Límites de tiempo»: inactividad y herramienta en curso por defecto [R70.21]. */
+  limits?: Pick<StepLimits, 'idleMinutes' | 'toolMinutes'>;
+  /** Qué hacer por defecto con una pregunta que nadie responde [R70.21]. */
+  unanswered?: UnansweredPolicy;
+  /** Tope de la memoria de la ejecución, en tokens [R72.15]. */
+  memoryTokens?: number;
+  /** Cada rama en paralelo trabaja en su propio espacio y se junta al terminar; activo por defecto [R73.2]. */
+  isolateBranches?: boolean;
+  /** Dejar que Claude Code guarde su propia memoria (local al equipo); apagado por defecto [R76.18]. */
+  claudeAutoMemory?: boolean;
+  /** Tope de la memoria del proyecto en el prompt, en tokens [R76.14]. */
+  projectMemoryTokens?: number;
+  /** Agentes trabajando a la vez en toda la app; 8 por defecto [R77.1]. */
+  maxAgentsTotal?: number;
+  /** Al llegar al 100 % del presupuesto: parar ya (por defecto) o dejar terminar lo que está en marcha [R77.8]. */
+  onBudget?: 'stop-now' | 'finish-running';
+  /** Dólares por minuto que dispara `burn-rate`; 1 por defecto [R77.10]. */
+  burnRateUsdPerMin?: number;
 }
+
+/** Límites de toda la app [R77.1]. */
+export const MAX_AGENTS_TOTAL = 8;
+export const MAX_AGENTS_TOTAL_RANGE = [1, 32] as const;
+export const MAX_DECISIONS_TOTAL = 4;
+const agentsTotalOk = (v: unknown): v is number => Number.isInteger(v) && (v as number) >= MAX_AGENTS_TOTAL_RANGE[0] && (v as number) <= MAX_AGENTS_TOTAL_RANGE[1];
+const burnRateOk = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0 && v <= 100;
+export const ON_BUDGET = ['stop-now', 'finish-running'] as const;
+/** Agentes a la vez en toda la app [R77.1]. */
+export const agentsTotal = (s: Pick<AppSettings, 'maxAgentsTotal'>): number => s.maxAgentsTotal ?? MAX_AGENTS_TOTAL;
+
+/** ¿Se aíslan las ramas en paralelo? Sí, salvo que se apague [R73.2]. */
+export const isolatesBranches = (settings: Pick<AppSettings, 'isolateBranches'>): boolean => settings.isolateBranches !== false;
+
+/** Rango del tope de la memoria [R72.15]. */
+export const MEMORY_TOKENS_RANGE = [500, 8000] as const;
+const memoryTokensOk = (v: unknown): v is number => Number.isInteger(v) && (v as number) >= MEMORY_TOKENS_RANGE[0] && (v as number) <= MEMORY_TOKENS_RANGE[1];
+
+export const HUMAN_CHECKS = ['warn', 'fail'] as const;
+export type HumanChecks = (typeof HUMAN_CHECKS)[number];
 
 /** Modelo del Supervisor si no se elige otro [R60.14]. */
 export const SUPERVISOR_MODEL = 'claude-haiku-5-5';
@@ -38,6 +84,14 @@ export const JUDGE_MODEL = 'claude-haiku-5-5';
 export const supervisorReviews = (settings: Pick<AppSettings, 'supervisorReview'>): boolean => settings.supervisorReview !== false;
 
 export const supervisorModel = (settings: Pick<AppSettings, 'supervisorModel'>): string => settings.supervisorModel ?? SUPERVISOR_MODEL;
+/** Modelo de la comprobación final por defecto [R75.19]. */
+export const SUPERVISOR_VERIFY_MODEL = 'claude-sonnet-5-5';
+export const supervisorVerifyModel = (settings: Pick<AppSettings, 'supervisorVerifyModel'>): string => settings.supervisorVerifyModel ?? SUPERVISOR_VERIFY_MODEL;
+export const supervisorStopAt = (settings: Pick<AppSettings, 'supervisorStopAt'>): StopAt => settings.supervisorStopAt ?? 'high';
+export const supervisorUnverified = (settings: Pick<AppSettings, 'supervisorUnverified'>): HumanChecks => settings.supervisorUnverified ?? 'warn';
+
+/** Qué hace la comprobación final con lo que solo puede comprobar una persona [R65.2]. */
+export const supervisorHumanChecks = (settings: Pick<AppSettings, 'supervisorHumanChecks'>): HumanChecks => settings.supervisorHumanChecks ?? 'warn';
 
 /** ¿Se carga la configuración de Claude Code? Activado salvo que se apague [R50.3]. */
 export const loadsClaudeConfig = (settings: Pick<AppSettings, 'claudeConfig'>): boolean => settings.claudeConfig !== false;
@@ -72,8 +126,21 @@ export function validateSettings(s: unknown): FieldProblem[] {
   }
   if (s.permissions !== undefined && !(PROJECT_PERMISSIONS as readonly unknown[]).includes(s.permissions)) out.push({ field: 'permissions', message: 'Elige un nivel de permisos de la lista' });
   if (s.claudeConfig !== undefined && typeof s.claudeConfig !== 'boolean') out.push({ field: 'claudeConfig', message: '«Cargar la configuración de Claude Code» no es válido' });
+  if (s.claudeAutoMemory !== undefined && typeof s.claudeAutoMemory !== 'boolean') out.push({ field: 'claudeAutoMemory', message: '«Memoria propia de Claude Code» no es válido' });
+  if (s.projectMemoryTokens !== undefined && !(Number.isInteger(s.projectMemoryTokens) && (s.projectMemoryTokens as number) >= 300 && (s.projectMemoryTokens as number) <= 6000)) out.push({ field: 'projectMemoryTokens', message: 'El tope de la memoria del proyecto va de 300 a 6000 tokens' });
+  if (s.isolateBranches !== undefined && typeof s.isolateBranches !== 'boolean') out.push({ field: 'isolateBranches', message: '«Aislar las ramas en paralelo» no es válido' });
   if (s.supervisorReview !== undefined && typeof s.supervisorReview !== 'boolean') out.push({ field: 'supervisorReview', message: 'La revisión del Supervisor tiene que estar activa o no' });
   if (s.supervisorModel !== undefined && !known(s.supervisorModel)) out.push({ field: 'supervisorModel', message: 'Elige un modelo de la lista' });
+  if (s.supervisorHumanChecks !== undefined && !(HUMAN_CHECKS as readonly unknown[]).includes(s.supervisorHumanChecks)) out.push({ field: 'supervisorHumanChecks', message: 'Elige «Avisar» o «Hacer fallar la ejecución»' });
+  if (s.supervisorStopAt !== undefined && !(STOP_AT as readonly unknown[]).includes(s.supervisorStopAt)) out.push({ field: 'supervisorStopAt', message: 'Elige cuándo para la revisión' });
+  if (s.supervisorVerifyModel !== undefined && !known(s.supervisorVerifyModel)) out.push({ field: 'supervisorVerifyModel', message: 'Elige un modelo de la lista' });
+  if (s.supervisorUnverified !== undefined && !(HUMAN_CHECKS as readonly unknown[]).includes(s.supervisorUnverified)) out.push({ field: 'supervisorUnverified', message: 'Elige «Avisar» o «Hacer fallar la ejecución»' });
+  out.push(...limitProblems(s.limits));
+  if (s.unanswered !== undefined && !readUnanswered(s.unanswered)) out.push({ field: 'unanswered', message: 'Elige qué hacer si nadie responde' });
+  if (s.maxAgentsTotal !== undefined && !agentsTotalOk(s.maxAgentsTotal)) out.push({ field: 'maxAgentsTotal', message: `Los agentes a la vez en toda la app van de ${MAX_AGENTS_TOTAL_RANGE[0]} a ${MAX_AGENTS_TOTAL_RANGE[1]}` });
+  if (s.onBudget !== undefined && !(ON_BUDGET as readonly unknown[]).includes(s.onBudget)) out.push({ field: 'onBudget', message: 'Elige qué hacer al llegar al presupuesto' });
+  if (s.burnRateUsdPerMin !== undefined && !burnRateOk(s.burnRateUsdPerMin)) out.push({ field: 'burnRateUsdPerMin', message: 'El gasto por minuto que avisa va de más de 0 a 100 $' });
+  if (s.memoryTokens !== undefined && !memoryTokensOk(s.memoryTokens)) out.push({ field: 'memoryTokens', message: `El tope de la memoria va de ${MEMORY_TOKENS_RANGE[0]} a ${MEMORY_TOKENS_RANGE[1]} tokens` });
   return out;
 }
 
@@ -88,11 +155,31 @@ export function normalizeSettings(raw: unknown): AppSettings {
   if (Number.isInteger(raw.maxParallel) && (raw.maxParallel as number) >= 1 && (raw.maxParallel as number) <= LIMITS.maxParallel) out.maxParallel = raw.maxParallel as number;
   if (Number.isInteger(raw.defaultMaxTokens) && (raw.defaultMaxTokens as number) > 0) out.defaultMaxTokens = raw.defaultMaxTokens as number;
   if (typeof raw.supervisorReview === 'boolean') out.supervisorReview = raw.supervisorReview;
+  if (typeof raw.isolateBranches === 'boolean') out.isolateBranches = raw.isolateBranches;
+  if (typeof raw.claudeAutoMemory === 'boolean') out.claudeAutoMemory = raw.claudeAutoMemory;
+  if (Number.isInteger(raw.projectMemoryTokens) && (raw.projectMemoryTokens as number) >= 300 && (raw.projectMemoryTokens as number) <= 6000) out.projectMemoryTokens = raw.projectMemoryTokens as number;
   if (known(raw.supervisorModel)) out.supervisorModel = raw.supervisorModel as string;
+  if ((HUMAN_CHECKS as readonly unknown[]).includes(raw.supervisorHumanChecks)) out.supervisorHumanChecks = raw.supervisorHumanChecks as HumanChecks;
+  if ((STOP_AT as readonly unknown[]).includes(raw.supervisorStopAt)) out.supervisorStopAt = raw.supervisorStopAt as StopAt;
+  if (known(raw.supervisorVerifyModel)) out.supervisorVerifyModel = raw.supervisorVerifyModel as string;
+  if ((HUMAN_CHECKS as readonly unknown[]).includes(raw.supervisorUnverified)) out.supervisorUnverified = raw.supervisorUnverified as HumanChecks;
   // Ajustes anteriores a R47.8: «Modificar sin preguntar» pasa a automático y «preguntar todos los comandos», a preguntar.
   if ((PROJECT_PERMISSIONS as readonly unknown[]).includes(raw.permissions)) out.permissions = raw.permissions as ProjectPermission;
   else if (raw.askCommands === true) out.permissions = 'ask';
   else if (raw.autoWrite === true) out.permissions = 'auto';
   if (typeof raw.claudeConfig === 'boolean') out.claudeConfig = raw.claudeConfig;
+  if (isObject(raw.limits) && limitProblems(raw.limits).length === 0) {
+    const l = raw.limits as StepLimits;
+    const limits: NonNullable<AppSettings['limits']> = {};
+    if (l.idleMinutes !== undefined) limits.idleMinutes = l.idleMinutes;
+    if (l.toolMinutes !== undefined) limits.toolMinutes = l.toolMinutes;
+    if (Object.keys(limits).length > 0) out.limits = limits;
+  }
+  const unanswered = readUnanswered(raw.unanswered);
+  if (unanswered) out.unanswered = unanswered;
+  if (memoryTokensOk(raw.memoryTokens)) out.memoryTokens = raw.memoryTokens;
+  if (agentsTotalOk(raw.maxAgentsTotal)) out.maxAgentsTotal = raw.maxAgentsTotal;
+  if ((ON_BUDGET as readonly unknown[]).includes(raw.onBudget)) out.onBudget = raw.onBudget as NonNullable<AppSettings['onBudget']>;
+  if (burnRateOk(raw.burnRateUsdPerMin)) out.burnRateUsdPerMin = raw.burnRateUsdPerMin;
   return out;
 }

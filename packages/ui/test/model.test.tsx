@@ -7,6 +7,7 @@ import type { RunEvent } from '@orquestador/core';
 import { deriveLive } from '@orquestador/editor';
 import { App } from '../src/App';
 import { NodePanel } from '../src/runs/NodePanel';
+import { stepTab } from './nav';
 import { createMemoryApi } from '../src/memoryApi';
 
 const AGENTS = [{ id: 'sprites', name: 'Sprites', description: 'Dibuja en píxel art', model: 'claude-sonnet-5-5' }];
@@ -17,6 +18,7 @@ describe('SPEC-040 · modelo por paso en la interfaz', () => {
     await userEvent.click(screen.getByRole('button', { name: '+ Agente' }));
     await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Sprites/ }));
     const card = await screen.findByLabelText(/^Agente «sprites»/);
+    await stepTab('Agente');
     const select = screen.getByLabelText('Modelo') as HTMLSelectElement;
     expect(select.value).toBe('');
     expect([...select.options].map((o) => o.textContent)).toEqual(['El del agente (Sonnet 5.5)', 'Sonnet 5.5', 'Opus 5.5', 'Haiku 5.5']);
