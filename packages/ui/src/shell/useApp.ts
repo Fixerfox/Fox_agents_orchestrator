@@ -108,7 +108,7 @@ export function useApp({ api, agents: builtIn = [], confirm = (m) => window.conf
     newDiagram: doc.createNamed,
     run: async (input) => {
       await doc.save();
-      await launcher.onStart(input);
+      return launcher.onStart(input);
     },
     refresh: () => {
       void lib.reloadAgents();

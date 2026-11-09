@@ -190,11 +190,11 @@ export const ASSISTANT_TOOLS: readonly AssistantToolSpec[] = [
     params: { program: s('«claude» o «shell»'), prompt: s('Petición inicial para Claude Code', true) },
     destructive: true,
   },
-  { name: 'remove_step', description: 'Quita un paso del diagrama abierto.', params: { nodeId: s('Id del paso') }, destructive: true },
+  { name: 'remove_step', description: 'Quita un paso del diagrama abierto. Si estaba en medio de una cadena, une el paso anterior con el siguiente; si no, dice qué pasos quedaron sin conexión.', params: { nodeId: s('Id del paso') }, destructive: true },
   { name: 'delete_agent', description: 'Borra un agente del proyecto.', params: { id: s('Id del agente') }, destructive: true },
   { name: 'delete_skill', description: 'Borra una skill del proyecto.', params: { id: s('Id de la skill') }, destructive: true },
   { name: 'delete_context', description: 'Borra un contexto del proyecto.', params: { id: s('Id del contexto') }, destructive: true },
-  { name: 'run_diagram', description: 'Ejecuta el diagrama abierto con una entrada (gasta tokens).', params: { input: s('Entrada para el diagrama') }, destructive: true },
+  { name: 'run_diagram', description: 'Ejecuta el diagrama abierto con una entrada (gasta tokens). Antes lo valida: si tiene problemas, falla con la lista. Devuelve el id de la ejecución.', params: { input: s('Entrada para el diagrama') }, destructive: true },
 ];
 
 export const ASSISTANT_SERVER = 'orquestador';
