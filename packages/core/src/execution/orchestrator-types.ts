@@ -55,6 +55,8 @@ export interface OrchestratorDeps {
   resources?: SharedResources;
   /** Junta los `token.stream` seguidos de un paso antes del bus [R77.15]. */
   coalesceTokens?: { ms: number; chars: number };
+  /** Cada agente dentro de un bucle recibe vuelta, criterio, petición y último motivo [R84.3]. */
+  loopContext?: boolean;
 }
 
 export interface RunResult {

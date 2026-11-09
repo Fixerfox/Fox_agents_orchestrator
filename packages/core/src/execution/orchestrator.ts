@@ -86,6 +86,7 @@ export class Orchestrator {
       ...(supervisor ? { supervisor } : {}),
       ...(memory ? { memory } : {}),
       ...(spaces ? { spaces } : {}),
+      ...(this.deps.loopContext ? { loops: new Map() } : {}),
       ...(this.deps.checks?.runner ? { checkRunner: this.deps.checks.runner } : {}),
       ...(this.deps.projectMemory ? { projectMemory: (agentId: Id) => this.deps.projectMemory!(runId, { diagramId: diagram.id, agentId }).catch(() => undefined) } : {}),
       ...(this.deps.checks?.agentChecks ? { agentChecks: (agentId: Id) => this.deps.checks!.agentChecks!(agentId, runId) } : {}),

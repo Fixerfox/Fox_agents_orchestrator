@@ -43,6 +43,8 @@ export type EventBody =
       split?: string;
       /** Memoria que recibe este paso [R60.25]. */
       memory?: string;
+      /** Bloque «Estás dentro de un bucle» que recibe este paso [R84.4]. */
+      loop?: string;
       /** Tokens estimados de cada bloque de la memoria y cuáles se recortaron [R72.19]. */
       memoryStats?: MemoryStats;
       /** Archivos a los que se limita [R60.16]. */
