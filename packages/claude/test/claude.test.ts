@@ -263,6 +263,16 @@ describe('SPEC-027 · decisiones con Claude', () => {
     expect(await d.route({ nodeId: 'r', candidates: cands, input }, sig)).toMatchObject({ edgeIds: ['e2'], reason: 'Solo sonido' });
   });
 
+  it('[R81.4] cada opción va con su descripción y el criterio, si lo hay, antes de los datos', async () => {
+    let prompt = '';
+    const d = new ClaudeDecider({ query: fake((_o, p) => ((prompt = p), [ok('{"edges":["e1"],"reason":"x"}')])).query, projectRoot: '/proy', settings: () => defaultSettings(), apiKey: async () => undefined });
+    await d.route({ nodeId: 'r', candidates: [{ ...cands[0]!, description: '«Arte», agente «Pintor»: Dibuja' }, cands[1]!], input, criteria: 'Si falta arte, a Arte' }, sig);
+    expect(prompt).toContain('- e1: «Arte», agente «Pintor»: Dibuja\n- e2: Sonido');
+    expect(prompt.indexOf('Criterio para elegir: Si falta arte, a Arte')).toBeLessThan(prompt.indexOf('Salida del paso anterior'));
+    await d.route({ nodeId: 'r', candidates: cands, input }, sig);
+    expect(prompt).not.toContain('Criterio para elegir');
+  });
+
   it('[R27.11] sin ninguna arista válida o sin JSON falla con error claro, no inventa una decisión', async () => {
     await expect(decider('{"edges":["zzz"]}').route({ nodeId: 'r', candidates: cands, input }, sig)).rejects.toThrow(/ninguna conexión válida/);
     await expect(decider('no sé').route({ nodeId: 'r', candidates: cands, input }, sig)).rejects.toThrow(/decisión legible/);

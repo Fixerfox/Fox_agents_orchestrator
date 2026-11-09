@@ -12,7 +12,7 @@ export { CONFIRM_APPROVE, composeConfirmInput, isApproval } from './text/confirm
 export { REQUIREMENTS_UNMET, UNFINISHED_CONTINUE, UNFINISHED_OPTIONS, UNFINISHED_RETRY, UNFINISHED_STOP } from './text/unfinished';
 export { explainTouchedFiles } from './text/touched-files';
 export { BURN_MINUTES, BURN_RATE_USD_PER_MIN, applyRules, branchMemoryLine, newBranchMemory, newRuleState, rememberBranch, type BranchMemory, type RuleState, type SupervisorAlert } from './run/supervisor-rules';
-export { FLOW_HEADING, FLOW_MAX_TARGETS, FLOW_ONLY_YOURS, flowContext, type FlowView } from './text/flow-context';
+export { FLOW_HEADING, FLOW_MAX_TARGETS, FLOW_ONLY_YOURS, describeTarget, flowContext, type FlowView } from './text/flow-context';
 export { checkSplit, composeSplitFix, declaredFiles, describeSplitProblem, parseSplit, splitInputs, splitRule, withinDeclared, type SplitBranch, type SplitPart, type SplitProblem, type SplitResult } from './text/split';
 export { describePreviousAttempt, PREVIOUS_ATTEMPT_CHARS } from './nodes/agent-retries';
 export { DECISION_TIMEOUT_MS, guardDecider } from './run/guarded-decider';

@@ -287,6 +287,8 @@ export interface RouteCandidate {
   edgeId: Id;
   to: Id;
   label: string;
+  /** Qué hay en ese destino: agente y tarea, revisión, salida… [R81.2] */
+  description?: string;
 }
 
 /** Lo que juzga el Juez de una revisión [R34.26]. */
@@ -309,7 +311,7 @@ export interface JudgeVerdict {
 export interface Decider {
   /** `usage`: lo que gastó la decisión, que cuenta en el presupuesto [R63.15]. */
   route(
-    request: { nodeId: Id; candidates: RouteCandidate[]; input: Payload },
+    request: { nodeId: Id; candidates: RouteCandidate[]; input: Payload; /** Criterio del router [R81.3]. */ criteria?: string },
     signal: AbortSignal,
   ): Promise<{ edgeIds: Id[]; reason: string; usage?: TransformUsage }>;
   judge(

@@ -339,6 +339,7 @@
   "describeFailedChecks",
   "describePreviousAttempt",
   "describeSplitProblem",
+  "describeTarget",
   "diagramLabelOf",
   "downstreamOf",
   "effectivePermission",

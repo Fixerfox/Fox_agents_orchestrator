@@ -25,7 +25,7 @@ Esta spec le da a cada paso de agente su **contexto local**: quién recibe su sa
    - *Primera:* en el prompt de sistema, como la regla de reparto.
    - *Revisión:* cambia de un paso a otro y de una vuelta a otra, y el prompt de sistema de un mismo agente se comparte entre pasos. Romperíamos la caché, igual que pasaba con la memoria (R72.18).
    - *Segunda (elegida):* **en el mensaje del usuario**, después de la memoria y antes de la tarea.
-3. **Revisiones en modo `verdict`.** No se le dice al agente que la revisión busca `VEREDICTO:`. Si el que hace el trabajo va directo a la revisión, se aprobaría a sí mismo. Solo se le dice que hay una revisión y su criterio.
+3. **Revisiones en modo `verdict`.** No se le dice al agente que la revisión busca `VEREDICTO:`. Si el que hace el trabajo va directo a la revisión, se aprobaría a sí mismo. Solo se le dice que hay una revisión y su criterio. SPEC-081 (R81.6) lo amplía: a quien revisa sin ser el destino del retorno sí se le pide el veredicto.
 
 ## Requisitos
 

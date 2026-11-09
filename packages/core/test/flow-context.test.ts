@@ -131,3 +131,60 @@ describe('SPEC-080 · cómo llega', () => {
     expect(ofType(res.events, 'agent.request').every((e) => e.flow === undefined)).toBe(true);
   });
 });
+
+describe('SPEC-081 · decidir con contexto', () => {
+  /** Entrada → a → router IA (Paso 2: fixer · salida). */
+  const routed = (criteria?: string) =>
+    diagram(
+      [ENTRY, agent('a'), { ...router('r', 'ai'), router: { mode: 'ai' as const, ...(criteria ? { criteria } : {}) } }, { ...withTask('fixer', 'Corrige los tests en rojo'), label: 'Paso 2' }, OUTPUT],
+      [edge('entry', 'a'), edge('a', 'r'), edge('r', 'fixer'), edge('r', 'output'), edge('fixer', 'output')],
+    );
+  const fixer = { name: 'Fixer', model: 'claude-sonnet-5-5', version: 1, instructions: '', skillIds: [], contextIds: [], mcpServers: [], allowedTools: [] };
+
+  it('[R81.2][R81.3] E81.a: con flow, el router recibe qué hay en cada opción y el criterio, y quedan en la decisión', async () => {
+    const { orch, decider } = setup({ flow: true, scripts: { a: { output: 'hay 2 tests en rojo' }, fixer: { output: 'ok' } }, describeAgent: (id) => (id === 'fixer' ? fixer : undefined) });
+    const res = await orch.start(routed('Si hay tests en rojo, a arreglar'), 'x').result;
+    const req = decider.routeCalls[0] as { candidates: { description?: string }[]; criteria?: string };
+    expect(req.candidates.map((c) => c.description)).toEqual(['«Paso 2», agente «Fixer»: Corrige los tests en rojo', 'La salida final de la ejecución.']);
+    expect(req.criteria).toBe('Si hay tests en rojo, a arreglar');
+    const decision = ofType(res.events, 'decision').find((e) => e.kind === 'route')!;
+    expect(decision.request).toMatchObject({ criteria: 'Si hay tests en rojo, a arreglar', candidates: [{ description: expect.stringContaining('Fixer') }, { description: 'La salida final de la ejecución.' }] });
+  });
+
+  it('[R81.2][R81.3] E81.c: sin flow no hay descripciones, pero el criterio sí llega', async () => {
+    const { orch, decider } = setup({ scripts: { a: { output: 'x' }, fixer: { output: 'ok' } } });
+    await orch.start(routed('Elige bien'), 'x').result;
+    const req = decider.routeCalls[0] as { candidates: object[]; criteria?: string };
+    expect(req.candidates.every((c) => !('description' in c))).toBe(true);
+    expect(req.criteria).toBe('Elige bien');
+    const plain = setup({ scripts: { a: { output: 'x' }, fixer: { output: 'ok' } } });
+    await plain.orch.start(routed(), 'x').result;
+    expect(plain.decider.routeCalls[0]).not.toHaveProperty('criteria');
+  });
+
+  /** Entrada → prog → qa → rev verdict (✓ → Salida, ✗ → prog). */
+  const verdictFlow = () =>
+    diagram(
+      [ENTRY, agent('prog'), agent('qa'), review('rev', 3, 'verdict'), OUTPUT],
+      [edge('entry', 'prog'), edge('prog', 'qa'), edge('qa', 'rev'), port('rev', 'output', 'approved'), port('rev', 'prog', 'rejected')],
+    );
+
+  it('[R81.6] E81.b: quien revisa sin ser el destino del retorno escribe el veredicto', () => {
+    expect(flowContext({ diagram: verdictFlow(), nodeId: 'qa' })).toContain(
+      'Esa revisión lee tu veredicto: termina tu respuesta con una línea «VEREDICTO: APROBADO» o «VEREDICTO: RECHAZADO». Si rechazas, explica qué hay que corregir: es lo que recibirá «prog».',
+    );
+    expect(flowContext({ diagram: verdictFlow(), nodeId: 'prog' })).not.toContain('VEREDICTO');
+  });
+
+  it('[R81.7] ni al destino del retorno, ni sin retorno, ni en modo ai o human', () => {
+    const direct = diagram([ENTRY, agent('prog'), review('rev', 3, 'verdict'), OUTPUT], [edge('entry', 'prog'), edge('prog', 'rev'), port('rev', 'output', 'approved'), port('rev', 'prog', 'rejected')]);
+    expect(flowContext({ diagram: direct, nodeId: 'prog' })).not.toContain('VEREDICTO');
+    const noReturn = diagram([ENTRY, agent('prog'), agent('qa'), review('rev', 3, 'verdict'), OUTPUT], [edge('entry', 'prog'), edge('prog', 'qa'), edge('qa', 'rev'), port('rev', 'output', 'approved')]);
+    expect(flowContext({ diagram: noReturn, nodeId: 'qa' })).not.toContain('VEREDICTO');
+    for (const mode of ['ai', 'human'] as const) {
+      const d = verdictFlow();
+      d.nodes[3] = review('rev', 3, mode);
+      expect(flowContext({ diagram: d, nodeId: 'qa' })).not.toContain('VEREDICTO');
+    }
+  });
+});

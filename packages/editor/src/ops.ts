@@ -226,6 +226,8 @@ export function updateNode(root: Diagram, path: readonly Id[], id: Id, patch: No
       if (patch.router) {
         if (n.kind !== 'router') throw ERR('invalid');
         next.router = { mode: 'ai', ...n.router, ...patch.router };
+        // Un criterio en blanco no se guarda [R81.1].
+        if (!next.router.criteria?.trim()) delete next.router.criteria;
       }
       if (patch.review) {
         if (n.kind !== 'review') throw ERR('invalid');

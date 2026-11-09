@@ -57,6 +57,8 @@ export interface ReviewConfig {
 export interface RouterConfig {
   /** `ai`: lo decide un Decider (IA). `rules`: se evalúa la condición de cada arista saliente. */
   mode: 'ai' | 'rules';
+  /** Solo en modo `ai`: cómo elegir, escrito por la persona [R81.1]. */
+  criteria?: string;
 }
 
 export interface LoopConfig {

@@ -16,6 +16,7 @@ El hito indica cuándo debe estar cubierto por tests. `npm run spec:check` exige
 ## Índice
 | Spec | Título | Hito | Estado |
 |---|---|---|---|
+| [081](081-decidir-con-contexto.md) | Decidir con contexto: el router con IA ve qué hay en cada opción y un criterio propio; quien revisa sin ser el destino del retorno escribe el VEREDICTO | M15l | Implementada |
 | [080](080-sitio-en-el-flujo.md) | Su sitio en el flujo: cada paso sabe quién recibe su salida (agente, router, revisión, salida), si su tramo pasa por una revisión y en qué vuelta del bucle va, en el mensaje del usuario | M15k | Implementada |
 | [079](079-no-matar-el-orquestador.md) | Un agente no puede cerrar el orquestador: matar por nombre electron, node, claude u orquestador se deniega con cualquier permiso | M15j | Implementada |
 | [078](078-aprobaciones-en-modal.md) | Aprobaciones largas en un modal: confirmaciones y revisiones con quién pregunta siempre a la vista y «Aprobar» fijo abajo | M15i | Implementada |

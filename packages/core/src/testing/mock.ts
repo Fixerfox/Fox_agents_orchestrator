@@ -123,7 +123,7 @@ export class MockAgent implements AgentAdapter {
 }
 
 export interface MockDeciderConfig {
-  route?: (req: { nodeId: Id; candidates: RouteCandidate[]; input: Payload }) => {
+  route?: (req: { nodeId: Id; candidates: RouteCandidate[]; input: Payload; criteria?: string }) => {
     edgeIds: Id[];
     reason: string;
   };
