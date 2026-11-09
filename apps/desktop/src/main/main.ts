@@ -3,7 +3,7 @@ import { appendFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { execFile, spawn } from 'node:child_process';
-import { ASSISTANT_EVENTS_CHANNEL, CHANNELS, OPEN_RUN_CHANNEL, RUN_EVENTS_CHANNEL, TERMINAL_EVENTS_CHANNEL } from '@orquestador/editor';
+import { ASSISTANT_EVENTS_CHANNEL, CHANNELS, OPEN_RUN_CHANNEL, RUN_EVENTS_CHANNEL, TERMINAL_EVENTS_CHANNEL, TEST_ARG, TEST_CALL_CHANNEL, TEST_READY_CHANNEL, TEST_REPLY_CHANNEL } from '@orquestador/editor';
 import { sdkCreateAppServer, sdkQuery } from '@orquestador/claude';
 import { ApiKeyVault, McpSecretVault, RecentStore, SettingsStore } from '@orquestador/store';
 import { crashLine } from './crash';
@@ -13,6 +13,17 @@ import { DesktopHandlers } from './handlers';
 import { TerminalService, type SpawnPty } from './terminal';
 import { parseWindowTone, secureWebContents, titleBarOverlay, windowOptions, TITLEBAR, WINDOW_TONE_CHANNEL } from './window';
 import { APP_USER_MODEL_ID, appIdRegistration } from './windows-app-id';
+import { ConsoleLog, DialogQueue, RendererBridge, consoleEntry } from './test-mcp/bridge';
+import { TEST_DATA_FOLDER, loadToken, startTestServer, testMode } from './test-mcp/server';
+import { testTools } from './test-mcp/tools';
+
+// Modo prueba: con sus propios datos, antes de pedir la instancia única, para convivir con la app normal [R82.1][R82.2].
+const test = testMode(process.argv, app.isPackaged);
+if (test) app.setPath('userData', join(app.getPath('appData'), TEST_DATA_FOLDER));
+/** Respuestas para los diálogos de archivos; solo se llena en modo prueba [R82.11]. */
+const dialogs = new DialogQueue();
+/** Errores y avisos de la interfaz, para el modo prueba [R82.15]. */
+const consoleLog = new ConsoleLog();
 
 // Una sola instancia: abrir la app otra vez enseña la ventana que ya existe [R61.6].
 if (!app.requestSingleInstanceLock()) app.exit(0);
@@ -92,36 +103,36 @@ const handlers = new DesktopHandlers({
   watchRun: (event, diagram) => background.onRunEvent(event, diagram),
   offerInterrupted: (runs, act) => background.offerInterrupted(runs, act),
   memoryProposals: (n) => background.memoryProposals(n),
-  async pickSkillFiles(kind) {
+  pickSkillFiles: (kind) => dialogs.many(async () => {
     const res = await dialog.showOpenDialog({
       title: kind === 'folder' ? 'Elige la carpeta de referencia' : 'Elige los archivos de referencia',
       properties: kind === 'folder' ? ['openDirectory'] : ['openFile', 'multiSelections'],
     });
     return res.canceled || res.filePaths.length === 0 ? null : res.filePaths;
-  },
-  async pickInputFiles(defaultPath) {
+  }),
+  pickInputFiles: (defaultPath) => dialogs.many(async () => {
     const res = await dialog.showOpenDialog({
       title: defaultPath ? 'Elige archivos del proyecto para la entrada' : 'Adjunta archivos a la entrada',
       properties: ['openFile', 'multiSelections'],
       ...(defaultPath ? { defaultPath } : {}),
     });
     return res.canceled || res.filePaths.length === 0 ? null : res.filePaths;
-  },
-  async pickImport(kind) {
+  }),
+  pickImport: (kind) => dialogs.one(async () => {
     const res = await dialog.showOpenDialog({
       title: kind === 'zip' ? 'Elige el archivo Zip con agentes o skills' : 'Elige la carpeta con agentes o skills',
       properties: kind === 'zip' ? ['openFile'] : ['openDirectory'],
       ...(kind === 'zip' ? { filters: [{ name: 'Zip', extensions: ['zip'] }] } : {}),
     });
     return res.canceled ? null : (res.filePaths[0] ?? null);
-  },
-  async pickFolder(purpose) {
+  }),
+  pickFolder: (purpose) => dialogs.one(async () => {
     const res = await dialog.showOpenDialog({
       title: purpose === 'create' ? 'Elige o crea la carpeta del proyecto' : purpose === 'work' ? 'Elige la carpeta de trabajo de los agentes' : 'Abre la carpeta de un proyecto',
       properties: purpose === 'create' ? ['openDirectory', 'createDirectory'] : ['openDirectory'],
     });
     return res.canceled ? null : (res.filePaths[0] ?? null);
-  },
+  }),
 });
 
 const background = new Background({
@@ -173,8 +184,10 @@ const background = new Background({
 });
 
 function createWindow(): void {
-  const win = new BrowserWindow(windowOptions(join(__dirname, 'preload.cjs'), process.platform, ICON));
+  const win = new BrowserWindow(windowOptions(join(__dirname, 'preload.cjs'), process.platform, ICON, test ? { title: 'Orquestador · modo prueba', args: [TEST_ARG] } : undefined));
   mainWindow = win;
+  // El título del modo prueba no lo cambia la página [R82.3].
+  if (test) win.on('page-title-updated', (e) => e.preventDefault());
   win.on('close', (e) => background.onClose(e));
   // Al apagar o cerrar sesión, Windows no espera a una ventana que se niega a cerrarse [R61.5].
   win.on('session-end', () => background.onQuitting());
@@ -184,6 +197,7 @@ function createWindow(): void {
   // Una interfaz caída deja la ventana vacía: se recarga y vuelve al proyecto [R19.11][R19.12].
   win.webContents.on('render-process-gone', (_e, details) => {
     noteCrash(`interfaz caída: ${details.reason} (${details.exitCode})`);
+    consoleLog.add(`[caída] ${details.reason} (${details.exitCode})`);
     if (details.reason !== 'clean-exit' && !win.isDestroyed()) win.reload();
   });
   win.on('unresponsive', () => noteCrash('la interfaz no responde'));
@@ -191,10 +205,51 @@ function createWindow(): void {
   win.webContents.on('console-message', (...args: unknown[]) => {
     const message = crashLine(args);
     if (message) noteCrash(message);
+    const entry = consoleEntry(args);
+    if (entry && (entry.level === 'warning' || entry.level === 'error')) consoleLog.add(`[${entry.level}] ${entry.message}`);
   });
   // Sin menú del sistema (File, Edit…) en Windows y Linux [R19.8].
   if (process.platform !== 'darwin') win.removeMenu();
   void win.loadURL(indexUrl);
+}
+
+/** Servidor MCP del modo prueba: las acciones de la app y las de prueba [R82.4]–[R82.17]. */
+async function startTestMcp(port: number): Promise<void> {
+  const fromWindow = (sender: Electron.WebContents) => mainWindow !== undefined && !mainWindow.isDestroyed() && sender === mainWindow.webContents;
+  const bridge = new RendererBridge((call) => {
+    if (!mainWindow || mainWindow.isDestroyed()) return false;
+    mainWindow.webContents.send(TEST_CALL_CHANNEL, call);
+    return true;
+  });
+  ipcMain.on(TEST_REPLY_CHANNEL, (e, raw: unknown) => fromWindow(e.sender) && bridge.reply(raw));
+  ipcMain.on(TEST_READY_CHANNEL, (e) => fromWindow(e.sender) && bridge.ready());
+  const url = `http://127.0.0.1:${port}/mcp`;
+  const file = join(dataDir(), 'test-mcp.json');
+  const tools = testTools({
+    invoke: (channel, payload) => handlers.invoke(channel, payload),
+    renderer: (tool, args, ms) => bridge.call(tool, args, ms),
+    screenshot: async () => {
+      if (!mainWindow || mainWindow.isDestroyed()) throw new Error('No hay ventana de la app.');
+      return (await mainWindow.webContents.capturePage()).toPNG().toString('base64');
+    },
+    queueDialog: (paths) => dialogs.push(paths),
+    logs: (n) => consoleLog.last(n),
+    reload: async () => {
+      if (!mainWindow || mainWindow.isDestroyed()) throw new Error('No hay ventana de la app.');
+      const ready = bridge.nextReady(30_000);
+      mainWindow.webContents.reload();
+      await ready;
+    },
+    sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
+  });
+  try {
+    const token = await loadToken(file, url);
+    await startTestServer(port, token, () => tools);
+    console.log(`[modo prueba] MCP en ${url} · token en ${file}`);
+  } catch (e) {
+    // Con el puerto ocupado la app sigue, sin servidor [R82.6].
+    console.error(`[modo prueba] No se pudo abrir el MCP en ${url}: ${e instanceof Error ? e.message : String(e)}`);
+  }
 }
 
 // Los botones de ventana siguen el tema de la app [R19.8].
@@ -217,6 +272,7 @@ app.whenReady().then(() => {
     return abs ? net.fetch(pathToFileURL(abs).toString()) : new Response('No encontrado', { status: 404 });
   });
   createWindow();
+  if (test) void startTestMcp(test.port);
   // Espacios de ramas que quedaron de un cierre inesperado [R73.18].
   void new RecentStore(join(dataDir(), 'config')).list().then((recent) => cleanupSpaces(join(dataDir(), 'spaces'), recent.map((r) => r.root)));
   // La bandeja es para Windows y Linux, los sistemas de la app.

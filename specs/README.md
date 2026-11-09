@@ -16,6 +16,7 @@ El hito indica cuándo debe estar cubierto por tests. `npm run spec:check` exige
 ## Índice
 | Spec | Título | Hito | Estado |
 |---|---|---|---|
+| [082](082-modo-prueba-mcp.md) | Modo prueba: la app arrancada con --test-mcp abre un MCP local (token, solo 127.0.0.1, datos aparte) con las acciones del asistente y herramientas para manejar la interfaz, abrir proyectos, responder diálogos, llamar a la API y esperar ejecuciones | M16a | Implementada |
 | [079](079-no-matar-el-orquestador.md) | Un agente no puede cerrar el orquestador: matar por nombre electron, node, claude u orquestador se deniega con cualquier permiso | M15j | Implementada |
 | [078](078-aprobaciones-en-modal.md) | Aprobaciones largas en un modal: confirmaciones y revisiones con quién pregunta siempre a la vista y «Aprobar» fijo abajo | M15i | Implementada |
 | [077](077-gobierno-de-recursos.md) | Gobierno de recursos: límite global de agentes, enfriamiento compartido ante límites de uso, presupuesto con aviso y freno, pausa en la siguiente herramienta, tokens agrupados y métricas | M15h | Implementada |

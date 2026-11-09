@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { EditorSession, createDiagram, t, type ProjectApi } from '@orquestador/editor';
+import { EditorSession, createDiagram, t, type ProjectApi, type TestBridgeApi } from '@orquestador/editor';
 import { isolatesBranches } from '@orquestador/core';
 import { DraftStore, type LibraryTarget, type OpenLibrary } from '../common';
 import type { AssistantHost, ChatState } from '../assistant';
@@ -19,6 +19,8 @@ export interface AppProps {
   confirm?: (message: string) => boolean;
   /** Abre el editor directamente, sin pantalla de inicio: para pruebas y para desarrollar la vista. */
   initialProject?: string;
+  /** Puente del modo prueba; solo existe con la app arrancada en modo prueba [R82.7]. */
+  test?: TestBridgeApi;
 }
 
 /** Estado de la aplicación: compone los hooks de cada contexto y lo que los une (proyecto, sección y asistente) [R32.13]. */
