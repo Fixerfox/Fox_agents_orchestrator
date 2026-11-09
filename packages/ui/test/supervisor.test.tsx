@@ -162,19 +162,20 @@ describe('SPEC-060 · lo que se ve de la ejecución', () => {
     expect(open).toHaveBeenCalled();
   });
 
-  it('[R69.4] la tarjeta enseña la rama y las dos últimas entradas de la memoria, se pliega y «Ver las N entradas» pide la pestaña', () => {
-    const second = ev({ type: 'supervisor.note', nodeId: 'a', text: 'Luego el mar', files: [] });
-    const third = ev({ type: 'supervisor.note', nodeId: 'a', text: 'Y las nubes', files: ['cielo.png', 'mar.png', 'nubes.png'] });
+  it('[R69.4] bajo la tarjeta, el botón «Memoria» dice cuántas entradas hay por bloque y abre la memoria en un modal', () => {
+    const second = ev({ type: 'supervisor.note', nodeId: 'b', text: 'Luego el mar', files: [] });
+    const third = ev({ type: 'supervisor.note', nodeId: 'c', text: 'Y las nubes', files: ['cielo.png', 'mar.png', 'nubes.png'] });
     const onAll = vi.fn();
     render(<SupervisorMemory view={view([start, branch, reviewed, second, third])} onAll={onAll} />);
-    const panel = within(screen.getByRole('region', { name: 'Memoria de la ejecución' }));
-    expect(panel.getByText(/feature\/login/)).toBeTruthy();
-    expect(panel.getAllByRole('listitem').map((li) => li.querySelector('.orq-memcard__text')!.textContent)).toEqual(['Y las nubes', 'Luego el mar']);
-    expect(panel.getByText('+1')).toBeTruthy();
-    fireEvent.click(panel.getByRole('button', { name: 'Ver las 3 entradas' }));
+    const button = screen.getByRole('button', { name: 'Abrir la memoria de la ejecución: 3 pasos' });
+    expect(button.textContent).toContain('3 pasos');
+    fireEvent.click(button);
     expect(onAll).toHaveBeenCalled();
-    fireEvent.click(panel.getByRole('button', { name: 'Plegar la memoria' }));
-    expect(panel.queryByRole('listitem')).toBeNull();
+  });
+
+  it('[R69.4] sin nada anotado, la memoria no ocupa el lienzo', () => {
+    const { container } = render(<SupervisorMemory view={view([start])} />);
+    expect(container.innerHTML).toBe('');
   });
 
   it('[R60.39] el Resumen da el balance y la rama', () => {

@@ -1,6 +1,6 @@
 # SPEC-074 · Ejecución duradera
 
-**Estado:** Borrador · **Hito:** M15e · **Paquetes:** `core`, `store`, `runtime`, `apps/desktop`, `editor`, `ui` · **Rama:** `feature/ejecucion-duradera`
+**Estado:** Implementada · **Hito:** M15e · **Paquetes:** `core`, `store`, `runtime`, `apps/desktop`, `editor`, `ui` · **Rama:** `feature/robustez-ejecucion`
 
 ## Propósito
 El planificador (`executeDiagram`) guarda en memoria todo lo que sabe de una ejecución: qué aristas se entregaron, en qué vuelta va cada revisión, qué preguntas esperan respuesta. Si la app se cierra, se cuelga o se apaga el equipo, la ejecución queda `interrupted` y se pierde ese estado (auditoría del 08/11, P3 y P11):
@@ -32,26 +32,26 @@ Una ejecución duradera es la que, tras un corte, sigue desde donde estaba y por
 
 ## Requisitos
 ### Reproducción
-- **R74.1** [M15e] Cada paso tiene una clave estable `stepKey(path, nodeId, pass)`, donde `pass` cuenta desde 1 las veces que ese nodo arranca en esa ruta (vueltas de bucle, retornos de revisión, repeticiones por «no terminó lo pedido»). `node.started` y `node.finished` llevan `pass`.
+- **R74.1** [M15e] Cada paso tiene una clave estable `stepKey(path, nodeId, pass)`, donde `pass` cuenta desde 1 las veces que ese nodo arranca en esa ruta (vueltas de bucle, retornos de revisión, repeticiones por «no terminó lo pedido»). La pasada no se guarda en los eventos: se cuenta con `stepKeysOf(events)` (los `node.started` de la misma ruta), así que no hay dos fuentes que puedan no coincidir y las grabaciones de SPEC-056 no cambian.
 - **R74.2** [M15e] `ResumeCache` se indexa por `stepKey` y no solo por id del nivel principal: se reutilizan pasos de cualquier nivel, también dentro de bucles y subdiagramas (cambia R41.1).
 - **R74.3** [M15e] Al reanudar se reutilizan, por `stepKey`: la salida de los pasos que terminaron bien (con su rastro, R41.7), el resultado de cada `decision` (ruta, condiciones, veredicto del juez y de la revisión) y cada respuesta de la persona a una pregunta del mismo paso y pasada.
-- **R74.4** [M15e] Una decisión reutilizada emite `decision` con `reused: true` y no consulta al motor ni gasta. Si el diagrama cambió y la ruta reutilizada ya no existe, se vuelve a decidir y se avisa con `supervisor.alert` `resume-diverged`.
+- **R74.4** [M15e] Una decisión reutilizada emite `decision` con `reused: true` y no consulta al motor ni gasta. Si el diagrama cambió y la ruta (o las condiciones) reutilizadas ya no existen, se vuelve a decidir y se avisa con `supervisor.alert` `resume-diverged`.
 - **R74.5** [M15e] Un paso que estaba en marcha al cortarse se ejecuta de nuevo. Recibe como `previousAnswers` las respuestas que ya había dado la persona en esa pasada y, como intento anterior (SPEC-071), «la ejecución se interrumpió» con los archivos que había tocado.
-- **R74.6** [M15e] Una pregunta que esperaba respuesta al cortarse vuelve a salir cuando el paso llega otra vez a ella, y el aviso del sistema (SPEC-061) se repite. Si al repetirse el paso hace la misma pregunta (mismo `stepKey` y mismo texto) que ya tenía respuesta, se responde sola con esa respuesta, marcada como reutilizada.
+- **R74.6** [M15e] Una pregunta que esperaba respuesta al cortarse vuelve a salir cuando el paso llega otra vez a ella, y el aviso del sistema (SPEC-061) se repite. Si al repetirse el paso hace la misma pregunta (mismo `stepKey` y mismo texto) que ya tenía respuesta, se responde sola con esa respuesta: salen `agent.question` y `agent.answer` con `reused: true`.
 - **R74.7** [M15e] Al corregir, se reutilizan como hoy los pasos anteriores al corregido; desde el corregido en adelante no se reutiliza nada, tampoco las decisiones (R53.8).
 - **R74.8** [M15e] Una revisión humana ya aprobada se reutiliza por `stepKey` (cambia R53.9, que solo valía en el nivel principal).
 
 ### Validación antes de empezar
-- **R74.9** [M15e] Antes de `run.started` se resuelven todas las plantillas de los subdiagramas (de la copia de la ejecución, R52.1) y se valida el árbol entero: tipos sin handler (R56.12), `validateDiagram` de cada nivel, profundidad máxima y referencias circulares. Si algo falla, la ejecución termina `failed` sin haber ejecutado ningún paso, con `reason: 'invalid-diagram'` y cada problema con su ruta.
+- **R74.9** [M15e] Antes de `run.started` se resuelven todas las plantillas de los subdiagramas (de la copia de la ejecución, R52.1) y se valida el árbol entero: tipos sin handler (R56.12), `validateDiagram` de cada nivel, profundidad máxima y referencias circulares. Si algo falla, la ejecución termina `failed` sin haber ejecutado ningún paso, con `reason: 'invalid-diagram'` (o `node-no-handler`, como R56.12) y un `error` por problema con su ruta. La ejecución usa las plantillas que se resolvieron aquí.
 
 ### Lo que se escribe en disco
 - **R74.10** [M15e] Tras `node.finished` con `succeeded`, tras cada `decision` y tras cada `agent.answer`, el registro hace `fsync` de `events.jsonl` antes de seguir, para que lo reutilizable nunca se pierda en un corte. Los demás eventos se siguen escribiendo sin esperar.
 - **R74.11** [M15e] `meta.json` guarda `lastStepKey` y cuántos pasos terminaron, para enseñar en la bandeja hasta dónde llegó sin leer todo el registro.
 
 ### Al abrir la app
-- **R74.12** [M15e] Al abrir un proyecto, las ejecuciones `interrupted` de las últimas 72 horas salen en la bandeja (SPEC-061) como «Interrumpida en <paso>» con «Reanudar» y «Descartar». No se reanuda nada solo.
+- **R74.12** [M15e] Al abrir un proyecto, las ejecuciones `interrupted` de las últimas 72 horas (sin reanudar aún) salen en el menú de la bandeja (SPEC-061) como «<diagrama>: interrumpida tras «<último paso terminado>»» con «Reanudar» y «Descartar», y un aviso del sistema lo dice. No se reanuda nada solo.
 - **R74.13** [M15e] «Reanudar» crea una ejecución nueva enlazada a la anterior (`resumedFrom`), como hoy. El Resumen dice cuántos pasos, decisiones y respuestas se reutilizaron y cuánto se ahorró según lo que costaron en la anterior.
-- **R74.14** [M15e] Los espacios aislados de una ejecución interrumpida (SPEC-073) se borran al abrir. Una rama que no llegó a fusionarse se repite entera al reanudar.
+- **R74.14** [M15e] Los espacios aislados de una ejecución interrumpida (SPEC-073) se borran al abrir la app (R73.18). Una rama que no llegó a fusionarse se repite entera al reanudar: `replayPlan` no reutiliza sus salidas ni sus decisiones.
 
 ## Escenarios
 - **E74.a** *Dado* un bucle de 8 vueltas cortado en la 7, *entonces* al reanudar las vueltas 1 a 6 se reutilizan con sus veredictos y la 7 se ejecuta de nuevo.
@@ -63,6 +63,7 @@ Una ejecución duradera es la que, tras un corte, sigue desde donde estaba y por
 ## Cambia
 - **R41.1:** se reutiliza en cualquier nivel por `stepKey`, y también las decisiones y las respuestas (R74.2–R74.3).
 - **R53.9:** las aprobaciones de revisión humana se reutilizan por `stepKey` (R74.8).
+- **R6.6:** una plantilla que falta o no es válida hace fallar la ejecución antes de empezar, no al llegar al nodo (R74.9).
 
 ## Fuera de alcance
 - Retomar un paso de agente a mitad de su turno (sesión del SDK). Se repite entero con lo que dejó (R74.5).

@@ -17,8 +17,10 @@ const LONG = '¿Puedo ejecutar este comando?\n\n' + Array.from({ length: 200 }, 
 describe('una pregunta larga no oculta sus botones', () => {
   it('el texto va en su propia caja con scroll; opciones y respuesta quedan fuera de ella', async () => {
     const onAnswer = vi.fn();
-    const { container } = render(<QuestionCard item={{ text: LONG, options: ['Permitir', 'Denegar'] }} from="Implementador" onAnswer={onAnswer} />);
-    const box = container.querySelector('.orq-inbox__text')!;
+    render(<QuestionCard item={{ text: LONG, options: ['Permitir', 'Denegar'] }} from="Implementador" onAnswer={onAnswer} />);
+    // Una pregunta tan larga se responde en un modal [R78.1][R78.3].
+    await userEvent.click(screen.getByRole('button', { name: 'Revisar y responder' }));
+    const box = screen.getByRole('dialog').querySelector('.orq-qmodal__body')!;
     expect(box).toBeTruthy();
     expect(box.textContent).toContain('linea_199');
     // se puede llegar con el teclado para desplazarlo

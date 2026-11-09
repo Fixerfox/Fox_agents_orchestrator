@@ -1,4 +1,5 @@
 import { COORDINATOR_ID } from '@orquestador/core';
+import { applyStepPatch, type StepPatch } from './ops-step';
 import {
   CURRENT_SCHEMA_VERSION,
   mergeExtra,
@@ -157,7 +158,7 @@ export function moveNodes(root: Diagram, path: readonly Id[], moves: { id: Id; p
   });
 }
 
-export interface NodePatch {
+export interface NodePatch extends StepPatch {
   label?: string;
   agentId?: Id;
   /** Tarea del nodo agente; cadena vacía la quita [R32.1]. */
@@ -215,6 +216,7 @@ export function updateNode(root: Diagram, path: readonly Id[], id: Id, patch: No
         if (patch.confirm) next.confirm = true;
         else delete next.confirm;
       }
+      if (!applyStepPatch(next, n, patch)) throw ERR('invalid');
       if (patch.extra !== undefined) {
         if (n.kind !== 'agent') throw ERR('invalid');
         const clean = cleanExtra(patch.extra);

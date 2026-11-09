@@ -26,6 +26,12 @@ export interface SettingsApi {
   clearApiKey(): Promise<ApiResult<SettingsView>>;
 }
 
+/** Ajustes nuevos por forma: objetos, sí/no, números y palabras [R70.21]. */
+const SETTINGS_OBJECTS = ['limits', 'unanswered'];
+const SETTINGS_FLAGS: string[] = ['isolateBranches', 'claudeAutoMemory'];
+const SETTINGS_NUMBERS: string[] = ['memoryTokens', 'projectMemoryTokens', 'maxAgentsTotal', 'burnRateUsdPerMin'];
+const SETTINGS_WORDS: string[] = ['supervisorStopAt', 'supervisorVerifyModel', 'supervisorUnverified', 'onBudget'];
+
 export function parseSettingsRequest(channel: string, payload: unknown, { bad, exact, str }: RequestCheck): unknown {
   switch (channel) {
     case CHANNELS.testConnection:
@@ -35,7 +41,12 @@ export function parseSettingsRequest(channel: string, payload: unknown, { bad, e
       return undefined;
     case CHANNELS.saveSettings: {
       if (!isObject(payload)) throw bad('se esperaban ajustes');
-      exact(payload, ['schemaVersion', 'authMode', 'engine', 'defaultModel', 'maxParallel', 'defaultMaxTokens', 'permissions', 'claudeConfig', 'supervisorReview', 'supervisorModel', 'supervisorHumanChecks']);
+      exact(payload, ['schemaVersion', 'authMode', 'engine', 'defaultModel', 'maxParallel', 'defaultMaxTokens', 'permissions', 'claudeConfig', 'supervisorReview', 'supervisorModel', 'supervisorHumanChecks', ...SETTINGS_OBJECTS, ...SETTINGS_FLAGS, ...SETTINGS_NUMBERS, ...SETTINGS_WORDS]);
+      // Los ajustes de SPEC-070–077 se comprueban por su forma; el contenido lo valida `validateSettings` al guardar.
+      for (const k of SETTINGS_OBJECTS) if (payload[k] !== undefined && !isObject(payload[k])) throw bad(`${k} no válido`);
+      for (const k of SETTINGS_FLAGS) if (payload[k] !== undefined && typeof payload[k] !== 'boolean') throw bad(`${k} no válido`);
+      for (const k of SETTINGS_NUMBERS) if (payload[k] !== undefined && typeof payload[k] !== 'number') throw bad(`${k} no válido`);
+      for (const k of SETTINGS_WORDS) if (payload[k] !== undefined) str(payload[k], k, 200);
       if (typeof payload.schemaVersion !== 'number') throw bad('falta la versión');
       str(payload.authMode, 'authMode', 50);
       str(payload.engine, 'engine', 50);

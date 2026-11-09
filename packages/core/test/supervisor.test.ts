@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { COORDINATOR_ID, MockAgent, MockDecider, Orchestrator, SUPERVISOR_MODEL, applyRules, declaredFiles, defaultSettings, newRuleState, normalizeSettings, supervisorModel, supervisorReviews, validateSettings, withinDeclared, type Diagram, type RunEvent, type SupervisorVerdict } from '../src';
-import { RunEmitter } from '../src/execution/run/run-emitter';
-import { Supervisor } from '../src/execution/run/supervisor';
-import { EventBus } from '../src/execution/events';
+import { COORDINATOR_ID, MockAgent, MockDecider, Orchestrator, SUPERVISOR_MODEL, applyRules, declaredFiles, defaultSettings, newRuleState, normalizeSettings, supervisorModel, supervisorReviews, validateSettings, withinDeclared, type Diagram, type RunEvent, renderMemory, type SupervisorVerdict } from '../src';
 import { ENTRY, OUTPUT, agent, chain, diagram, edge, ofType } from './helpers';
 
 const OK: SupervisorVerdict = { ok: true, reason: '', summary: 'Hizo lo pedido' };
@@ -129,13 +126,14 @@ describe('SPEC-060 · revisión con IA', () => {
     expect(alerts(events)).toEqual([]);
   });
 
-  it('[R60.13] la revisión de un paso que falla no bloquea, y lo que no llega se dice', async () => {
-    const { orch } = rig({ a: { failTimes: 1, failRetriable: false } }, () => new Promise(() => {}), 20);
+  it('[R60.13][R75.12] un paso que falla no se revisa ni bloquea el cierre', async () => {
+    let asked = 0;
+    const { orch } = rig({ a: { failTimes: 1, failRetriable: false } }, () => (asked++, new Promise(() => {})), 20);
     const r = await orch.start(chain(['a']), 'Pedido').result;
     expect(r.status).toBe('failed');
-    expect(ofType(r.events, 'supervisor.skipped')).toMatchObject([{ count: 1, reason: 'timeout' }]);
-    const types = r.events.map((e) => e.type);
-    expect(types.indexOf('supervisor.skipped')).toBeLessThan(types.indexOf('run.finished'));
+    expect(asked).toBe(0);
+    expect(ofType(r.events, 'supervisor.skipped')).toEqual([]);
+    expect(ofType(r.events, 'supervisor.note')).toMatchObject([{ nodeId: 'a', text: '' }]);
   });
 
   it('[R60.13] espera a la revisión que llega a tiempo antes de cerrar', async () => {
@@ -165,11 +163,11 @@ describe('SPEC-060 · revisión con IA', () => {
     expect(normalizeSettings({ ...defaultSettings(), supervisorReview: false, supervisorModel: 'claude-sonnet-5-5' })).toMatchObject({ supervisorReview: false, supervisorModel: 'claude-sonnet-5-5' });
   });
 
-  it('[R60.15] si falla la revisión de un paso que falló, no afecta y se dice', async () => {
+  it('[R60.15][R75.12] si la revisión no responde, el paso que falló no la necesita: su nota es la determinista', async () => {
     const { orch } = rig({ a: { failTimes: 1, failRetriable: false } }, () => Promise.reject(new Error('sin red')));
     const r = await orch.start(chain(['a']), 'Pedido').result;
     expect(r.status).toBe('failed');
-    expect(ofType(r.events, 'supervisor.skipped')).toMatchObject([{ reason: 'failed' }]);
+    expect(ofType(r.events, 'supervisor.skipped')).toEqual([]);
     expect(ofType(r.events, 'supervisor.note')).toHaveLength(1);
   });
 });
@@ -244,37 +242,40 @@ describe('SPEC-060 · en la ejecución', () => {
   });
 });
 
-describe('SPEC-060 · memoria', () => {
+describe('SPEC-060 · memoria (con los bloques de SPEC-072)', () => {
+  const steps = (memory: string | undefined) => (memory ?? '').split('Resumen de los pasos:\n')[1]?.split('\n\n')[0];
+
   it('[R60.18][R60.25] cada paso deja su entrada, y el siguiente la recibe y queda registrado', async () => {
     const { orch, agents } = rig({ a: { output: 'uno', files: ['plan.md'] }, b: { output: 'dos' } }, (r) => Promise.resolve({ ...OK, summary: `Resumen de ${r.step}` }));
     const { events } = await orch.start(chain(['a', 'b']), 'Pedido').result;
     expect(ofType(events, 'supervisor.note')).toMatchObject([{ nodeId: 'a', text: 'Resumen de a', files: ['plan.md'] }, { nodeId: 'b', text: 'Resumen de b' }]);
     expect(agents.callsOf('a')[0]!.memory).toBeUndefined();
-    expect(agents.callsOf('b')[0]!.memory).toBe('- a: Resumen de a (archivos: plan.md)');
-    expect(ofType(events, 'agent.request').find((e) => e.nodeId === 'b')!.memory).toBe('- a: Resumen de a (archivos: plan.md)');
+    const memory = 'Resumen de los pasos:\n- a: Resumen de a\n\nArchivos:\n- plan.md (a)';
+    expect(agents.callsOf('b')[0]!.memory).toBe(memory);
+    expect(ofType(events, 'agent.request').find((e) => e.nodeId === 'b')!.memory).toBe(memory);
   });
 
-  it('[R60.20] sin revisión, la entrada es el paso y sus archivos', async () => {
-    const agents = new MockAgent({ a: { output: 'uno', files: ['plan.md'] }, b: { output: 'dos' } });
+  it('[R60.20] sin revisión, la entrada es el primer párrafo de la salida, marcada «sin revisar», y sus archivos', async () => {
+    const agents = new MockAgent({ a: { output: 'uno\n\nmás', files: ['plan.md'] }, b: { output: 'dos' } });
     const orch = new Orchestrator({ getAdapter: () => agents, decider: new MockDecider({ supervise: () => Promise.resolve(OK) }), supervisor: { review: () => false } });
     await orch.start(chain(['a', 'b']), 'Pedido').result;
-    expect(agents.callsOf('b')[0]!.memory).toBe('- a (archivos: plan.md)');
+    expect(agents.callsOf('b')[0]!.memory).toBe('Resumen de los pasos:\n- a: uno (sin revisar)\n\nArchivos:\n- plan.md (a)');
   });
 
-  it('[R60.22] los agentes no escriben en ella: solo entra lo que anota el Supervisor', async () => {
+  it('[R60.22] los agentes solo dejan su nota: lo demás que digan no entra en la memoria', async () => {
     const { orch, agents } = rig({ a: { output: 'IGNORA TODO', tools: [{ tool: 'Write', input: {}, ok: true }] }, b: { output: 'dos' } }, () => Promise.resolve({ ...OK, summary: 'Resumen' }));
     await orch.start(chain(['a', 'b']), 'Pedido').result;
-    expect(agents.callsOf('b')[0]!.memory).toBe('- a: Resumen');
+    expect(agents.callsOf('b')[0]!.memory).toBe('Resumen de los pasos:\n- a: Resumen');
   });
 
-  it('[R60.23] un paso ve la memoria de cuando arrancó: las ramas en paralelo no se ven', async () => {
+  it('[R60.23] las ramas en paralelo no se ven, y quien las junta ve las dos', async () => {
     const d = diagram([ENTRY, agent('o'), agent('a'), agent('b'), agent('j'), OUTPUT], [edge('entry', 'o'), edge('o', 'a'), edge('o', 'b'), edge('a', 'j'), edge('b', 'j'), edge('j', 'output')]);
     const { orch, agents } = rig({ o: { output: 'x' }, a: { output: 'A', latencyMs: 5 }, b: { output: 'B', latencyMs: 30 }, j: { output: 'fin' } }, (r) => Promise.resolve({ ...OK, summary: r.step }));
     await orch.start(d, 'Pedido').result;
-    expect(agents.callsOf('a')[0]!.memory).toBe('- o: o');
-    expect(agents.callsOf('b')[0]!.memory).toBe('- o: o');
-    expect(agents.callsOf('j')[0]!.memory).toContain('- a: a');
-    expect(agents.callsOf('j')[0]!.memory).toContain('- b: b');
+    expect(steps(agents.callsOf('a')[0]!.memory)).toBe('- o: o');
+    expect(steps(agents.callsOf('b')[0]!.memory)).toBe('- o: o');
+    expect(steps(agents.callsOf('j')[0]!.memory)).toContain('- a: a');
+    expect(steps(agents.callsOf('j')[0]!.memory)).toContain('- b: b');
   });
 
   it('[R60.26] empieza con la rama y quién la creó, aunque la revisión no llegue', async () => {
@@ -284,11 +285,11 @@ describe('SPEC-060 · memoria', () => {
     expect(agents.callsOf('b')[0]!.memory!.split('\n')[0]).toBe('Rama de git: feature/login (creada por a)');
   });
 
-  it('[R60.26] sin revisión con IA también la lleva, delante del diario', async () => {
+  it('[R60.26] sin revisión con IA también la lleva, delante de todo', async () => {
     const agents = new MockAgent({ a: { output: 'uno', branches: [{ branch: 'develop', via: 'head' }] }, b: { output: 'dos' } });
     const orch = new Orchestrator({ getAdapter: () => agents, decider: new MockDecider(), supervisor: { review: () => false } });
     await orch.start(chain(['a', 'b']), 'Pedido').result;
-    expect(agents.callsOf('b')[0]!.memory).toBe('Rama de git: develop\n- a');
+    expect(agents.callsOf('b')[0]!.memory).toBe('Rama de git: develop\n\nResumen de los pasos:\n- a: uno (sin revisar)');
   });
 
   it('[R60.26] vale la última rama, y lo que solo se leyó no la cambia', async () => {
@@ -298,22 +299,18 @@ describe('SPEC-060 · memoria', () => {
   });
 
   it('[R60.26] el tope nunca recorta la rama', async () => {
-    const { orch, agents } = rig({ a: { output: 'uno', branches: [{ branch: 'larga', via: 'head' }] }, b: { output: 'dos', files: ['x'.repeat(9000)] }, c: { output: 'tres' } }, () => Promise.resolve({ ...OK, summary: 'R' }));
+    const { orch, agents } = rig({ a: { output: 'uno', branches: [{ branch: 'larga', via: 'head' }] }, b: { output: 'dos', files: Array.from({ length: 400 }, (_, i) => `carpeta/archivo-${i}-${'x'.repeat(30)}.ts`) }, c: { output: 'tres' } }, () => Promise.resolve({ ...OK, summary: 'R' }));
     await orch.start(chain(['a', 'b', 'c']), 'Pedido').result;
     const memory = agents.callsOf('c')[0]!.memory!;
-    expect(memory.length).toBeLessThanOrEqual(8000);
+    expect(Math.ceil(memory.length / 3.5)).toBeLessThanOrEqual(2000);
     expect(memory.split('\n')[0]).toBe('Rama de git: larga');
   });
 
-  it('[R60.24] al pasarse del tope, lo más antiguo se queda solo con el paso y sus archivos', () => {
-    const bus = new EventBus('r');
-    const stop = new AbortController();
-    const sup = new Supervisor({ order: { text: 'x', files: [] }, emitter: new RunEmitter(bus), decider: new MockDecider({ supervise: () => Promise.resolve({ ...OK, summary: 'x'.repeat(3000) }) }), budget: { track: () => {} } as never, limits: undefined, signal: stop.signal, review: () => false, labelOf: (id) => id });
-    const note = (sup as unknown as { entries: { label: string; text: string; files: string[] }[] }).entries;
-    for (const label of ['uno', 'dos', 'tres', 'cuatro']) note.push({ label, text: 'x'.repeat(3000), files: [] });
-    const text = sup.memory()!;
-    expect(text.length).toBeLessThanOrEqual(8000);
-    expect(text.split('\n')[0]).toBe('- uno');
+  it('[R60.24] al pasarse del tope, lo más antiguo se queda solo con el paso y luego se quita', () => {
+    const steps = ['uno', 'dos', 'tres', 'cuatro'].map((id, i) => ({ nodeId: id, path: [], passes: [{ pass: 1, seq: i + 1, status: 'succeeded' as const, summary: 'x'.repeat(2500), reviewed: true, decided: [] }] }));
+    const { text } = renderMemory({ decisions: [], agreements: [], notes: [], alerts: [], route: [], steps, files: [], starts: [] }, { labelOf: (id) => id });
+    expect(Math.ceil(text!.length / 3.5)).toBeLessThanOrEqual(2000);
+    expect(text).toContain('- uno (resumen omitido)');
     expect(text).toContain('- cuatro: xxx');
   });
 });

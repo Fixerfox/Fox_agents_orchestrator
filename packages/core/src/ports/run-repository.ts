@@ -24,6 +24,11 @@ export interface RunMeta {
   correctedBy?: string[];
   /** Avisos de una ejecución que terminó bien con algo pendiente, p. ej. el entregable [R46.11]. */
   warnings?: string[];
+  /** Último paso que terminó bien (`ruta/nodo#pasada`) y cuántos terminaron, para la bandeja [R74.11]. */
+  lastStepKey?: string;
+  stepsDone?: number;
+  /** Reintentos de toda la ejecución, para ordenar y filtrar [R77.19]. */
+  retries?: number;
   /** Dada por buena tras fallar: quién, por qué, cuándo y el motivo del fallo [R65.5]. */
   accepted?: RunAcceptance & { at: string; previousReason?: string };
 }
@@ -69,6 +74,14 @@ export interface RunRepository {
   snapshotStep(args: { runId: string; workRoot: string; key: string; files: readonly string[]; blocked: (rel: string) => boolean }): Promise<unknown>;
   /** Ruta absoluta de la copia de un archivo de un paso, si existe [R54.4]. */
   findPreview(runId: string, key: string, rel: string): Promise<string | undefined>;
+  /** Añade lo que dijo la persona de un aviso a una ejecución terminada [R75.21]. */
+  addFeedback?(runId: string, body: { alertSeq: number; verdict: 'false-alarm' | 'confirmed'; note?: string; nodeId?: string }): Promise<void>;
+  /** Añade un evento al final del registro de una ejecución terminada (propuestas de memoria y lo decidido) [R76.8]. */
+  appendEvent?(runId: string, body: Record<string, unknown>): Promise<void>;
+  /** Guarda un caso de referencia del Supervisor [R75.23]. */
+  addSupervisorCase?(c: unknown): Promise<void>;
+  /** Ruta absoluta de una versión guardada de un conflicto (`<rama>/rama|destino/<ruta>`), si existe [R73.16]. */
+  findConflict?(runId: string, rel: string): Promise<string | undefined>;
   /** Carpeta de los resultados de una ejecución (R20.6). */
   outputFolder(runId: string): string;
   /** Carpeta en la que trabajan los agentes [R48.5]. */

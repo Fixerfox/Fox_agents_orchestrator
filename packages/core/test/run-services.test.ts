@@ -129,7 +129,7 @@ describe('SPEC-056 · servicios de una ejecución, sin orquestador', () => {
     const broker = (timeoutMs?: number) => {
       const em = emitter();
       const ctrl = new AbortController();
-      return { em, ctrl, q: new QuestionBroker(em, ctrl.signal, timeoutMs) };
+      return { em, ctrl, q: new QuestionBroker(em, ctrl.signal, timeoutMs === undefined ? undefined : { afterMinutes: timeoutMs / 60000, action: 'fail' as const }) };
     };
 
     it('[R56.13] pregunta, queda pendiente y se responde una sola vez', async () => {

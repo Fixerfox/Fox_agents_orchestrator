@@ -101,7 +101,9 @@ describe('SPEC-043 · confirmar antes de terminar (interfaz)', () => {
   it('[R43.8] en «Necesitan tu respuesta» dice qué se confirma y el resumen va en Markdown', async () => {
     const onAnswer = vi.fn();
     render(<QuestionCard item={{ text: MD, options: ['Aprobar'], confirm: { round: 1 } }} from="Sprites" onAnswer={onAnswer} />);
-    const card = within(screen.getByRole('article', { name: 'Confirmar lo que ha hecho Sprites' }));
+    // Una confirmación se revisa en un modal [R78.3].
+    await userEvent.click(within(screen.getByRole('article', { name: 'Confirmar lo que ha hecho Sprites' })).getByRole('button', { name: 'Revisar y responder' }));
+    const card = within(screen.getByRole('dialog', { name: 'Confirmar lo que ha hecho Sprites' }));
     expect(card.getByRole('heading', { name: 'Hecho' })).toBeTruthy();
     await userEvent.click(card.getByRole('button', { name: 'Aprobar' }));
     expect(onAnswer).toHaveBeenCalledWith('Aprobar');

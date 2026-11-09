@@ -148,9 +148,10 @@ describe('SPEC-056 · casos de uso: otro motor', () => {
     const library = new MemoryLibrary();
     library.agentList = [{ ...newAgent(COORDINATOR_ID, 'Falso'), instructions: 'otra cosa' }, newAgent('a', 'Ana')];
     const agents = await withBuiltinAgents(library).agents();
-    expect(agents.map((a) => a.name)).toEqual(['Ana', 'Coordinador']);
-    expect(agents.at(-1)!.instructions).toContain('sin hacerlo');
-    expect((await withBuiltinAgents(new MemoryLibrary()).agents()).map((a) => a.id)).toEqual([COORDINATOR_ID]);
+    // El Verificador también viene con la app (SPEC-075).
+    expect(agents.map((a) => a.name)).toEqual(['Ana', 'Coordinador', 'Verificador']);
+    expect(agents.find((a) => a.id === COORDINATOR_ID)!.instructions).toContain('sin hacerlo');
+    expect((await withBuiltinAgents(new MemoryLibrary()).agents()).map((a) => a.id)).toEqual([COORDINATOR_ID, 'verificador']);
   });
 
   it('[R59.18] si no se puede leer la biblioteca, la regla sigue con el id', async () => {

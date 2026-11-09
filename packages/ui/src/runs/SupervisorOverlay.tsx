@@ -1,10 +1,8 @@
-import { useState } from 'react';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { BookOpen, Maximize2 } from 'lucide-react';
 import { MODELS } from '@orquestador/core';
 import { ViewportPortal, useReactFlow, useStore } from '@xyflow/react';
 import { t, type MessageKey, type SupervisorView } from '@orquestador/editor';
 import { money } from './runFormat';
-import { MemoryCards } from './MemoryCards';
 
 /** Distancia entre la tarjeta y el paso más alto, en coordenadas del lienzo [R69.3]. */
 const GAP = 120;
@@ -88,19 +86,31 @@ export function SupervisorCard({ view: v, onOpen }: { view: SupervisorView; onOp
   );
 }
 
-/** La memoria en la tarjeta: la rama y las dos últimas entradas, plegable [R69.4]. */
+/** Orden y nombre corto de cada bloque en la línea plegada [R69.4]. */
+const SHORT_BLOCKS = ['decisions', 'agreements', 'notes', 'alerts', 'route', 'steps'] as const;
+
+/** «2 decisiones · 1 nota · 3 pasos»: cuántas entradas tiene cada bloque [R69.4]. */
+export function memoryCounts(memory: SupervisorView['memory']): string {
+  const count = (b: string) => memory.filter((m) => (m.block ?? 'steps') === b).length;
+  return SHORT_BLOCKS.map((b) => ({ b, n: count(b) }))
+    .filter((x) => x.n > 0)
+    .map((x) => t(`sup.memory.count.${x.b}.${x.n === 1 ? 'one' : 'many'}` as MessageKey, { n: x.n }))
+    .join(' · ');
+}
+
+/** El botón «Memoria» bajo la tarjeta: lo que hay por bloque; abre la memoria completa en un modal. Sin nada anotado no se muestra [R69.4]. */
 export function SupervisorMemory({ view: v, onAll }: { view: SupervisorView; onAll?: (() => void) | undefined }) {
-  const [open, setOpen] = useState(true);
+  if (v.memory.length === 0 && !v.branch) return null;
+  const counts = memoryCounts(v.memory) || v.branch;
   return (
-    <section className="orq-supmem" aria-label={t('rsum.sup.memory')}>
-      <header className="orq-supmem__head">
-        <h3>{t('rsum.sup.memory')}</h3>
-        <button type="button" className="orq-supmem__fold" aria-expanded={open} aria-label={t(open ? 'sup.memory.fold' : 'sup.memory.unfold')} onClick={() => setOpen(!open)}>
-          {open ? <ChevronUp size={14} aria-hidden="true" /> : <ChevronDown size={14} aria-hidden="true" />}
-        </button>
-      </header>
-      {open && <MemoryCards notes={v.memory} branch={v.branch} limit={2} onAll={onAll} />}
-    </section>
+    <button type="button" className="orq-supmem" aria-label={t('sup.memory.open', { counts: counts ?? '' })} onClick={() => onAll?.()}>
+      <span className="orq-supmem__head">
+        <BookOpen size={13} aria-hidden="true" />
+        <span className="orq-supmem__title">{t('sup.memory.short')}</span>
+        <span className="orq-supmem__counts">{counts}</span>
+        <Maximize2 size={13} aria-hidden="true" />
+      </span>
+    </button>
   );
 }
 

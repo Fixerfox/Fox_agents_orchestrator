@@ -1,4 +1,5 @@
-import { type Diagram, type Id, type KnowledgeExtra, type DeliverableSpec, type ReviewPort } from '@orquestador/core';
+import { type Diagram, type Id, type KnowledgeExtra, type DeliverableSpec, type ReviewPort, type StepCheck } from '@orquestador/core';
+import { setDiagramChecks } from './ops-step';
 import { EditorError, type EditorErrorCode } from './errors';
 import { History } from './history';
 import { t } from './i18n';
@@ -90,7 +91,7 @@ export class EditorSession {
       canUndo: !this.locked && this.history.canUndo,
       canRedo: !this.locked && this.history.canRedo,
       dirty: this.history.dirty,
-      problems: computeProblems(diagram, this.path),
+      problems: computeProblems(diagram, this.path, { sharedFans: this.shared }),
       readOnly: this.locked,
     };
     return this.cached;
@@ -98,6 +99,16 @@ export class EditorSession {
 
   private changed(): void {
     this.path = validPath(this.history.present, this.path);
+    this.version++;
+    for (const l of [...this.listeners]) l();
+  }
+
+  private shared = false;
+
+  /** Con el aislamiento apagado, los abanicos avisan de que sus ramas comparten carpeta [R73.21]. */
+  setSharedFans(on: boolean): void {
+    if (this.shared === on) return;
+    this.shared = on;
     this.version++;
     for (const l of [...this.listeners]) l();
   }
@@ -145,6 +156,12 @@ export class EditorSession {
   /** Conocimiento para todos los agentes del diagrama (un paso de deshacer) [R33.1]. */
   setDiagramExtra(extra: KnowledgeExtra | undefined): void {
     this.commit(setDiagramExtra(this.history.present, extra));
+  }
+
+  /** Comprobaciones de la ejecución (un paso de deshacer) [R75.24]. */
+  setDiagramChecks(checks: StepCheck[]): void {
+    const next = setDiagramChecks(this.history.present, checks);
+    if (next !== this.history.present) this.commit(next);
   }
 
   /** Entregable de la ejecución (un paso de deshacer) [R46.12]. */

@@ -1,6 +1,8 @@
 import type { DeliverableSpec, Diagram, DiagramNode, Edge, ReturnInfo } from '../../diagrams';
-import type { Id, KnowledgeExtra, Payload } from '../../shared';
-import type { AgentAdapter, AgentProfile, AgentSnapshot, Decider, TransformUsage } from '../adapter';
+import type { SharedResources } from '../resources-port';
+import type { Id, KnowledgeExtra, Payload, StepCheck, StepLimits } from '../../shared';
+import type { CheckRunner } from '../checks-port';
+import type { AgentAdapter, AgentProfile, AgentSnapshot, Decider, FileChange, RestoreResult, TransformUsage } from '../adapter';
 import type { BudgetTracker } from '../run/budget-tracker';
 import type { ConcurrencyLimiter } from '../run/concurrency-limiter';
 import type { PauseGate } from '../run/pause-gate';
@@ -9,6 +11,9 @@ import type { ResumeCache } from '../run/resume-cache';
 import type { RetryPolicy } from '../run/retry-policy';
 import type { RunEmitter } from '../run/run-emitter';
 import type { Supervisor } from '../run/supervisor';
+import type { RunMemoryService } from '../run/memory-service';
+import type { Timers } from '../run/timers';
+import type { BranchSpaces, SpaceRef } from '../branch-spaces';
 
 /** Cómo acaba un paso. */
 export interface Outcome {
@@ -40,8 +45,12 @@ export interface RunServices {
   gate: PauseGate;
   limiter: ConcurrencyLimiter;
   budget: BudgetTracker;
+  /** Hueco global y enfriamiento de los proveedores, si la app los comparte [R77.1][R77.4]. */
+  resources?: SharedResources;
   /** Vigila la ejecución, si la app lo activa [R60.1]. */
   supervisor?: Supervisor;
+  /** La memoria de la ejecución, con el Supervisor o si se pide [R72.3]. */
+  memory?: RunMemoryService;
   questions: QuestionBroker;
   retry: RetryPolicy;
   cache: ResumeCache;
@@ -54,6 +63,8 @@ export interface RunServices {
   agentProfile?(agentId: Id, extra: KnowledgeExtra | undefined, runId: Id): Promise<AgentProfile | undefined>;
   resolveTemplate?(templateId: Id, version: number | 'latest', runId?: Id): Promise<Diagram> | Diagram;
   maxDepth: number;
+  /** Tiempo máximo de cada decisión [R70.12]. */
+  decisionTimeoutMs: number;
   /** Diagrama principal (etiquetas y entrada para componer el entregable). */
   root: Diagram;
   /** Conocimiento del diagrama raíz, que reciben todos sus agentes [R33.3]. */
@@ -63,8 +74,30 @@ export interface RunServices {
   finalIds: ReadonlySet<Id>;
   /** Motivo con el que falla la ejecución cuando lo da un paso (p. ej. el entregable) [R46.8]. */
   failRun(reason: string): void;
+  /** Devuelve al punto de partida archivos de un intento fallido, si la app sabe hacerlo [R71.10]. */
+  restoreFiles?(files: { path: string; change?: FileChange }[], dir?: string): Promise<RestoreResult>;
+  /** Ejecuta las comprobaciones que lanzan procesos o miran el disco [R75.4]. */
+  checkRunner?: CheckRunner;
+  /** Memoria del proyecto que recibe un agente [R76.14]. */
+  projectMemory?(agentId: Id): Promise<{ text: string; ids: Id[]; scopes?: string[] } | undefined>;
+  /** Comprobaciones de la ficha de un agente [R75.2]. */
+  agentChecks?(agentId: Id): Promise<StepCheck[] | undefined>;
+  /** Espacios de las ramas en paralelo, si la app las aísla [R73.2]. */
+  spaces?: BranchSpaces;
+  /** ¿Puede escribir este agente? Una rama solo de lectura no se aísla [R73.2]. */
+  canWrite?(agentId: Id): Promise<boolean>;
+  /** Para la ejecución con un motivo (p. ej. un conflicto que la persona no quiere resolver) [R73.14]. */
+  halt(reason: string): void;
+  /** Reloj de la ejecución, inyectable [R70.9]. */
+  timers: Timers;
+  /** Límites efectivos de un paso: los suyos, los de su agente y los de la ejecución [R70.7]. */
+  limitsFor(node: DiagramNode): Promise<StepLimits>;
+  /** Siguiente pasada de un nodo en una ruta (1, 2…) [R74.1]. */
+  nextPass(path: readonly Id[], nodeId: Id): number;
+  /** Plantillas de los subdiagramas, resueltas y validadas antes de empezar [R74.9]. */
+  templates?: Map<string, Diagram>;
   /** Ejecuta un diagrama anidado (cuerpo de bucle o subdiagrama). */
-  execute(diagram: Diagram, input: Payload, path: Id[], depth: number, stack: Id[]): Promise<DiagramOutcome>;
+  execute(diagram: Diagram, input: Payload, path: Id[], depth: number, stack: Id[], space?: SpaceRef): Promise<DiagramOutcome>;
 }
 
 /** Todo lo que ve un paso: los servicios de la ejecución y su sitio en el diagrama [R56.13]. */
@@ -77,6 +110,10 @@ export interface StepContext extends RunServices {
   round: number;
   back: ReturnInfo | undefined;
   level: ReviewLevel;
+  /** Espacio aislado de la rama en la que está el paso, si lo hay [R73.2]. */
+  space?: SpaceRef;
+  /** Clave estable del paso: ruta, nodo y pasada [R74.1]. */
+  stepKey: string;
 }
 
 /** Comportamiento de un tipo de nodo [R56.12]. */

@@ -87,7 +87,10 @@ export function parseKnowledgeRequest(channel: string, payload: unknown, { bad, 
       return payload;
     case CHANNELS.saveAgent: {
       if (!isObject(payload)) throw bad('se esperaba un agente');
-      exact(payload, ['id', 'schemaVersion', 'name', 'description', 'instructions', 'model', 'contextIds', 'skillIds', 'mcpIds', 'maxTurns', 'askFirst', 'permissions', 'icon', 'tone', 'required']);
+      exact(payload, ['id', 'schemaVersion', 'name', 'description', 'instructions', 'model', 'contextIds', 'skillIds', 'mcpIds', 'maxTurns', 'askFirst', 'permissions', 'icon', 'tone', 'required', 'limits', 'checks']);
+      // Límites y comprobaciones de la ficha: aquí solo la forma; el contenido lo valida `validateAgent` [R70.7][R75.2][R77.9].
+      if (payload.limits !== undefined && !isObject(payload.limits)) throw bad('limits no válido');
+      if (payload.checks !== undefined && (!Array.isArray(payload.checks) || payload.checks.length > 50)) throw bad('checks no válido');
       if (!safeId(payload.id)) throw bad('id no válido');
       if (typeof payload.schemaVersion !== 'number') throw bad('falta la versión');
       str(payload.name, 'name', 1000);

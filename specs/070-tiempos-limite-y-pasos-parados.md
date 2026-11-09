@@ -1,6 +1,6 @@
 # SPEC-070 · Tiempos límite y pasos parados
 
-**Estado:** Borrador · **Hito:** M15a · **Paquetes:** `core`, `claude`, `runtime`, `editor`, `ui` · **Rama:** `feature/tiempos-limite`
+**Estado:** Implementada (M15a) · **Hito:** M15a · **Paquetes:** `core`, `claude`, `runtime`, `editor`, `ui` · **Rama:** `feature/tiempos-limite`
 
 ## Propósito
 La auditoría del 08/11 («Auditoría de la pipeline de ejecución, Supervisor y memoria», hallazgos P2 y S5) encontró que **ninguna ejecución tiene garantizado terminar**:
@@ -48,7 +48,7 @@ En un orquestador profesional (Temporal, Airflow, Step Functions) cada actividad
 - **R70.11** [M15a] Si llega a 8 veces seguidas, el motor corta el intento como en R70.5, con `node.timeout` `kind: 'loop'` y el mensaje «Repitió la misma acción 8 veces sin avanzar».
 
 ### Decisiones
-- **R70.12** [M15a] Cada llamada a `Decider.route`, `condition`, `conditions`, `judge`, `judgeReview`, `blame` y `transform` tiene un tiempo máximo de 120 s (`decisionTimeoutMs` en `RunOptions`). Al pasarse se cancela su consulta y cuenta como error reintentable (los reintentos son de SPEC-071).
+- **R70.12** [M15a] Cada llamada a `Decider.route`, `condition`, `conditions`, `judge`, `judgeReview`, `blame` y `transform` tiene un tiempo máximo de 120 s (`decisionTimeoutMs` en `RunOptions`). Al pasarse se cancela su consulta y cuenta como error reintentable de tipo `timeout` (los reintentos son de SPEC-071). `transform` no se reintenta aquí: su nodo ya lo hace (R37.7).
 
 ### Preguntas
 - **R70.13** [M15a] `AgentQuestion` admite `fallback`: la opción que se elige si la política lo permite. El motor la pone en las suyas: permisos → la opción de denegar; `unfinished` → «Parar la ejecución»; `gate` (R39.4) → «Que lo rehaga». Las preguntas del agente y las confirmaciones no llevan `fallback`.

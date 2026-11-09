@@ -42,7 +42,8 @@ export function reduceRunState(events: readonly RunEvent[]): RunState {
         state.reason = e.reason;
         break;
       case 'node.queued':
-        state.nodeStatus[pathKey(e.nodePath, e.nodeId)] = 'queued';
+        // Esperando hueco global ya había empezado [R77.3].
+        if (e.others === undefined) state.nodeStatus[pathKey(e.nodePath, e.nodeId)] = 'queued';
         break;
       case 'node.started':
         state.nodeStatus[pathKey(e.nodePath, e.nodeId)] = 'running';

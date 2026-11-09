@@ -1,6 +1,6 @@
 # SPEC-077 · Gobierno de recursos: concurrencia global, presupuesto, pausa y métricas
 
-**Estado:** Borrador · **Hito:** M15h · **Paquetes:** `core`, `claude`, `runtime`, `store`, `editor`, `ui` · **Rama:** `feature/recursos`
+**Estado:** Implementada · **Hito:** M15h · **Paquetes:** `core`, `claude`, `runtime`, `store`, `apps/desktop`, `editor`, `ui` · **Rama:** `feature/robustez-ejecucion`
 
 ## Propósito
 Los controles de recursos de hoy son de cada ejecución y reaccionan tarde (auditoría del 08/11, P5, P6, P8, P9, P10 y P12):
@@ -29,9 +29,9 @@ Los controles de recursos de hoy son de cada ejecución y reaccionan tarde (audi
 
 ## Requisitos
 ### Concurrencia
-- **R77.1** [M15h] `runtime` tiene un `GlobalLimiter` compartido por todas las ejecuciones: `maxAgentsTotal` (8 por defecto, en Ajustes › Ejecución, entre 1 y 32) para pasos de agente y `maxDecisionsTotal` (4) para decisiones, revisiones del Supervisor y comprobaciones con IA. Un paso de agente necesita hueco en su ejecución (R23.6) y en el global.
+- **R77.1** [M15h] `runtime` tiene un `GlobalLimiter` compartido por todas las ejecuciones: `maxAgentsTotal` (8 por defecto, en Ajustes › Ejecución, entre 1 y 32) para pasos de agente y `maxDecisionsTotal` (4) para decisiones, revisiones del Supervisor y comprobaciones con IA. Un paso de agente necesita hueco en su ejecución (R23.6) y cada intento, en el global (puerto `SharedResources` de `core`; `AppResources`, uno por app, en `runtime`). Las decisiones pasan por el suyo desde el decisor del motor.
 - **R77.2** [M15h] El hueco global también se suelta mientras el paso espera a la persona (como `whileWaiting`, R63.9). Los pasos esperan en orden de llegada entre todas las ejecuciones.
-- **R77.3** [M15h] Mientras un paso espera hueco global, su nodo sale como «En cola (8 agentes trabajando en otras ejecuciones)».
+- **R77.3** [M15h] Mientras un paso espera hueco global, su nodo sale como «En cola (8 agentes trabajando en toda la app)» (`node.queued` con `others`).
 
 ### Límites de uso compartidos
 - **R77.4** [M15h] Un error `rate_limit` u `overloaded` con `retryAfterMs` (R71.1) abre un enfriamiento del proveedor: hasta que pase, ningún intento ni decisión nuevo de ninguna ejecución arranca con ese proveedor. Se emite `provider.cooldown` (`provider`, `untilTs`, `reason`) en las ejecuciones afectadas.
@@ -41,23 +41,23 @@ Los controles de recursos de hoy son de cada ejecución y reaccionan tarde (audi
 - **R77.6** [M15h] Al pasar del 80 % del presupuesto de la ejecución (tokens o coste) se emite una vez `run.budget_warning` (`limit`, `used`, `max`) y llega un aviso del sistema.
 - **R77.7** [M15h] Desde el 90 % no arranca ningún paso de agente nuevo: los que estaban listos quedan `waiting_input` con la pregunta «Queda menos del 10 % del presupuesto», con las opciones «Seguir hasta el límite», «Subir el límite a…» y «Parar la ejecución». El `fallback` (R70.13) es «Parar la ejecución».
 - **R77.8** [M15h] `RunOptions.onBudget` es `'stop-now'` (por defecto, como R7.4) o `'finish-running'`. Con `'finish-running'`, al llegar al 100 % no arranca nada nuevo, lo que está en marcha termina, y la ejecución acaba `failed` con `reason: 'budget_exceeded'`.
-- **R77.9** [M15h] Un paso (`limits.maxCostUsd`) y una ficha de agente (`maxCostUsd`) pueden tener tope propio, que se pasa al SDK como `maxBudgetUsd` en cada intento. Al pasarse, el intento falla con `kind: 'fatal'` y el mensaje «El paso llegó a su presupuesto de N $» (no se reintenta).
+- **R77.9** [M15h] Un paso (`limits.maxCostUsd`, en el inspector) y una ficha de agente (`limits.maxCostUsd`, en «Avanzado» de la ficha) pueden tener tope propio, que se pasa al SDK como `maxBudgetUsd` en cada intento. Al pasarse, el intento falla con `kind: 'fatal'` y el mensaje «El paso llegó a su presupuesto de N $» (no se reintenta).
 - **R77.10** [M15h] Regla `burn-rate` (`warning`): un paso gasta más de 1 $ por minuto durante 3 minutos seguidos (configurable en Ajustes › Supervisor).
 - **R77.11** [M15h] Lo que gasta el verificador (R75.14) y la integración de conflictos (R73.15) cuenta en el presupuesto. Lo del Supervisor sigue sin dispararlo (R60.14).
 
 ### Pausa
 - **R77.12** [M15h] Con la ejecución en pausa, el gancho de permisos del adaptador espera, antes de decidir, a que se reanude: ninguna herramienta nueva empieza durante la pausa. Lo que ya estaba en marcha termina.
-- **R77.13** [M15h] Al pausar, los pasos de agente en marcha salen como «Pausando: termina lo que está haciendo», y como «En pausa» cuando su siguiente herramienta queda retenida o acaba el turno.
+- **R77.13** [M15h] Al pausar, los pasos de agente en marcha salen como «Pausando: termina lo que está haciendo», y como «En pausa» cuando su siguiente herramienta queda retenida o acaba el turno (`node.paused`, una vez por pausa).
 - **R77.14** [M15h] La pausa sigue deteniendo los relojes de SPEC-070.
 
 ### Registro
 - **R77.15** [M15h] El motor junta los `token.stream` seguidos de un mismo paso en un solo evento cada 250 ms o cada 2.000 caracteres, lo que llegue antes. Cualquier otro evento de ese paso cierra el grupo antes de emitirse, para que el orden se mantenga.
-- **R77.16** [M15h] Con R77.15, una ejecución de referencia de las grabaciones de SPEC-056 tiene al menos 10 veces menos eventos `token.stream`, con el mismo texto concatenado (hay test).
+- **R77.16** [M15h] Con R77.15, el caso de referencia «lineal» de las grabaciones de SPEC-056, con 200 fragmentos de texto por agente, tiene al menos 10 veces menos eventos `token.stream`, con el mismo texto concatenado (hay test). Las grabaciones no cambian: el orquestador solo junta si se lo pide la app.
 
 ### Métricas
 - **R77.17** [M15h] `runMetrics(events)` (pura, en `core`) da por paso: duración trabajando, duración esperando a la persona, en cola, intentos y su motivo, tokens y coste; y por ejecución: totales, coste por agente y por modelo, y lo que gastó el Supervisor aparte.
 - **R77.18** [M15h] El Resumen de la ejecución tiene la pestaña «Rendimiento» con esas métricas: un cronograma de los pasos (trabajando, esperando, en cola) y una tabla por agente, que se puede exportar a CSV.
-- **R77.19** [M15h] La pantalla de Ejecuciones puede ordenar y filtrar por coste, duración y reintentos.
+- **R77.19** [M15h] La pantalla de Ejecuciones puede ordenar y filtrar por coste, duración y reintentos (más de 1 $, más de 10 min, con reintentos). La meta de cada ejecución guarda sus reintentos.
 
 ## Escenarios
 - **E77.a** *Dado* tres ejecuciones de 4 ramas con el límite global en 8, *entonces* trabajan como mucho 8 agentes a la vez y los demás esperan en orden de llegada.

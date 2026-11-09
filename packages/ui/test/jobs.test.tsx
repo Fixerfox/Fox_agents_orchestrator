@@ -139,7 +139,7 @@ describe('SPEC-052 · lanzar desde Trabajos', () => {
     expect(informe.getByText('1 ejecución')).toBeTruthy();
     await userEvent.click(informe.getByRole('button', { name: 'Ver ejecuciones' }));
     const runs = within(await screen.findByRole('region', { name: 'Ejecuciones' }));
-    await waitFor(() => expect((runs.getByRole('combobox') as HTMLSelectElement).value).toBe('informe'));
+    await waitFor(() => expect((runs.getByRole('combobox', { name: /Diagrama/ }) as HTMLSelectElement).value).toBe('informe'));
   });
 
   it('[R52.7] «Quedarme donde estoy» lanza sin salir y avisa; la siguiente vez trae la última entrada', async () => {

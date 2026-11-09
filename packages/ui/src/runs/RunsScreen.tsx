@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { historyRows, type HistoryGroup, type RunAction, t, type HistoryRow } from '@orquestador/editor';
+import { historyRows, type RunAction, t, type HistoryRow } from '@orquestador/editor';
 import type { InboxItem } from './useRunsIndex';
 import { type RunsSection, type RunsScreenProps, type RunsNav } from './runsTypes';
 import { useNow, useDiagrams } from './useRunData';
@@ -8,7 +8,7 @@ import { SECTIONS, crumbSection, diagramLabel } from './runFormat';
 import { RunDetail } from './RunDetail';
 import { LiveSection } from './LiveSection';
 import { InboxSection } from './InboxSection';
-import { HistorySection } from './HistorySection';
+import { HistorySection, type HistoryFilterState } from './HistorySection';
 
 /** Ejecuciones: submenú con En directo, Necesitan tu respuesta e Historial, y la vista de una ejecución [R35.4–R35.12]. */
 export function RunsScreen(p: RunsScreenProps) {
@@ -16,7 +16,7 @@ export function RunsScreen(p: RunsScreenProps) {
   const tickNow = useNow(p.index.runs.some((r) => r.status === 'running'), now);
   const rows = useMemo(() => historyRows(p.index.runs, p.index.diagramNames, tickNow), [p.index.runs, p.index.diagramNames, tickNow]);
   const active = rows.filter((r) => r.status === 'running');
-  const [filter, setFilter] = useState<{ group: HistoryGroup; diagramId: string; text: string }>({ group: 'all', diagramId: '', text: '' });
+  const [filter, setFilter] = useState<HistoryFilterState>({ group: 'all', diagramId: '', text: '' });
   // «Ver ejecuciones» desde Trabajos abre el historial de ese diagrama [R52.6].
   useEffect(() => {
     if (p.nav.section === 'history' && p.nav.diagramId) setFilter({ group: 'all', diagramId: p.nav.diagramId, text: '' });

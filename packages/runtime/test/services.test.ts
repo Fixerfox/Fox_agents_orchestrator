@@ -395,3 +395,13 @@ describe('SPEC-056 · RunFiles', () => {
     await expect(p.service.readOutput('r', 'no.md')).rejects.toMatchObject({ code: 'not-found' });
   });
 });
+
+describe('SPEC-070 · lanzar', () => {
+  it('[R70.19] «Si nadie responde» del lanzamiento sustituye al de Ajustes', async () => {
+    const { launcher } = parts();
+    const def = await launcher.prepare({ diagramId: 'd', order: 'x' });
+    expect(def.options.unanswered).toBeUndefined();
+    const run = await launcher.prepare({ diagramId: 'd', order: 'x', unanswered: { afterMinutes: 30, action: 'fallback' } });
+    expect(run.options.unanswered).toEqual({ afterMinutes: 30, action: 'fallback' });
+  });
+});

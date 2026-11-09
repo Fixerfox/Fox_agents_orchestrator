@@ -222,6 +222,7 @@ export function buildFlowNodes(
     const gitActions = live?.gitActions[key];
     const prUrl = live?.gitLinks[key];
     const alerts = live?.alerts[key];
+    const isolation = live?.isolation?.[key];
     const own = subtitle(n, agentNames, level);
     const sub = finals.has(n.id) ? (own !== undefined ? t('node.sub.final', { sub: own }) : t('node.sub.finalOnly')) : own;
     return {
@@ -249,6 +250,7 @@ export function buildFlowNodes(
         ...(review ? { review } : {}),
         ...(gitActions ? { gitActions } : {}),
         ...(prUrl ? { prUrl } : {}),
+        ...(isolation ? { isolation } : {}),
         ...(alerts ? { alerts, ...(extra.onAlerts ? { onAlerts: () => extra.onAlerts!(key) } : {}) } : {}),
         // Fichas con lo que hizo el paso, colgadas debajo [R54.1].
         ...((extra.stepFiles?.[key]?.length ?? 0) > 0

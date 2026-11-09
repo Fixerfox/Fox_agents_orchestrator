@@ -195,15 +195,17 @@ describe('SPEC-069 · memoria en tarjetas y su pestaña', () => {
 
   it('[R69.5] tarjetas, la última primero, con marca de avisos, ficheros «+N» y filtro «Con avisos»', async () => {
     modal([started, note('b', 'Planificó', ['a.md', 'b.md', 'c.md']), branch, note('a', 'Especificó')], { initialTab: 'memory' });
-    const cards = [...document.querySelectorAll('.orq-memcard')];
+    // El aviso abierto va en su bloque; los pasos, en el suyo, el último primero [R72.22].
+    expect(screen.getByRole('region', { name: 'Avisos abiertos' })).toBeTruthy();
+    const cards = [...screen.getByRole('region', { name: 'Lo que hizo cada paso' }).querySelectorAll('.orq-memcard')];
     expect(cards.map((c) => c.querySelector('strong')!.textContent)).toEqual(['Especificador', 'Planificador']);
     expect(cards[0]!.classList.contains('is-warn')).toBe(true);
     expect(cards[1]!.classList.contains('is-warn')).toBe(false);
     expect(cards[1]!.textContent).toContain('+1');
-    await userEvent.click(screen.getByRole('button', { name: 'Con avisos · 1' }));
-    expect([...document.querySelectorAll('.orq-memcard strong')].map((x) => x.textContent)).toEqual(['Especificador']);
-    await userEvent.click(screen.getByRole('button', { name: 'Todas · 2' }));
-    expect(document.querySelectorAll('.orq-memcard')).toHaveLength(2);
+    await userEvent.click(screen.getByRole('button', { name: 'Con avisos · 2' }));
+    expect([...document.querySelectorAll('.orq-memcard strong')].map((x) => x.textContent)).toEqual(['Especificador', 'Especificador']);
+    await userEvent.click(screen.getByRole('button', { name: 'Todas · 3' }));
+    expect(document.querySelectorAll('.orq-memcard')).toHaveLength(3);
   });
 
   it('[R69.3] en el diagrama: líneas a los pasos en revisión y «Con aviso» en los que tienen aviso', () => {

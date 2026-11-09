@@ -18,7 +18,8 @@
     "spec:check": "node scripts/spec-trace.mjs",
     "build:desktop": "node scripts/build-desktop.mjs",
     "start:desktop": "npm run build:desktop && electron apps/desktop",
-    "build:preview": "node scripts/build-preview.mjs"
+    "build:preview": "node scripts/build-preview.mjs",
+    "supervisor:eval": "node scripts/supervisor-eval.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

@@ -133,6 +133,14 @@
           "text": "pedido inicial",
           "files": []
         },
+        "previousAttempt": {
+          "attempt": 1,
+          "kind": "transient",
+          "message": "fallo simulado de a",
+          "ended": "error",
+          "actions": [],
+          "files": []
+        },
         "runId": "run-1"
       },
       {

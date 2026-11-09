@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, Eye, Folder, Gauge, KeyRound, Palette, ShieldCheck, Sparkles, type LucideIcon } from 'lucide-react';
-import { MODELS, loadsClaudeConfig, projectPermission, type AppSettings, type AuthMode, type Engine, type ProjectPermission, supervisorHumanChecks, supervisorModel, supervisorReviews } from '@orquestador/core';
+import { Brain, Clock, Eye, Folder, Gauge, KeyRound, Palette, ShieldCheck, Sparkles } from 'lucide-react';
+import { BURN_RATE_USD_PER_MIN, MEMORY_TOKENS, PROJECT_MEMORY_TOKENS, agentsTotal, isolatesBranches, DEFAULT_IDLE_MINUTES, DEFAULT_TOOL_MINUTES, DEFAULT_UNANSWERED, MODELS, UNANSWERED_ACTIONS, loadsClaudeConfig, projectPermission, type AppSettings, type AuthMode, type Engine, type StopAt, supervisorHumanChecks, supervisorModel, supervisorReviews, supervisorStopAt, supervisorUnverified, supervisorVerifyModel } from '@orquestador/core';
 import { PermissionPicker, permissionName } from '../common';
-import { PROJECT_LEVELS, permissionMatrix, t, type ConnectionResult, type MessageKey, type PermAnswer, type ProjectApi, type SettingsView, type WorkFolderView } from '@orquestador/editor';
+import { t, type ConnectionResult, type MessageKey, type ProjectApi, type SettingsView, type WorkFolderView } from '@orquestador/editor';
 import { fieldErrors } from '../common';
 import { applyTheme, loadTheme, saveTheme, type Theme } from './theme';
+import { Choice, PermMatrix, RULES, Row, Shell, type Section, type SectionId } from './SettingsParts';
 
 interface Props {
   api: ProjectApi;
@@ -77,6 +78,18 @@ export function SettingsDialog({ api, onClose, onSaved }: Props) {
       ...(draft.supervisorReview !== undefined ? { supervisorReview: draft.supervisorReview } : {}),
       ...(draft.supervisorModel !== undefined ? { supervisorModel: draft.supervisorModel } : {}),
       ...(draft.supervisorHumanChecks !== undefined ? { supervisorHumanChecks: draft.supervisorHumanChecks } : {}),
+      ...(draft.supervisorStopAt !== undefined ? { supervisorStopAt: draft.supervisorStopAt } : {}),
+      ...(draft.supervisorVerifyModel !== undefined ? { supervisorVerifyModel: draft.supervisorVerifyModel } : {}),
+      ...(draft.supervisorUnverified !== undefined ? { supervisorUnverified: draft.supervisorUnverified } : {}),
+      ...(draft.limits ? { limits: draft.limits } : {}),
+      ...(draft.unanswered ? { unanswered: draft.unanswered } : {}),
+      ...(draft.memoryTokens !== undefined ? { memoryTokens: draft.memoryTokens } : {}),
+      ...(draft.isolateBranches !== undefined ? { isolateBranches: draft.isolateBranches } : {}),
+      ...(draft.claudeAutoMemory !== undefined ? { claudeAutoMemory: draft.claudeAutoMemory } : {}),
+      ...(draft.projectMemoryTokens !== undefined ? { projectMemoryTokens: draft.projectMemoryTokens } : {}),
+      ...(draft.maxAgentsTotal !== undefined ? { maxAgentsTotal: draft.maxAgentsTotal } : {}),
+      ...(draft.onBudget !== undefined ? { onBudget: draft.onBudget } : {}),
+      ...(draft.burnRateUsdPerMin !== undefined ? { burnRateUsdPerMin: draft.burnRateUsdPerMin } : {}),
     };
     const res = await api.saveSettings(body);
     if (!res.ok) {
@@ -288,6 +301,33 @@ export function SettingsDialog({ api, onClose, onSaved }: Props) {
               <option value="fail">{t('set.sup.human.fail')}</option>
             </select>
           </Row>
+          {/* Cuándo para la revisión, con qué modelo se comprueba el final y qué hacer si no se puede [R75.10][R75.19][R75.20]. */}
+          <Row id="set-sup-stop" label={t('set.sup.stop')} hint={t('set.sup.stop.hint')} error={errors['supervisorStopAt']}>
+            <select id="set-sup-stop" value={supervisorStopAt(draft)} onChange={(e) => set({ supervisorStopAt: e.target.value as StopAt })}>
+              <option value="high">{t('set.sup.stop.high')}</option>
+              <option value="medium">{t('set.sup.stop.medium')}</option>
+              <option value="never">{t('set.sup.stop.never')}</option>
+            </select>
+          </Row>
+          <Row id="set-sup-vmodel" label={t('set.sup.vmodel')} hint={t('set.sup.vmodel.hint')} error={errors['supervisorVerifyModel']}>
+            <select id="set-sup-vmodel" value={supervisorVerifyModel(draft)} onChange={(e) => set({ supervisorVerifyModel: e.target.value })}>
+              {MODELS.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name}
+                </option>
+              ))}
+            </select>
+          </Row>
+          <Row id="set-sup-unverified" label={t('set.sup.unverified')} error={errors['supervisorUnverified']}>
+            <select id="set-sup-unverified" value={supervisorUnverified(draft)} onChange={(e) => set({ supervisorUnverified: e.target.value as 'warn' | 'fail' })}>
+              <option value="warn">{t('set.sup.human.warn')}</option>
+              <option value="fail">{t('set.sup.human.fail')}</option>
+            </select>
+          </Row>
+          {/* Gasto por minuto que avisa [R77.10]. */}
+          <Row id="set-sup-burn" label={t('set.sup.burn')} hint={t('set.sup.burn.hint')} error={errors['burnRateUsdPerMin']}>
+            <input id="set-sup-burn" type="number" min={0.1} max={100} step={0.1} value={draft.burnRateUsdPerMin ?? BURN_RATE_USD_PER_MIN} onChange={(e) => set({ burnRateUsdPerMin: Number(e.target.value) })} />
+          </Row>
         </div>
       ),
     },
@@ -303,8 +343,76 @@ export function SettingsDialog({ api, onClose, onSaved }: Props) {
           <Row id="set-parallel" label={t('settings.parallel')} error={errors['maxParallel']}>
             <input id="set-parallel" type="number" min={1} max={16} value={draft.maxParallel} onChange={(e) => set({ maxParallel: Number(e.target.value) })} />
           </Row>
+          {/* Agentes a la vez en toda la app y qué hacer al llegar al presupuesto [R77.1][R77.8]. */}
+          <Row id="set-agents-total" label={t('settings.agentsTotal')} hint={t('settings.agentsTotal.hint')} error={errors['maxAgentsTotal']}>
+            <input id="set-agents-total" type="number" min={1} max={32} value={agentsTotal(draft)} onChange={(e) => set({ maxAgentsTotal: Number(e.target.value) })} />
+          </Row>
+          <Row id="set-onbudget" label={t('settings.onBudget')} hint={t('settings.onBudget.hint')} error={errors['onBudget']}>
+            <select id="set-onbudget" value={draft.onBudget ?? 'stop-now'} onChange={(e) => set({ onBudget: e.target.value as 'stop-now' | 'finish-running' })}>
+              <option value="stop-now">{t('settings.onBudget.stop')}</option>
+              <option value="finish-running">{t('settings.onBudget.finish')}</option>
+            </select>
+          </Row>
           <Row id="set-tokens" label={t('settings.tokens')} error={errors['defaultMaxTokens']}>
             <input id="set-tokens" type="number" min={1} value={tokens} onChange={(e) => ((touched.current = true), setTokens(e.target.value), setStatus(t('settings.saving')))} />
+          </Row>
+          <Row id="set-isolate" label={t('settings.isolate')} hint={t('settings.isolate.hint')}>
+            <input id="set-isolate" type="checkbox" className="orq-toggle" checked={isolatesBranches(draft)} onChange={(e) => set({ isolateBranches: e.target.checked })} />
+          </Row>
+        </div>
+      ),
+    },
+    {
+      id: 'limits',
+      group: 'general',
+      icon: Clock,
+      label: t('settings.section.limits'),
+      summary: t('settings.sum.limits', { idle: draft.limits?.idleMinutes ?? DEFAULT_IDLE_MINUTES, unanswered: t(`rundlg.unanswered.${(draft.unanswered ?? DEFAULT_UNANSWERED).action}`) }),
+      intro: t('settings.limits.intro'),
+      content: (
+        <div className="orq-setrows">
+          <Row id="set-idle" label={t('settings.limits.idle')} error={errors['limits.idleMinutes']}>
+            <input id="set-idle" type="number" min={2} max={120} value={draft.limits?.idleMinutes ?? DEFAULT_IDLE_MINUTES} onChange={(e) => set({ limits: { ...draft.limits, idleMinutes: Number(e.target.value) } })} />
+          </Row>
+          <Row id="set-toolidle" label={t('settings.limits.tool')} error={errors['limits.toolMinutes']}>
+            <input id="set-toolidle" type="number" min={5} max={480} value={draft.limits?.toolMinutes ?? DEFAULT_TOOL_MINUTES} onChange={(e) => set({ limits: { ...draft.limits, toolMinutes: Number(e.target.value) } })} />
+          </Row>
+          <Row id="set-unanswered" label={t('settings.limits.unanswered')} error={errors['unanswered']}>
+            <select id="set-unanswered" value={(draft.unanswered ?? DEFAULT_UNANSWERED).action} onChange={(e) => set({ unanswered: { ...(draft.unanswered ?? DEFAULT_UNANSWERED), action: e.target.value as (typeof UNANSWERED_ACTIONS)[number] } })}>
+              {UNANSWERED_ACTIONS.map((a) => (
+                <option key={a} value={a}>
+                  {t(`rundlg.unanswered.${a}`)}
+                </option>
+              ))}
+            </select>
+          </Row>
+          {(draft.unanswered ?? DEFAULT_UNANSWERED).action !== 'wait' && (
+            <Row id="set-unanswered-after" label={t('rundlg.unanswered.after')}>
+              <input id="set-unanswered-after" type="number" min={1} max={1440} value={(draft.unanswered ?? DEFAULT_UNANSWERED).afterMinutes} onChange={(e) => set({ unanswered: { ...(draft.unanswered ?? DEFAULT_UNANSWERED), afterMinutes: Math.max(1, Number(e.target.value) || 1) } })} />
+            </Row>
+          )}
+        </div>
+      ),
+    },
+    {
+      id: 'memory',
+      group: 'general',
+      icon: Brain,
+      label: t('settings.section.memory'),
+      summary: t('settings.sum.memory', { n: draft.memoryTokens ?? MEMORY_TOKENS }),
+      intro: t('settings.memory.intro'),
+      content: (
+        <div className="orq-setrows">
+          <Row id="set-memtokens" label={t('settings.memory.tokens')} error={errors['memoryTokens']}>
+            <input id="set-memtokens" type="number" min={500} max={8000} step={100} value={draft.memoryTokens ?? MEMORY_TOKENS} onChange={(e) => set({ memoryTokens: Number(e.target.value) })} />
+          </Row>
+          <p className="orq-hint">{t('settings.memory.tokens.hint')}</p>
+          {/* La memoria del proyecto y la propia de Claude Code [R76.14][R76.18]. */}
+          <Row id="set-pmemtokens" label={t('settings.memory.project')} error={errors['projectMemoryTokens']}>
+            <input id="set-pmemtokens" type="number" min={300} max={6000} step={100} value={draft.projectMemoryTokens ?? PROJECT_MEMORY_TOKENS} onChange={(e) => set({ projectMemoryTokens: Number(e.target.value) })} />
+          </Row>
+          <Row id="set-automem" label={t('settings.memory.auto')} hint={t('settings.memory.auto.hint')}>
+            <input id="set-automem" type="checkbox" className="orq-toggle" checked={draft.claudeAutoMemory === true} onChange={(e) => set({ claudeAutoMemory: e.target.checked })} />
           </Row>
         </div>
       ),
@@ -390,156 +498,5 @@ export function SettingsDialog({ api, onClose, onSaved }: Props) {
         )}
       </form>
     </Shell>
-  );
-}
-
-type SectionId = 'claude' | 'perms' | 'supervisor' | 'budget' | 'look' | 'work';
-
-/** Una sección de Ajustes: entrada del índice y su contenido [R67.1]. */
-interface Section {
-  id: SectionId;
-  group: 'general' | 'project';
-  icon: LucideIcon;
-  label: string;
-  summary: string;
-  intro: string;
-  content: React.ReactNode;
-}
-
-const ANSWER_MARK: Record<PermAnswer, string> = { yes: '✓', ask: '?', no: '✕' };
-
-/** «Lo que pasará con cada nivel»: acciones × niveles, con el nivel elegido resaltado [R67.6]. */
-function PermMatrix({ level }: { level: ProjectPermission }) {
-  return (
-    <div className="orq-permtable">
-      <table>
-        <caption>{t('perm.matrix')}</caption>
-        <thead>
-          <tr>
-            <th scope="col">{t('perm.matrix.action')}</th>
-            {PROJECT_LEVELS.map((l) => (
-              <th key={l} scope="col" className={l === level ? 'is-on' : undefined} aria-current={l === level ? 'true' : undefined}>
-                {permissionName(l)}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {permissionMatrix().map((r) => (
-            <tr key={r.action}>
-              <th scope="row">{t(`perm.row.${r.action}` as MessageKey)}</th>
-              {PROJECT_LEVELS.map((l) => (
-                <td key={l} className={`is-${r.answers[l]}${l === level ? ' is-on' : ''}`}>
-                  <span aria-hidden="true">{ANSWER_MARK[r.answers[l]]}</span> {t(`perm.ans.${r.answers[l]}` as MessageKey)}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-/** Opciones con consecuencias: tarjetas con su explicación debajo [R67.3]. */
-function Choice<V extends string>({ legend, name, value, options, onChange, error, list = false }: { legend: string; name: string; value: V; options: { value: V; label: string; hint: string }[]; onChange: (v: V) => void; error?: string | undefined; list?: boolean }) {
-  return (
-    <fieldset className="orq-field orq-choice">
-      <legend>{legend}</legend>
-      <div className={`orq-choice__opts${list ? ' is-list' : ''}`} role="radiogroup">
-        {options.map((o) => (
-          <div key={o.value} className={`orq-choice__opt${value === o.value ? ' is-on' : ''}`}>
-            <label>
-              <input type="radio" name={name} checked={value === o.value} aria-describedby={`${name}-${o.value}-hint`} onChange={() => onChange(o.value)} />
-              <span>{o.label}</span>
-            </label>
-            <p className="orq-hint" id={`${name}-${o.value}-hint`}>
-              {o.hint}
-            </p>
-          </div>
-        ))}
-      </div>
-      {error && (
-        <p className="orq-field__error" role="alert">
-          {error}
-        </p>
-      )}
-    </fieldset>
-  );
-}
-
-/** Fila de ajuste: texto a la izquierda y el control a la derecha [R67.3]. */
-function Row({ id, label, hint, error, children }: { id: string; label: string; hint?: string | undefined; error?: string | undefined; children: React.ReactNode }) {
-  return (
-    <div className={`orq-field orq-setrow${error ? ' has-error' : ''}`}>
-      <div className="orq-setrow__text">
-        <label htmlFor={id}>{label}</label>
-        {hint && <p className="orq-hint">{hint}</p>}
-        {error && (
-          <p className="orq-field__error" id={`${id}-error`} role="alert">
-            {error}
-          </p>
-        )}
-      </div>
-      <div className="orq-setrow__ctrl">{children}</div>
-    </div>
-  );
-}
-
-/** Reglas que siguen todos los agentes, tal como las aplica el motor [R31.14]. */
-const RULES = (level: ProjectPermission): MessageKey[] => [
-  'settings.rules.read',
-  'settings.rules.create',
-  level === 'ask' ? 'settings.rules.modify.ask' : 'settings.rules.modify.auto',
-  level === 'ask' ? 'settings.rules.commands' : level === 'auto' ? 'settings.rules.commands.auto' : 'settings.rules.commands.full',
-  'settings.rules.agent',
-  level === 'full' ? 'settings.rules.outside.full' : 'settings.rules.outside',
-  'settings.rules.explain',
-  'settings.rules.record',
-];
-
-/** Página de Ajustes: índice por grupos a la izquierda, una sección cada vez y el estado del guardado al pie [R67.1][R67.5]. */
-function Shell({ onClose, children, status, items, current, onPick }: { onClose?: (() => void) | undefined; children: React.ReactNode; status?: string | undefined; items: readonly Section[]; current: SectionId; onPick: (id: SectionId) => void }) {
-  const groups = (['general', 'project'] as const).map((g) => ({ g, rows: items.filter((x) => x.group === g) })).filter((x) => x.rows.length > 0);
-  return (
-    <section className="orq-page orq-settings-page" aria-label={t('settings.title')}>
-      <aside className="orq-settings-page__nav">
-        {onClose && (
-          <button type="button" className="orq-btn orq-btn--ghost orq-btn--small" onClick={onClose}>
-            <ArrowLeft size={16} aria-hidden="true" />
-            {t('settings.back')}
-          </button>
-        )}
-        <h1>{t('settings.title')}</h1>
-        <nav aria-label={t('settings.title')}>
-          {groups.map(({ g, rows }) => (
-            <div key={g} className="orq-setnav__group">
-              <span className="orq-setnav__label">{t(g === 'general' ? 'settings.group.general' : 'settings.group.project')}</span>
-              {rows.map((x) => {
-                const Icon = x.icon;
-                return (
-                  <button key={x.id} type="button" className="orq-setnav__item" aria-current={x.id === current ? 'page' : undefined} onClick={() => onPick(x.id)}>
-                    <Icon size={16} strokeWidth={1.7} aria-hidden="true" className="orq-setnav__icon" />
-                    <span className="orq-setnav__text">
-                      <span className="orq-setnav__title">{x.label}</span>
-                      <span className="orq-setnav__sum">{x.summary}</span>
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          ))}
-        </nav>
-        <p className="orq-hint orq-settings-page__auto">
-          {t('settings.autosaved')}{' '}
-          {status && (
-            <span role="status" className="orq-settings-page__status">
-              {status}
-            </span>
-          )}
-        </p>
-      </aside>
-      <div className="orq-settings-page__main">{children}</div>
-    </section>
   );
 }

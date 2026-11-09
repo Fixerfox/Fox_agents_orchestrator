@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { ArrowLeft, Play, Pause, Square } from 'lucide-react';
-import { correctionTargets } from '@orquestador/core';
-import { type HistoryRow, type RunAction, defaultStep, t, formatDuration, filesByStep } from '@orquestador/editor';
+import { correctionTargets, type RunEvent } from '@orquestador/core';
+import { type HistoryRow, type RunAction, defaultStep, t, formatDuration, filesByStep, stepFacts } from '@orquestador/editor';
 import { CorrectionDialog } from './CorrectionDialog';
 import { PreviewThumb, PreviewDialog } from './Preview';
 import { FoldedStep, NodePanel } from './NodePanel';
@@ -16,6 +16,7 @@ import { type Btab } from './RunTabs';
 import { QuestionCard } from './QuestionCard';
 import { RunModalView } from './RunModal';
 import { AcceptDialog } from './AcceptDialog';
+import { MemoryEntryCard, useMemoryEntries } from './MemoryProposals';
 
 /** Vista de una ejecución: cabecera, avisos, lienzo, mensajes del paso y pestañas inferiores [R35.8–R35.10]. */
 export function RunDetail(
@@ -48,6 +49,10 @@ export function RunDetail(
   }, []);
   /** Fichero abierto en el visor [R45.10]. */
   const [viewing, setViewing] = useState<string>();
+  // La memoria del proyecto que recibió cada paso, con su ficha [R76.22].
+  const memoryEntries = useMemoryEntries(p.api);
+  const memoryTitles = Object.fromEntries(memoryEntries.map((e) => [e.id, e.title]));
+  const [memoryEntry, setMemoryEntry] = useState<string>();
   /** Ventana «Pedir corrección», con el paso desde el que se abrió [R53.13]. */
   const [fix, setFix] = useState<{ prefer?: string }>();
   /** Vista previa en grande de un archivo de un paso [R54.5]. */
@@ -62,6 +67,11 @@ export function RunDetail(
   const { live, running, status, reason, label, diagram } = d;
   // Pasos que se pueden corregir de una ejecución que ya no está en marcha [R53.13].
   const fixable = !running && diagram ? correctionTargets(diagram, d.events) : [];
+  // Quién pregunta: el agente del último intento del paso [R78.3].
+  const agentOf = (nodeId: string, nodePath: readonly string[]) => {
+    const req = [...d.events].reverse().find((e): e is Extract<RunEvent, { type: 'agent.request' }> => e.type === 'agent.request' && e.nodeId === nodeId && (e.nodePath ?? []).join('/') === nodePath.join('/'));
+    return req ? (p.agentNames[req.agentId] ?? req.agentId) : undefined;
+  };
   const answerHere = (questionId: string, text: string) => p.answer({ runId: p.runId, questionId, nodeId: '', nodePath: [], text: '' }, text);
 
   return (
@@ -98,10 +108,21 @@ export function RunDetail(
         <div className="orq-run__asks">
           {live.pending.map((q) => (
             <div key={q.questionId} className="orq-run__banner">
-              <QuestionCard item={q} from={label(q.nodeId, q.nodePath)} onAnswer={(text) => answerHere(q.questionId, text)} />
+              <QuestionCard item={q} from={label(q.nodeId, q.nodePath)} agent={agentOf(q.nodeId, q.nodePath)} facts={stepFacts(d.events, q.nodeId, q.nodePath)} onOpenFile={setViewing} autoOpen onAnswer={(text) => answerHere(q.questionId, text)} />
             </div>
           ))}
         </div>
+      )}
+      {/* El proveedor pidió esperar, y el aviso del 80 % del presupuesto [R77.5][R77.6]. */}
+      {running && live.cooldown && Date.parse(live.cooldown.untilTs) > p.now() && (
+        <p className="orq-run__note" role="status">
+          {t('run.cooldown', { provider: live.cooldown.provider === 'claude' ? 'Claude' : live.cooldown.provider, time: new Date(live.cooldown.untilTs).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) })}
+        </p>
+      )}
+      {running && live.budgetWarning && !live.budgetReached && (
+        <p className="orq-run__note" role="status">
+          {t('run.budgetWarning', { pct: Math.round((live.budgetWarning.used / live.budgetWarning.max) * 100) })}
+        </p>
       )}
       {d.accepted && (
         // Aceptada: quién, por qué y por qué había fallado [R65.8].
@@ -178,7 +199,7 @@ export function RunDetail(
           {step && folded ? (
             <FoldedStep events={d.events} live={live} nodeId={step.nodeId} nodePath={step.nodePath} label={label(step.nodeId, step.nodePath)} onUnfold={() => setFolded(false)} />
           ) : step ? (
-            <NodePanel key={[...step.nodePath, step.nodeId].join('/')} events={d.events} live={live} nodeId={step.nodeId} nodePath={step.nodePath} label={label(step.nodeId, step.nodePath)} labelOf={(id) => label(id, step.nodePath)} onAnswer={answerHere} closed={!running} onOpenFile={setViewing} onPreview={openPreview} renderThumb={previewCard} onFold={() => setFolded(true)} />
+            <NodePanel key={[...step.nodePath, step.nodeId].join('/')} events={d.events} live={live} nodeId={step.nodeId} nodePath={step.nodePath} label={label(step.nodeId, step.nodePath)} labelOf={(id) => label(id, step.nodePath)} onAnswer={answerHere} closed={!running} onOpenFile={setViewing} onPreview={openPreview} renderThumb={previewCard} onFold={() => setFolded(true)} onMemory={() => setModal('memory')} memoryTitles={memoryTitles} onMemoryEntry={setMemoryEntry} />
           ) : (
             <p className="orq-hint">{t('runs.step.none')}</p>
           )}
@@ -211,6 +232,7 @@ export function RunDetail(
           onOpen={(id) => (setFix(undefined), p.index.refresh(), p.onNav({ section: p.nav.section, runId: id }))}
         />
       )}
+      {memoryEntry !== undefined && <MemoryEntryCard id={memoryEntry} entry={memoryEntries.find((e) => e.id === memoryEntry)} onClose={() => setMemoryEntry(undefined)} />}
       {viewing !== undefined && <FileViewer api={p.api} runId={p.runId} events={d.events} path={viewing} labelOf={label} onClose={() => setViewing(undefined)} />}
     </div>
   );

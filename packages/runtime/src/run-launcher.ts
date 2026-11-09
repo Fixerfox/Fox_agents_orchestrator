@@ -20,6 +20,7 @@ export class RunLauncher {
       throw new RunError('invalid-diagram', `El diagrama tiene ${issues.length} problema(s): ${issues[0]!.message}`);
     }
     const options: RunOptions = { ...this.defaults() };
+    if (input.unanswered) options.unanswered = { ...input.unanswered };
     if (input.deliverable === null) options.deliverable = null;
     else if (input.deliverable !== undefined) {
       const problems = deliverableProblems(input.deliverable);

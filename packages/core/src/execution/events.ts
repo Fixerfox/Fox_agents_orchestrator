@@ -1,9 +1,11 @@
 import type { DeliverableSpec, TransformFormat } from '../diagrams';
-import { type Id, type KnowledgeExtra, type KnowledgeKind, type Payload, redactSecrets } from '../shared';
-import type { AgentSnapshot, AnsweredQuestion, FileChange, FileVia, KnowledgeVia, QuestionKind, ReviewQuestion } from './adapter';
+import { type Id, type KnowledgeExtra, type KnowledgeKind, type Payload, type Severity, redactSecrets } from '../shared';
+import type { AgentErrorKind, AgentSnapshot, AnsweredQuestion, ConflictQuestion, VerifyFinding, FileChange, FileVia, KnowledgeVia, PreviousAttempt, QuestionKind, ReviewQuestion } from './adapter';
 import type { DeliverableItemResult, DeliverableLinks } from './deliverable';
 import type { NodeStatus, RunStatus } from './run-types';
 import type { SplitProblem } from './text/split';
+import type { MemoryProposal } from './memory-proposals';
+import type { MemoryStats } from './memory/memory-render';
 
 export type EventBody =
   | { type: 'run.started'; diagramId: Id; /** Ejecución que esta reanuda [R41.1]. */ resumedFrom?: string; /** Ejecución que esta corrige [R53.8]. */ correctedFrom?: string; /** Entregable efectivo [R46.3]. */ deliverable?: DeliverableSpec }
@@ -14,7 +16,16 @@ export type EventBody =
   | { type: 'run.paused' }
   | { type: 'run.resumed' }
   | { type: 'run.budget_reached'; limit: 'tokens' | 'cost'; used: number; max: number }
-  | { type: 'node.queued'; nodeId: Id }
+  /** Se pasó del 80 % del presupuesto; una vez por límite [R77.6]. */
+  | { type: 'run.budget_warning'; limit: 'tokens' | 'cost'; used: number; max: number }
+  /** La persona subió el límite al llegar al 90 % [R77.7]. */
+  | { type: 'run.budget_raised'; limit: 'tokens' | 'cost'; max: number }
+  /** El proveedor pidió esperar: nada nuevo arranca con él hasta `untilTs` [R77.4]. */
+  | { type: 'provider.cooldown'; provider: string; untilTs: string; reason: 'rate_limit' | 'overloaded'; nodeId?: Id }
+  /** En cola; `others`, si espera hueco en toda la app: agentes trabajando en otras ejecuciones [R77.3]. */
+  | { type: 'node.queued'; nodeId: Id; others?: number }
+  /** Con la ejecución en pausa, el paso queda retenido: su siguiente herramienta (`tool`) o el final de su turno [R77.13]. */
+  | { type: 'node.paused'; nodeId: Id; tool?: string }
   | { type: 'node.started'; nodeId: Id; input?: Payload }
   | {
       /** Lo que recibe exactamente el agente en cada intento, con la configuración usada. */
@@ -32,14 +43,24 @@ export type EventBody =
       split?: string;
       /** Memoria que recibe este paso [R60.25]. */
       memory?: string;
+      /** Tokens estimados de cada bloque de la memoria y cuáles se recortaron [R72.19]. */
+      memoryStats?: MemoryStats;
       /** Archivos a los que se limita [R60.16]. */
       scope?: string[];
+      /** Paso interno: un agente que junta los archivos en conflicto [R73.15] o que verifica el paso [R75.14]. */
+      kind?: 'merge' | 'verify';
+      /** El paso trabaja en el espacio aislado de su rama (sin la ruta) [R73.8]. */
+      isolated?: boolean;
+      /** Entradas de la memoria del proyecto que recibió [R76.16]. */
+      projectMemory?: Id[];
       /** Aviso del entregable que recibe este paso [R46.4]. */
       deliverable?: { role: 'final' | 'goal'; text: string };
       /** Lo añadido por el diagrama y por el paso, para saber de dónde vino cada cosa [R33.4]. */
       extra?: { diagram?: KnowledgeExtra; node?: KnowledgeExtra };
       snapshot?: AgentSnapshot;
       previousAnswers?: AnsweredQuestion[];
+      /** Lo que se le contó del intento anterior [R71.8]. */
+      previousAttempt?: PreviousAttempt;
     }
   | {
       /** Decisión tomada por la IA fuera de los agentes de trabajo (enrutado, condición, evaluador de bucle). */
@@ -48,10 +69,12 @@ export type EventBody =
       kind: 'route' | 'condition' | 'judge';
       request: unknown;
       response: unknown;
+      /** Se tomó de la ejecución que se reanuda, sin consultar al motor [R74.4]. */
+      reused?: boolean;
     }
   | { type: 'node.finished'; nodeId: Id; status: NodeStatus; output?: Payload }
   /** El paso no se ejecuta: se reutiliza la salida que dio en la ejecución reanudada [R41.1]. */
-  | { type: 'node.reused'; nodeId: Id; fromRunId: string }
+  | { type: 'node.reused'; nodeId: Id; fromRunId: string; /** Lo que costó en la anterior: lo que se ahorra [R74.13]. */ costUsd?: number }
   | {
       type: 'node.retrying';
       nodeId: Id;
@@ -59,6 +82,10 @@ export type EventBody =
       max: number;
       delayMs: number;
       message: string;
+      /** Tipo del error [R71.6]. */
+      kind?: AgentErrorKind;
+      /** Por qué se reintenta: un error, un corte por tiempo o por repetir la misma acción [R71.6]. */
+      cause?: 'error' | 'timeout' | 'loop';
     }
   | { type: 'token.stream'; nodeId: Id; text: string }
   | { type: 'tool.called'; nodeId: Id; tool: string; input: unknown }
@@ -67,10 +94,16 @@ export type EventBody =
   | { type: 'knowledge.used'; nodeId: Id; attempt: number; kind: KnowledgeKind; id: Id; via: KnowledgeVia; required: boolean }
   /** Obligatorio que el agente no usó en un intento [R36.13]. */
   | { type: 'knowledge.unmet'; nodeId: Id; attempt: number; kind: KnowledgeKind; id: Id }
-  | { type: 'agent.question'; nodeId: Id; questionId: string; text: string; options?: string[]; /** Confirmación del paso [R43.5]. */ confirm?: { round: number }; /** [R45.3] */ kind?: QuestionKind; /** Revisión humana [R53.3] */ review?: ReviewQuestion }
+  | { type: 'agent.question'; nodeId: Id; questionId: string; text: string; options?: string[]; /** Confirmación del paso [R43.5]. */ confirm?: { round: number }; /** [R45.3] */ kind?: QuestionKind; /** Revisión humana [R53.3] */ review?: ReviewQuestion; /** Conflicto al juntar ramas [R73.14] */ conflict?: ConflictQuestion }
   /** Respuesta a una confirmación: aprobada o con cambios pedidos [R43.6][R43.7]. */
   | { type: 'confirm.decided'; nodeId: Id; round: number; verdict: 'approved' | 'changes'; text?: string }
-  | { type: 'agent.answer'; nodeId: Id; questionId: string; text: string }
+  | { type: 'agent.answer'; nodeId: Id; questionId: string; text: string; /** Nadie respondió y se tomó la respuesta segura [R70.15]. */ auto?: true; /** Respondida con lo que dijo la persona en la ejecución que se reanuda [R74.6]. */ reused?: true }
+  /** Recordatorio de una pregunta que sigue sin respuesta [R70.16]. */
+  | { type: 'question.reminder'; nodeId: Id; questionId: string; text: string; minutes: number }
+  /** Archivos devueltos al punto de partida antes de reintentar [R71.10]. */
+  | { type: 'files.restored'; nodeId: Id; attempt: number; restored: string[]; removed: string[]; failed: { path: string; reason: string }[] }
+  /** El motor cortó un intento por inactividad, por su duración o por repetir la misma acción [R70.5][R70.11]. */
+  | { type: 'node.timeout'; nodeId: Id; attempt: number; kind: 'idle' | 'tool' | 'total' | 'loop'; minutes: number; tool?: string }
   /** Revisión humana: a qué paso vuelve el trabajo y quién lo decidió [R53.5]. */
   | { type: 'correction.routed'; nodeId: Id; round: number; targetId: Id; reason: string; by: 'assistant' | 'user' }
   /** El paso corregido de una corrección arranca con la corrección del usuario [R53.8]. */
@@ -91,19 +124,38 @@ export type EventBody =
   /** El paso hizo esto en una rama [R58.11]. */
   | { type: 'git.action'; nodeId: Id; branch: string; action: 'commit' | 'push' | 'pr' | 'merge' | 'delete' | 'switch'; /** PR o merge request [R58.14]. */ url?: string }
   /** El Supervisor detecta algo o frena una acción [R60.1]. */
-  | { type: 'supervisor.alert'; nodeId?: Id; rule: string; severity: 'info' | 'warning'; detail: string }
+  | { type: 'supervisor.alert'; nodeId?: Id; rule: string; severity: 'info' | 'warning'; detail: string; /** Gravedad de la revisión con IA y su evidencia [R75.10][R75.25]. */ gravity?: Severity; evidence?: string[] }
   /** Si el resultado final cumple lo pedido [R62.9]. */
   | { type: 'supervisor.verified'; met: boolean; detail: string; /** Lo que queda para una persona [R65.3]. */ forPerson?: string }
   /** Entrada de la memoria de la ejecución [R60.18]. */
-  | { type: 'supervisor.note'; nodeId: Id; text: string; files: string[]; /** Salió de una revisión con IA [R60.29]. */ reviewed?: boolean }
+  | { type: 'supervisor.note'; nodeId: Id; text: string; files: string[]; /** Salió de una revisión con IA [R60.29]. */ reviewed?: boolean; /** Lo que el paso decidió por su cuenta [R72.10]. */ decided?: string[] }
+  /** Nota que un paso deja a los siguientes, sacada de su salida [R72.11]. */
+  | { type: 'memory.note'; nodeId: Id; text: string }
+  /** Propuestas para la memoria del proyecto, al terminar la ejecución; ninguna se guarda sola [R76.8]. */
+  | { type: 'memory.proposed'; proposals: MemoryProposal[]; usage?: { inputTokens: number; outputTokens: number; costUsd?: number } }
+  /** Lo que la persona hizo con una propuesta [R76.11]. */
+  | { type: 'memory.decided'; proposalId: string; decision: 'save' | 'discard'; entryId?: Id; edited?: boolean; by?: 'user' | 'assistant' }
+  /** Resultado de una comprobación determinista del paso [R75.3]. */
+  | { type: 'check.result'; nodeId: Id; checkId: string; label: string; kind: 'command' | 'files' | 'output' | 'schema'; ok: boolean; detail: string; durationMs: number }
+  /** Lo que encontró el agente verificador [R75.15]. */
+  | { type: 'verify.result'; nodeId: Id; met: boolean; findings: VerifyFinding[] }
+  /** La persona dice si un aviso era un problema o no [R75.21]. */
+  | { type: 'supervisor.feedback'; alertSeq: number; verdict: 'false-alarm' | 'confirmed'; note?: string; nodeId?: Id }
   /** El Supervisor empieza a vigilar [R60.28]. */
   | { type: 'supervisor.started'; review: boolean; model?: string }
   /** Empieza a revisar un paso con IA [R60.29]. */
   | { type: 'supervisor.reviewing'; nodeId: Id }
   /** Revisiones que no se pudieron hacer [R60.13][R60.15]. */
   | { type: 'supervisor.skipped'; count: number; reason: 'timeout' | 'failed' }
-  | { type: 'workspace.merged'; nodeId: Id; files: string[] }
-  | { type: 'workspace.conflict'; nodeIds: Id[]; files: string[] }
+  /** Una rama en paralelo empieza a trabajar en su propio espacio [R73.7]; la ruta nunca sale en el evento. */
+  | { type: 'workspace.opened'; regionId: Id; branchNodeIds: Id[]; strategy: 'git' | 'copy'; warning?: string }
+  /** Lo de una rama llegó al destino; `nodeId`, el nodo que las junta [R73.13]. */
+  | { type: 'workspace.merged'; nodeId: Id; files: string[]; regionId?: Id; branchNodeIds?: Id[]; mergedByLines?: string[] }
+  | { type: 'workspace.conflict'; nodeIds: Id[]; files: string[]; regionId?: Id; branchNodeIds?: Id[]; savedTo?: string }
+  /** La persona (o un agente) resolvió un conflicto [R73.14][R73.15]. */
+  | { type: 'workspace.resolved'; regionId: Id; nodeIds: Id[]; files: string[]; choice: 'target' | 'branch' | 'agent' }
+  /** Una rama que falló o se canceló no se fusiona; lo cambiado queda aparte [R73.17]. */
+  | { type: 'workspace.discarded'; regionId: Id; branchNodeIds: Id[]; files: string[] }
   | { type: 'iteration.snapshot'; loopId: Id; n: number; path: string }
   | {
       type: 'route.decided';

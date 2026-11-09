@@ -263,3 +263,10 @@ describe('icono de la app [R61.13]', () => {
     expect(readFileSync(join(root, 'scripts', 'build-desktop.mjs'), 'utf8')).toContain("join(app, 'assets/icon.png'), join(out, 'icon.png')");
   });
 });
+
+describe('SPEC-070 · recordatorio de preguntas', () => {
+  it('[R70.16] una pregunta sin respuesta da un aviso de recordatorio con el paso y la pregunta', () => {
+    const reminder = { ...question(), type: 'question.reminder', minutes: 15 } as unknown as RunEvent;
+    expect(noticeFor(reminder, DIAGRAM)).toEqual({ title: 'Auditor sigue esperando tu respuesta (15 min)', body: '¿Pixel art o vectorial?', runId: 'r1', live: true });
+  });
+});

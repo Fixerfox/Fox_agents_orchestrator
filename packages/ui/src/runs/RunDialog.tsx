@@ -1,6 +1,6 @@
 import { useRef, useState, type ClipboardEvent, type DragEvent } from 'react';
 import { FileText, FolderOpen, Image as ImageIcon, Paperclip, Play, X } from 'lucide-react';
-import { deliverableProblems, type DeliverableSpec } from '@orquestador/core';
+import { DEFAULT_UNANSWERED, UNANSWERED_ACTIONS, deliverableProblems, type DeliverableSpec, type UnansweredPolicy } from '@orquestador/core';
 import { MAX_ATTACHMENT_BYTES, MAX_INPUT_FILES, deliverableLabel, t, type ProjectApi } from '@orquestador/editor';
 import { DeliverablePanel } from '../diagrams';
 
@@ -40,7 +40,9 @@ interface Props {
    * Lanzar con todas las opciones [R52.7]; si está, sustituye a `onStart`. `whenBusy` solo cuando hay otras;
    * `stay`: «Quedarme donde estoy».
    */
-  onLaunch?: (input: string, maxTokens: number | undefined, deliverable: DeliverableSpec | null | undefined, inputs: RunInputs | undefined, launch: { whenBusy?: 'parallel' | 'queue'; stay: boolean }) => void;
+  onLaunch?: (input: string, maxTokens: number | undefined, deliverable: DeliverableSpec | null | undefined, inputs: RunInputs | undefined, launch: { whenBusy?: 'parallel' | 'queue'; stay: boolean; unanswered?: UnansweredPolicy }) => void;
+  /** Qué hacer si nadie responde: la última elegida con este diagrama o la de Ajustes [R70.19]. */
+  unanswered?: UnansweredPolicy | undefined;
 }
 
 const kb = (n: number) => (n < 1024 * 1024 ? `${Math.max(1, Math.round(n / 1024)).toLocaleString('es-ES')} KB` : `${(n / 1024 / 1024).toLocaleString('es-ES', { maximumFractionDigits: 1 })} MB`);
@@ -50,7 +52,8 @@ const keyOf = (f: InputItem) => (f.kind === 'attachment' ? `a:${f.id}` : `p:${f.
  * Diálogo Ejecutar: un modal centrado con las pestañas «Ejecución» y «Entregable», cabecera y pie fijos y el cuerpo
  * con scroll [R48.1][R48.2]. La Entrada admite adjuntos [R48.3].
  */
-export function RunDialog({ diagramName, engine, runnable, lastInput = '', defaultLimit, onEngine, onStart, onClose, deliverable, finals = [], onSaveDeliverable, api, busyRuns, onLaunch }: Props) {
+export function RunDialog({ diagramName, engine, runnable, lastInput = '', defaultLimit, onEngine, onStart, onClose, deliverable, finals = [], onSaveDeliverable, api, busyRuns, onLaunch, unanswered: initialUnanswered }: Props) {
+  const [unanswered, setUnanswered] = useState<UnansweredPolicy>(initialUnanswered ?? DEFAULT_UNANSWERED);
   const others = (busyRuns?.running ?? 0) + (busyRuns?.queued ?? 0);
   const [whenBusy, setWhenBusy] = useState<'parallel' | 'queue'>('parallel');
   const [stay, setStay] = useState(false);
@@ -72,7 +75,7 @@ export function RunDialog({ diagramName, engine, runnable, lastInput = '', defau
     if (!ok) return;
     if (onLaunch) {
       const inputs = files.length > 0 ? { attachments: files.flatMap((f) => (f.kind === 'attachment' ? [f.id] : [])), files: files.flatMap((f) => (f.kind === 'project' ? [f.path] : [])) } : undefined;
-      onLaunch(input.trim(), limit !== '' && Number(limit) > 0 ? Number(limit) : undefined, changed ? (dlv ?? null) : undefined, inputs, { ...(others > 0 ? { whenBusy } : {}), stay });
+      onLaunch(input.trim(), limit !== '' && Number(limit) > 0 ? Number(limit) : undefined, changed ? (dlv ?? null) : undefined, inputs, { ...(others > 0 ? { whenBusy } : {}), stay, unanswered });
       return;
     }
     const args: [string, number | undefined, ...unknown[]] = [input.trim(), limit !== '' && Number(limit) > 0 ? Number(limit) : undefined];
@@ -235,6 +238,26 @@ export function RunDialog({ diagramName, engine, runnable, lastInput = '', defau
                 </p>
               )}
               <p className="orq-hint">{t('rundlg.input.hint')}</p>
+              {onLaunch && (
+                <fieldset className="orq-rundlg__busy orq-rundlg__unanswered">
+                  <legend>{t('rundlg.unanswered')}</legend>
+                  {UNANSWERED_ACTIONS.map((m) => (
+                    <label key={m} className={`orq-radiocard${unanswered.action === m ? ' is-on' : ''}`}>
+                      <input type="radio" name="run-unanswered" checked={unanswered.action === m} onChange={() => setUnanswered({ ...unanswered, action: m })} />
+                      <span>
+                        <strong>{t(`rundlg.unanswered.${m}`)}</strong>
+                        <span className="orq-hint">{t(`rundlg.unanswered.${m}.hint`)}</span>
+                      </span>
+                    </label>
+                  ))}
+                  {unanswered.action !== 'wait' && (
+                    <label className="orq-field orq-field--inline">
+                      <span>{t('rundlg.unanswered.after')}</span>
+                      <input type="number" min={1} max={1440} value={unanswered.afterMinutes} onChange={(e) => setUnanswered({ ...unanswered, afterMinutes: Math.max(1, Number(e.target.value) || 1) })} />
+                    </label>
+                  )}
+                </fieldset>
+              )}
               {others > 0 && (
                 <fieldset className="orq-rundlg__busy">
                   <legend>{busyRuns!.running > 0 ? (busyRuns!.running === 1 ? t('rundlg.busy.one') : t('rundlg.busy.many', { n: busyRuns!.running })) : t('rundlg.busy.queued', { n: busyRuns!.queued })}</legend>

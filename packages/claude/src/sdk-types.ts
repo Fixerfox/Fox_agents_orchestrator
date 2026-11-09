@@ -41,6 +41,8 @@ export interface ClaudeQueryOptions {
   systemPrompt?: SdkSystemPrompt;
   cwd?: string;
   maxTurns?: number;
+  /** Presupuesto de la consulta; al pasarse, `error_max_budget_usd` [R77.9]. */
+  maxBudgetUsd?: number;
   /** Lista de herramientas o todas las de Claude Code [R50.7]. */
   tools?: string[] | { type: 'preset'; preset: 'claude_code' };
   allowedTools?: string[];

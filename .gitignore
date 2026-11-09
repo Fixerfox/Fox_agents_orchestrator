@@ -10,3 +10,4 @@ _pendiente/
 .orquestador/
 .env
 .env.*
+dist-eval/

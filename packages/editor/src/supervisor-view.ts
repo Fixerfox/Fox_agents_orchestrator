@@ -1,4 +1,5 @@
 import { branchMemoryLine, newBranchMemory, pathKey, rememberBranch, type Id, type RunEvent } from '@orquestador/core';
+import { memoryCards, type MemoryCard } from './memory-cards';
 
 export type SupervisorStatus = 'watching' | 'reviewing' | 'alert' | 'rules' | 'done';
 
@@ -19,7 +20,8 @@ export interface SupervisorView {
   reviewing: string[];
   lastAlert?: string;
   targets: SupervisorTarget[];
-  memory: { label: string; text: string; files: string[] }[];
+  /** La memoria de la ejecución, por bloques [R72.22]. */
+  memory: MemoryCard[];
 }
 
 /** Un aviso del Supervisor, con lo que hace falta para explicarlo [R60.39]. */
@@ -30,14 +32,24 @@ export interface SupervisorAlertItem {
   rule: string;
   detail: string;
   at: string;
+  /** Para marcarlo como falso o acertado [R75.21]. */
+  seq: number;
+  /** Gravedad de la revisión con IA y la evidencia que cita [R75.10][R75.25]. */
+  gravity?: string;
+  evidence?: string[];
+  /** Lo que dijo la persona del aviso [R75.21]. */
+  feedback?: 'false-alarm' | 'confirmed';
 }
 
 export function supervisorAlerts(events: readonly RunEvent[], labelOf: (id: Id, path: readonly Id[]) => string): SupervisorAlertItem[] {
+  const said = new Map<number, 'false-alarm' | 'confirmed'>();
+  for (const e of events) if (e.type === 'supervisor.feedback') said.set(e.alertSeq, e.verdict);
   return events.flatMap((e) => {
     if (e.type !== 'supervisor.alert') return [];
     const path = e.nodePath ?? [];
     const step = e.nodeId === undefined ? { label: '' } : { key: pathKey(path, e.nodeId), label: labelOf(e.nodeId, path) };
-    return [{ ...step, rule: e.rule, detail: e.detail, at: e.ts }];
+    const feedback = said.get(e.seq);
+    return [{ ...step, rule: e.rule, detail: e.detail, at: e.ts, seq: e.seq, ...(e.gravity ? { gravity: e.gravity } : {}), ...(e.evidence ? { evidence: e.evidence } : {}), ...(feedback ? { feedback } : {}) }];
   });
 }
 
@@ -52,7 +64,6 @@ export function supervisorView(events: readonly RunEvent[], running: boolean, la
   const pending = new Map<string, { label: string; count: number }>();
   const warned = new Set<string>();
   const branches = newBranchMemory();
-  const memory: SupervisorView['memory'] = [];
   for (const e of events) {
     const path = e.nodePath ?? [];
     switch (e.type) {
@@ -73,7 +84,6 @@ export function supervisorView(events: readonly RunEvent[], running: boolean, la
         if (open && open.count > 1) open.count--;
         else pending.delete(key);
         if (e.reviewed) reviewed++;
-        memory.push({ label: labelOf(e.nodeId, path), text: e.text, files: e.files });
         break;
       }
       case 'supervisor.alert':
@@ -105,7 +115,7 @@ export function supervisorView(events: readonly RunEvent[], running: boolean, la
     costUsd,
     reviewing: open.map((key) => pending.get(key)!.label),
     targets: open.map((key) => ({ key, warn: warned.has(key) })),
-    memory,
+    memory: memoryCards(events, labelOf),
     ...(model ? { model } : {}),
     ...(branch ? { branch } : {}),
     ...(lastAlert ? { lastAlert } : {}),

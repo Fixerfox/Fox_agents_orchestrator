@@ -1,5 +1,5 @@
 import type { Diagram } from '../diagrams';
-import type { AgentDefinition, ContextDefinition, McpServerDefinition, SkillDefinition } from '../knowledge';
+import type { AgentDefinition, ContextDefinition, McpServerDefinition, MemoryEntry, SkillDefinition } from '../knowledge';
 import type { Id } from '../shared';
 
 /**
@@ -14,4 +14,6 @@ export interface LibraryReader {
   /** Rechaza si el diagrama no existe. */
   diagram(id: Id, runId?: Id): Promise<Diagram>;
   diagramIds(): Promise<Id[]>;
+  /** Memoria del proyecto; con `runId`, la de la copia de la ejecución [R76.13]. */
+  projectMemory?(runId?: Id): Promise<MemoryEntry[]>;
 }

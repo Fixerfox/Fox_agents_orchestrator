@@ -33,7 +33,7 @@ export async function runHumanReview(step: StepContext, node: DiagramNode, input
   };
 
   // Ya aprobada en la ejecución anterior: no vuelve a preguntar [R53.9].
-  if (step.cache.takeApproved(node.id)) return go('approved', 'reused');
+  if (step.cache.takeApproved(step.stepKey)) return go('approved', 'reused');
 
   const reply = await ask({ text: input.text, options: [CONFIRM_APPROVE], review: { round, max, phase: 'feedback' } });
   if (typeof reply !== 'string') return reply;

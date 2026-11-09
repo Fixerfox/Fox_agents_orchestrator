@@ -23,7 +23,7 @@ describe('SPEC-067 · Ajustes por secciones', () => {
   it('[R67.1] índice «General» (y «Este proyecto» con proyecto), con resumen y una sección cada vez', async () => {
     const { page, index } = await mount({ project: true });
     expect(groups()).toEqual(['General', 'Este proyecto']);
-    expect(titles()).toEqual(['Claude', 'Permisos de los agentes', 'Supervisor', 'Ejecución y presupuesto', 'Apariencia', 'Carpeta de trabajo']);
+    expect(titles()).toEqual(['Claude', 'Permisos de los agentes', 'Supervisor', 'Ejecución y presupuesto', 'Límites de tiempo', 'Memoria', 'Apariencia', 'Carpeta de trabajo']);
     expect(index.getByRole('button', { name: /^Claude/ }).getAttribute('aria-current')).toBe('page');
     expect(index.getByRole('button', { name: /^Ejecución y presupuesto/ }).textContent).toContain('4 en paralelo · sin límite');
     expect(index.getByRole('button', { name: /^Carpeta de trabajo/ }).textContent).toContain('Sin elegir');

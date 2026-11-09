@@ -1,5 +1,7 @@
 import type { TransformFormat } from '../diagrams';
-import type { Id, KnowledgeExtra, KnowledgeKind, Payload } from '../shared';
+import type { Id, KnowledgeExtra, KnowledgeKind, Payload, Severity } from '../shared';
+import type { MemoryKind } from '../knowledge';
+import type { MemoryProposal, MemorySignal } from './memory-proposals';
 
 export type FileChange = 'created' | 'modified';
 /** Cómo se cambió: con un comando, sin pasar por las herramientas de edición ni dejar copia [R55.3]. */
@@ -54,8 +56,29 @@ export interface AgentProfile {
 }
 
 /** Lo que el Supervisor revisa de un paso [R60.12]. */
+/** Un hallazgo del verificador [R75.15]. */
+export interface VerifyFinding {
+  severity: 'high' | 'medium' | 'low';
+  where: string;
+  what: string;
+}
+
+/** Lo que la revisión ve de verdad, no lo que el paso cuenta [R75.7]. */
+export interface ReviewEvidence {
+  diff: string;
+  checks: { label: string; ok: boolean; detail: string }[];
+  toolErrors: { count: number; last: string[] };
+  stats: { created: number; modified: number; removed: number };
+  /** Hallazgos del verificador, si lo hubo [R75.15]. */
+  verification?: { met: boolean; findings: VerifyFinding[] };
+}
+
 export interface SupervisorReview {
   step: string;
+  /** Avisos que la persona marcó como falsos antes para este agente o diagrama [R76.17]. */
+  falseAlarms?: string[];
+  /** Evidencia de lo hecho [R75.7]. */
+  evidence?: ReviewEvidence;
   /** Lo que pidió la persona: es el criterio [R62.2]. */
   order?: string;
   /** Para qué sirve el agente según su ficha [R62.2]. */
@@ -72,8 +95,14 @@ export interface SupervisorReview {
 export interface SupervisorVerdict {
   ok: boolean;
   reason: string;
+  /** Gravedad del problema; sin ella (motores de antes), un «no» cuenta como grave [R75.9]. */
+  severity?: Severity;
+  /** Cada problema con la evidencia que lo respalda [R75.9]. */
+  problems?: { text: string; evidence: string }[];
   summary: string;
   outOfScope?: string;
+  /** Lo que el paso decidió por su cuenta, solo si lo dice o lo hace explícitamente [R72.10]. */
+  decided?: string[];
   usage?: { inputTokens: number; outputTokens: number; costUsd?: number };
 }
 
@@ -89,6 +118,15 @@ export interface RunVerification {
   before?: { step: string; text: string; files: string[] }[];
   /** Lo que decidió la persona durante la ejecución [R62.17]. */
   decisions?: string[];
+  /** Archivos que cambió la ejecución, con sus líneas, y las comprobaciones de la ejecución [R75.18]. */
+  files?: { path: string; added: number; removed: number }[];
+  checks?: { label: string; ok: boolean; detail: string }[];
+  /** Cómo quedó cada elemento del entregable [R75.18]. */
+  deliverableItems?: { item: string; ok: boolean; detail?: string }[];
+  /** Por paso, la gravedad y los problemas de su revisión [R75.18]. */
+  reviews?: { step: string; severity: Severity; problems: string[] }[];
+  /** Avisos que la persona marcó como falsos antes [R76.17]. */
+  falseAlarms?: string[];
 }
 
 export interface RunVerdict {
@@ -109,6 +147,18 @@ export interface AgentQuestion {
   kind?: QuestionKind;
   /** Pregunta de una revisión humana: qué cambiar o a qué paso volver [R53.3][R53.5]. */
   review?: ReviewQuestion;
+  /** La respuesta segura, que se elige sola si la política lo permite [R70.13]. */
+  fallback?: string;
+  /** Conflicto al juntar ramas: archivos y dónde están las dos versiones, para verlas [R73.14][R73.16]. */
+  conflict?: ConflictQuestion;
+}
+
+/** Datos de una pregunta de conflicto [R73.14]. */
+export interface ConflictQuestion {
+  files: string[];
+  /** `<rama>` dentro de `conflicts/`: las versiones están en `<rama>/rama/<ruta>` y `<rama>/destino/<ruta>`. */
+  savedTo?: string;
+  branches: [string, string];
 }
 
 /** Datos de una pregunta de revisión humana [R53.3][R53.5]. */
@@ -130,7 +180,7 @@ export interface BlameCandidate {
   output?: Payload;
 }
 
-export type QuestionKind = 'question' | 'permission' | 'gate' | 'unfinished';
+export type QuestionKind = 'question' | 'permission' | 'gate' | 'unfinished' | 'conflict' | 'budget';
 
 export interface AnsweredQuestion {
   question: string;
@@ -167,6 +217,35 @@ export interface AgentRequest {
   ask(question: AgentQuestion): Promise<string>;
   /** Preguntas ya respondidas en intentos anteriores del mismo nodo. */
   previousAnswers: AnsweredQuestion[];
+  /** Lo que el intento inmediatamente anterior dejó: error, acciones y archivos [R71.7][R71.8]. */
+  previousAttempt?: PreviousAttempt;
+  /** Espacio aislado de la rama en paralelo: carpeta de trabajo y raíz de escritura del paso [R73.8]. */
+  workspace?: { dir: string };
+  /** Verificador: puede ejecutar comandos pero no editar archivos [R75.14]. */
+  verify?: boolean;
+  /** Memoria del proyecto del paso: el texto del prompt, qué entradas lleva y de qué ámbitos [R76.14][R76.15]. */
+  projectMemory?: { text: string; ids: Id[]; scopes?: string[] };
+  /** Presupuesto del intento en dólares; el motor lo aplica y al pasarse falla sin reintentar [R77.9]. */
+  maxCostUsd?: number;
+  /** Con la ejecución en pausa, espera a que se reanude; el adaptador la llama antes de cada herramienta [R77.12]. */
+  whilePaused?: (tool: string) => Promise<void>;
+}
+
+/** Lo que un intento fallido le deja al siguiente [R71.7]. */
+export interface PreviousAttempt {
+  attempt: number;
+  kind: AgentErrorKind;
+  message: string;
+  ended: 'error' | 'timeout' | 'loop' | 'unmet' | 'interrupted';
+  actions: string[];
+  files: { path: string; change?: FileChange; via?: FileVia; restored?: boolean }[];
+}
+
+/** Lo que se pudo devolver al punto de partida [R71.10]. */
+export interface RestoreResult {
+  restored: string[];
+  removed: string[];
+  failed: { path: string; reason: string }[];
 }
 
 /** Contrato que implementa cada motor de agentes (Claude Agent SDK, simulado, ...). */
@@ -174,18 +253,33 @@ export interface AgentAdapter {
   run(request: AgentRequest, signal: AbortSignal): AsyncIterable<AgentStreamEvent>;
 }
 
-/** Error de un adapter. `retriable` indica si el orquestador puede reintentar. */
+/** Tipo de un error del motor: decide si se reintenta y con qué cuenta [R71.1]. */
+export type AgentErrorKind = 'rate_limit' | 'overloaded' | 'transient' | 'timeout' | 'unmet' | 'fatal';
+
+/** Error de un adapter. `retriable` indica si el orquestador puede reintentar; `kind`, de qué tipo es [R71.1]. */
 export class AgentError extends Error {
+  readonly kind: AgentErrorKind;
+  readonly retriable: boolean;
+  /** Lo que pidió esperar el proveedor, si lo dijo (`retry-after`) [R71.2]. */
+  readonly retryAfterMs: number | undefined;
+
   constructor(
     message: string,
-    readonly retriable = false,
+    retriable = false,
     /** Obligatorios sin usar que provocaron el error [R36.11]. */
     readonly missed: KnowledgeRef[] = [],
+    opts: { kind?: AgentErrorKind; retryAfterMs?: number } = {},
   ) {
     super(message);
     this.name = 'AgentError';
+    this.kind = opts.kind ?? (missed.length > 0 ? 'unmet' : retriable ? 'transient' : 'fatal');
+    this.retriable = opts.kind ? opts.kind !== 'fatal' : retriable;
+    this.retryAfterMs = opts.retryAfterMs;
   }
 }
+
+/** ¿Es un límite de uso del proveedor? Tiene su propia cuenta de intentos [R71.5]. */
+export const isLimitError = (err: unknown): boolean => err instanceof AgentError && (err.kind === 'rate_limit' || err.kind === 'overloaded');
 
 export interface RouteCandidate {
   edgeId: Id;
@@ -237,8 +331,16 @@ export interface Decider {
   supervise?(request: SupervisorReview, signal: AbortSignal): Promise<SupervisorVerdict>;
   /** ¿El resultado cumple lo que pidió la persona? [R62.9] */
   verifyRun?(request: RunVerification, signal: AbortSignal): Promise<RunVerdict>;
+  /** Propuestas para la memoria del proyecto a partir de lo que dijo la persona. Opcional [R76.6]. */
+  proposeMemory?(request: MemoryProposalRequest, signal: AbortSignal): Promise<{ proposals: Omit<MemoryProposal, 'id'>[]; usage?: TransformUsage }>;
   /** Nodo «Transformar» con Claude: devuelve el texto convertido. Opcional: sin él, el nodo falla [R37.6]. */
   transform?(request: TransformRequest, signal: AbortSignal): Promise<{ text: string; usage?: TransformUsage }>;
+}
+
+/** Lo que recibe la propuesta de memoria: las señales, como datos, y lo que ya hay [R76.6]. */
+export interface MemoryProposalRequest {
+  signals: MemorySignal[];
+  entries: { id: Id; kind: MemoryKind; scope: string; title: string; text: string }[];
 }
 
 export interface TransformRequest {

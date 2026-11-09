@@ -3,12 +3,13 @@ import { pathKey } from '../replay';
 import type { RunEvent } from '../events';
 import type { RunOptions } from '../run-types';
 import { declaredFiles, withinDeclared } from '../text/split';
+import { LOOP_WARN, toolSignature } from './watchdog';
 
 /** Lo que detecta una regla [R60.1]. */
 export interface SupervisorAlert {
   nodeId: Id;
   path: readonly Id[];
-  rule: 'undeclared-file' | 'empty-output' | 'unexpected-branch' | 'retry-loop' | 'budget-burn';
+  rule: 'undeclared-file' | 'empty-output' | 'unexpected-branch' | 'retry-loop' | 'budget-burn' | 'tool-loop' | 'instructions-changed' | 'burn-rate';
   detail: string;
 }
 
@@ -21,15 +22,34 @@ export interface RuleState {
   spent: Map<string, { tokens: number; costUsd: number }>;
   /** Último reintento de cada paso, para saber si se agotaron al terminar [R63.4]. */
   retries: Map<string, { attempt: number; max: number; message: string }>;
+  /** Última herramienta de cada paso y cuántas veces seguidas se repitió [R70.10]. */
+  loops: Map<string, { sig: string; count: number }>;
+  /** Lo que gasta cada paso y cuándo, para `burn-rate` [R77.10]. */
+  burn?: Map<string, { spends: { at: number; costUsd: number }[]; alerted: boolean }>;
 }
 
-export const newRuleState = (): RuleState => ({ declared: new Map(), agents: new Set(), rejected: new Map(), spent: new Map(), retries: new Map() });
+/** Minutos seguidos que tiene que durar el gasto alto [R77.10]. */
+export const BURN_MINUTES = 3;
+export const BURN_RATE_USD_PER_MIN = 1;
+
+/** ¿Gastó más de `rate` $ en cada uno de los últimos minutos seguidos? [R77.10] */
+function burning(spends: readonly { at: number; costUsd: number }[], now: number, rate: number): boolean {
+  if (spends.length === 0 || now - spends[0]!.at < (BURN_MINUTES - 1) * 60_000) return false;
+  for (let m = 0; m < BURN_MINUTES; m++) {
+    const to = now - m * 60_000;
+    const sum = spends.filter((s) => s.at > to - 60_000 && s.at <= to).reduce((n, s) => n + s.costUsd, 0);
+    if (sum <= rate) return false;
+  }
+  return true;
+}
+
+export const newRuleState = (): RuleState => ({ declared: new Map(), agents: new Set(), rejected: new Map(), spent: new Map(), retries: new Map(), loops: new Map() });
 
 /** Veces que un Coordinador puede rechazar su reparto: la primera y sus 2 repeticiones [R59.8]. */
 const MAX_REJECTIONS = 3;
 
 /** Reglas del Supervisor: solo miran eventos, nunca llaman al motor [R60.2]. */
-export function applyRules(state: RuleState, e: RunEvent, budget: RunOptions['budget']): SupervisorAlert[] {
+export function applyRules(state: RuleState, e: RunEvent, budget: RunOptions['budget'], opts: { burnRate?: number } = {}): SupervisorAlert[] {
   const path = e.nodePath ?? [];
   const alert = (nodeId: Id, rule: SupervisorAlert['rule'], detail: string): SupervisorAlert[] => [{ nodeId, path, rule, detail }];
   switch (e.type) {
@@ -40,8 +60,21 @@ export function applyRules(state: RuleState, e: RunEvent, budget: RunOptions['bu
     }
     case 'agent.request':
       state.agents.add(pathKey(path, e.nodeId));
+      state.loops.delete(pathKey(path, e.nodeId));
       return [];
+    case 'tool.called': {
+      // La misma herramienta con la misma entrada, seguida y sin cambiar archivos [R70.10].
+      const key = pathKey(path, e.nodeId);
+      const sig = toolSignature(e.tool, e.input);
+      const prev = state.loops.get(key);
+      const count = prev?.sig === sig ? prev.count + 1 : 1;
+      state.loops.set(key, { sig, count });
+      return count === LOOP_WARN ? alert(e.nodeId, 'tool-loop', `Repitió ${LOOP_WARN} veces seguidas ${e.tool} con la misma entrada, sin cambiar ningún archivo.`) : [];
+    }
     case 'file.produced': {
+      state.loops.delete(pathKey(path, e.nodeId));
+      // Tocar las instrucciones del proyecto cambia todas las ejecuciones siguientes [R76.19].
+      if (!e.reused && INSTRUCTIONS.test(e.path)) return alert(e.nodeId, 'instructions-changed', `${e.change === 'created' ? 'Creó' : 'Cambió'} ${e.path}: eso cambia cómo trabajan los agentes en todas las ejecuciones siguientes.`);
       const declared = state.declared.get(pathKey(path, e.nodeId));
       return declared && !withinDeclared(e.path, declared) ? alert(e.nodeId, 'undeclared-file', `Tocó ${e.path}, que no estaba entre sus archivos (${declared.join(', ')}).`) : [];
     }
@@ -81,6 +114,18 @@ export function applyRules(state: RuleState, e: RunEvent, budget: RunOptions['bu
       spent.tokens += e.inputTokens + e.outputTokens;
       spent.costUsd += e.costUsd ?? 0;
       state.spent.set(key, spent);
+      // Más de 1 $ por minuto durante 3 minutos seguidos [R77.10].
+      const burn = (state.burn ??= new Map<string, { spends: { at: number; costUsd: number }[]; alerted: boolean }>());
+      const b = burn.get(key) ?? { spends: [], alerted: false };
+      burn.set(key, b);
+      const at = Date.parse(e.ts);
+      if (e.costUsd && Number.isFinite(at)) b.spends.push({ at, costUsd: e.costUsd });
+      b.spends = b.spends.filter((s: { at: number }) => s.at > at - BURN_MINUTES * 60_000);
+      const rate = opts.burnRate ?? BURN_RATE_USD_PER_MIN;
+      if (!b.alerted && burning(b.spends, at, rate)) {
+        b.alerted = true;
+        return alert(e.nodeId, 'burn-rate', `Lleva ${BURN_MINUTES} minutos gastando más de ${rate} $ por minuto.`);
+      }
       const burned = (budget?.maxTokens !== undefined && spent.tokens > budget.maxTokens / 2) || (budget?.maxCostUsd !== undefined && spent.costUsd > budget.maxCostUsd / 2);
       return burned ? alert(e.nodeId, 'budget-burn', 'Este paso ha gastado más de la mitad del presupuesto.') : [];
     }
@@ -88,6 +133,9 @@ export function applyRules(state: RuleState, e: RunEvent, budget: RunOptions['bu
       return [];
   }
 }
+
+/** Archivos de instrucciones de Claude Code y de otros agentes [R76.19]. */
+const INSTRUCTIONS = /(^|\/)(CLAUDE\.md|CLAUDE\.local\.md|AGENTS\.md)$|(^|\/)\.claude\//;
 
 /** La rama de git de una ejecución y quién creó cada una [R60.26]. */
 export interface BranchMemory {

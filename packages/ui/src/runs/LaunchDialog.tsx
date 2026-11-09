@@ -1,4 +1,4 @@
-import { finalSteps, validateDiagram } from '@orquestador/core';
+import { finalSteps, validateDiagram, type UnansweredPolicy } from '@orquestador/core';
 import type { ProjectApi } from '@orquestador/editor';
 import { RunDialog } from './RunDialog';
 import type { RunLauncher } from './useRunLauncher';
@@ -11,11 +11,13 @@ interface Props {
   engine: 'simulated' | 'claude';
   currentDiagramId: string;
   defaultMaxTokens: number | undefined;
+  /** La política de Ajustes para preguntas sin respuesta [R70.19]. */
+  defaultUnanswered?: UnansweredPolicy | undefined;
   onEngine: (engine: 'simulated' | 'claude') => void;
 }
 
 /** Diálogo de lanzar el diagrama elegido [R52.7]. */
-export function LaunchDialog({ api, launcher, runsIndex, engine, currentDiagramId, defaultMaxTokens, onEngine }: Props) {
+export function LaunchDialog({ api, launcher, runsIndex, engine, currentDiagramId, defaultMaxTokens, defaultUnanswered, onEngine }: Props) {
   const { launch, lastInput, lastInputs, maxTokens } = launcher;
   if (!launch) return null;
   return (
@@ -25,6 +27,7 @@ export function LaunchDialog({ api, launcher, runsIndex, engine, currentDiagramI
       runnable={validateDiagram(launch).length === 0}
       lastInput={lastInputs.current.get(launch.id) ?? (launch.id === currentDiagramId ? lastInput : '')}
       defaultLimit={maxTokens ?? defaultMaxTokens}
+      unanswered={launcher.lastUnanswered.current.get(launch.id) ?? defaultUnanswered}
       onEngine={onEngine}
       onStart={() => undefined}
       onLaunch={(o, l, d, f, opts) => void launcher.onLaunch(launch, o, l, d, f, opts)}

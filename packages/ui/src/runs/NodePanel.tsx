@@ -1,9 +1,10 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { AlertTriangle, Check, ChevronsRight, Loader2, Maximize2, MessageCircleQuestion, X as XIcon } from 'lucide-react';
-import { MODELS, isApproval, type RunEvent } from '@orquestador/core';
+import { MODELS, isApproval, type QuestionKind, type RunEvent } from '@orquestador/core';
 import { pathKey } from '@orquestador/core';
 import { conversationBlocks, filesSinceReview, questionGroup, stepFiles, stepOverview, t, toolTarget, transcriptItems, type LiveView, type MessageKey, type TranscriptItem } from '@orquestador/editor';
 import { Markdown } from '../common';
+import { ConflictCard } from './ConflictCard';
 import { StepFilesBlock } from './RunFiles';
 
 interface Props {
@@ -23,10 +24,16 @@ interface Props {
   onOpenFile?: (path: string) => void;
   /** Abre en grande la vista previa de un archivo de un paso [R54.6]. */
   onPreview?: (key: string, path: string) => void;
+  /** Abre una entrada de la memoria del proyecto [R76.22]. */
+  onMemoryEntry?: ((id: string) => void) | undefined;
+  /** Títulos de las entradas de la memoria del proyecto, por id. */
+  memoryTitles?: Readonly<Record<string, string>> | undefined;
   /** Miniatura de un archivo de un paso [R54.6]. */
   renderThumb?: (key: string, path: string) => ReactNode;
   /** Pliega el panel a una franja [R68.3]. */
   onFold?: () => void;
+  /** «Ver la memoria completa»: abre la pestaña «Memoria» de la ejecución [R72.23]. */
+  onMemory?: () => void;
 }
 
 /** Miniaturas que se ven en la tarjeta de una revisión humana [R54.6]. */
@@ -182,7 +189,7 @@ export function ReviewGateCard({ item, onAnswer, closed = false, files = [], onP
 }
 
 /** Fichero por el que pide permiso para modificar, si la pregunta es de ese tipo [R45.9]. */
-export function permissionTarget(item: { text: string; ask?: 'question' | 'permission' | 'gate' | 'unfinished' }): string | undefined {
+export function permissionTarget(item: { text: string; ask?: QuestionKind | undefined }): string | undefined {
   if (questionGroup({ text: item.text, ...(item.ask ? { kind: item.ask } : {}) }) !== 'permission') return undefined;
   return /^¿Puedo modificar (.+)\?$/.exec(item.text.trim())?.[1];
 }
@@ -191,6 +198,7 @@ export function Question({ item, onAnswer, closed = false, onOpenFile, reviewFil
   const [text, setText] = useState('');
   if (item.review) return <ReviewGateCard item={item} onAnswer={onAnswer} closed={closed} {...(reviewFiles ? { files: reviewFiles } : {})} {...(onPreview ? { onPreview } : {})} {...(renderThumb ? { renderThumb } : {})} />;
   if (item.confirm) return <ConfirmCard item={item} onAnswer={onAnswer} closed={closed} />;
+  if (item.conflict) return <ConflictCard item={item} onAnswer={onAnswer} closed={closed} onPreview={onPreview} />;
   const target = item.answer === undefined && !closed ? permissionTarget(item) : undefined;
   return (
     <li className="orq-chat orq-chat--question">
@@ -240,7 +248,7 @@ export function filesState(status: string | undefined, closed: boolean): 'done' 
   return 'unfinished';
 }
 
-export function NodePanel({ events, live, nodeId, nodePath, label, onAnswer, onExpand, closed = false, labelOf, onOpenFile, onPreview, renderThumb, onFold }: Props) {
+export function NodePanel({ events, live, nodeId, nodePath, label, onAnswer, onExpand, closed = false, labelOf, onOpenFile, onPreview, renderThumb, onFold, onMemory, onMemoryEntry, memoryTitles }: Props) {
   const items = transcriptItems(events, nodeId, nodePath);
   const key = [...nodePath, nodeId].join('/');
   const status = live.nodeStatus[key];
@@ -261,6 +269,8 @@ export function NodePanel({ events, live, nodeId, nodePath, label, onAnswer, onE
   const block = <StepFilesBlock files={files} state={state} onOpen={onOpenFile} />;
   const tone = stepTone(status);
   const metrics = stepMetrics(view);
+  const health = closed ? undefined : live.health?.[key];
+  const wait = closed ? undefined : live.waits?.[key];
   return (
     <section className="orq-nodepanel" aria-label={t('transcript.title', { name: label })}>
       <div className="orq-nodepanel__head">
@@ -283,6 +293,18 @@ export function NodePanel({ events, live, nodeId, nodePath, label, onAnswer, onE
             <StepIcon tone={tone} />
             {t(`node.status.${status}` as MessageKey)}
           </p>
+          {/* Sin señales de vida, o cortado y a punto de reintentarse [R70.20]. */}
+          {health && (
+            <p className="orq-stepstate__health" role="status">
+              {health.cut ? t(`step.health.cut.${health.cut}` as MessageKey) : t('step.health.stalled', { n: health.stalledMinutes ?? 0 })}
+            </p>
+          )}
+          {/* En cola por el límite de toda la app, o en pausa [R77.3][R77.13]. */}
+          {wait && (wait.pause || wait.queuedBehind !== undefined) && (
+            <p className="orq-stepstate__health" role="status">
+              {wait.pause ? t(wait.pause === 'paused' ? 'step.wait.paused' : 'step.wait.pausing') : t('step.wait.queued', { n: wait.queuedBehind ?? 0 })}
+            </p>
+          )}
           {metrics.length > 0 && (
             <p className="orq-stepstate__metrics">
               {metrics.map((m) => (
@@ -337,6 +359,34 @@ export function NodePanel({ events, live, nodeId, nodePath, label, onAnswer, onE
                         <details className="orq-t__memory">
                           <summary>{t('transcript.memory')}</summary>
                           <pre>{it.memory}</pre>
+                          {/* Qué bloques se recortaron y la memoria entera [R72.23]. */}
+                          {it.memoryTrimmed && <p className="orq-hint">{t('transcript.memory.trimmed', { blocks: it.memoryTrimmed.map((b) => t(`mem.block.${b}` as MessageKey)).join(', ') })}</p>}
+                          {onMemory && (
+                            <button type="button" className="orq-link" onClick={onMemory}>
+                              {t('transcript.memory.all')}
+                            </button>
+                          )}
+                        </details>
+                      )}
+                      {/* La memoria del proyecto que le llegó; cada entrada abre su ficha [R76.22]. */}
+                      {it.projectMemory && (
+                        <details className="orq-t__memory">
+                          <summary>{t('transcript.projectMemory', { n: it.projectMemory.length })}</summary>
+                          <ul>
+                            {it.projectMemory.map((id) => (
+                              <li key={id}>
+                                <button type="button" className="orq-link" disabled={!onMemoryEntry} onClick={() => onMemoryEntry?.(id)}>
+                                  {memoryTitles?.[id] ?? id}
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        </details>
+                      )}
+                      {it.previous && (
+                        <details className="orq-t__memory">
+                          <summary>{t('transcript.previous')}</summary>
+                          <pre>{it.previous}</pre>
                         </details>
                       )}
                     </details>
@@ -359,10 +409,46 @@ export function NodePanel({ events, live, nodeId, nodePath, label, onAnswer, onE
                 return <ToolGroup key={i} tools={it.tools} />;
               case 'question':
                 return <Question key={it.questionId} item={it} onAnswer={onAnswer} closed={closed} onOpenFile={onOpenFile} {...(it.review?.phase === 'feedback' ? { reviewFiles: filesSinceReview(events, nodeId, nodePath, it.questionId) } : {})} {...(onPreview ? { onPreview } : {})} {...(renderThumb ? { renderThumb } : {})} />;
+              case 'checks': {
+                // «3 de 4 comprobaciones bien», con la salida de cada una al desplegar [R75.25].
+                const good = it.results.filter((r) => r.ok).length;
+                return (
+                  <li key={i} className={`orq-t orq-t--checks${good < it.results.length ? ' is-bad' : ''}`}>
+                    <details>
+                      <summary>{t('step.checks.row', { ok: good, total: it.results.length })}</summary>
+                      <ul>
+                        {it.results.map((r, j) => (
+                          <li key={j} className={r.ok ? 'is-ok' : 'is-bad'}>
+                            <strong>{`${r.ok ? '✓' : '✗'} ${r.label}`}</strong>
+                            {r.detail && <pre>{r.detail}</pre>}
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  </li>
+                );
+              }
+              case 'note':
+                // La nota que dejó para los siguientes pasos [R72.24].
+                return (
+                  <li key={i} className="orq-t orq-t--note">
+                    <div className="orq-t__card">
+                      <strong>{t('transcript.note')}</strong>
+                      <Markdown text={it.text} />
+                      <p className="orq-hint">{t('transcript.note.hint')}</p>
+                    </div>
+                  </li>
+                );
               case 'retry':
+                // Separador del reintento: por qué se repite y, desplegado, el error [R71.15].
                 return (
                   <li key={i} className="orq-t orq-t--retry">
-                    {t('transcript.retry', { attempt: it.attempt, max: it.max, message: it.message })}
+                    <details className="orq-t__fold">
+                      <summary>
+                        <strong>{t(it.cause === 'timeout' ? 'transcript.retry.timeout' : it.cause === 'loop' ? 'transcript.retry.loop' : 'transcript.retry.error', { next: it.attempt + 1 })}</strong>
+                      </summary>
+                      <p>{t('transcript.retry.detail', { attempt: it.attempt, message: it.message })}</p>
+                    </details>
                   </li>
                 );
               case 'pass':

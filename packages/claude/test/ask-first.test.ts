@@ -61,7 +61,7 @@ describe('SPEC-039 · agentes que preguntan antes de actuar', () => {
   it('[R39.4] si termina sin preguntar, la app pregunta; «Dar por bueno» sigue y otra respuesta repite el paso', async () => {
     const ok = setup(true, [ASK_FIRST_OK]);
     const out = await ok.run();
-    expect(ok.seen.asked[0]).toEqual({ text: '«Dev» ha terminado sin consultarte. ¿Doy por bueno su resultado?', options: [ASK_FIRST_OK, ASK_FIRST_REDO], kind: 'gate' });
+    expect(ok.seen.asked[0]).toEqual({ text: '«Dev» ha terminado sin consultarte. ¿Doy por bueno su resultado?', options: [ASK_FIRST_OK, ASK_FIRST_REDO], kind: 'gate', fallback: ASK_FIRST_REDO });
     expect(out.some((e) => e.type === 'result')).toBe(true);
     const redo = setup(true, ['Usa la paleta de 16 colores']);
     await expect(redo.run()).rejects.toMatchObject({ message: 'El usuario pide que lo rehaga: Usa la paleta de 16 colores', retriable: true });

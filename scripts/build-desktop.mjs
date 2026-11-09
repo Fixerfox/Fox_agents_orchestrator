@@ -23,6 +23,8 @@ await build({
   jsx: 'automatic',
   define: { 'process.env.NODE_ENV': '"production"' },
   minify: true,
+  // Con nombres: la traza de un error de la interfaz dice dónde falló [R19.12].
+  keepNames: true,
   loader: { '.woff2': 'file', '.woff': 'file' },
   assetNames: '[name]-[hash]',
 });

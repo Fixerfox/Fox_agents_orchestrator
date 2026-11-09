@@ -168,6 +168,22 @@ export function AgentModelPart({ draft, set, errors, id, turns, setTurns, setSav
         <Field label={t('agent.maxTurns')} id="agent-turns" error={errors['maxTurns']}>
           <input id="agent-turns" type="number" min={1} max={200} value={turns} onChange={(e) => (setTurns(e.target.value), setSaved(false))} />
         </Field>
+        {/* Presupuesto propio de cada intento de este agente; el del paso manda [R77.9]. */}
+        <Field label={t('agent.maxCost')} id="agent-cost" error={errors['limits.maxCostUsd']}>
+          <input
+            id="agent-cost"
+            type="number"
+            min={0.01}
+            step={0.1}
+            value={draft.limits?.maxCostUsd ?? ''}
+            onChange={(e) => {
+              const { maxCostUsd: _old, ...other } = draft.limits ?? {};
+              void _old;
+              const limits = e.target.value === '' ? other : { ...other, maxCostUsd: Number(e.target.value) };
+              set({ limits });
+            }}
+          />
+        </Field>
       </details>
     </>
   );

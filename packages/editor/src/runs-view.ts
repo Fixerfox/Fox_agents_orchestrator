@@ -28,6 +28,8 @@ export interface HistoryRow {
   /** Enlaces con la ejecución corregida y las que la corrigieron [R53.14]. */
   correctedFrom?: string;
   correctedBy?: string[];
+  /** Reintentos de la ejecución [R77.19]. */
+  retries: number;
 }
 
 const ms = (iso: string | undefined): number | undefined => {
@@ -56,6 +58,7 @@ export function historyRows(runs: readonly RunSummary[], diagramNames: Readonly<
         tokens: r.usage.inputTokens + r.usage.outputTokens,
         costUsd: r.usage.costUsd,
         input: r.order ?? '',
+        retries: r.retries ?? 0,
         ...(r.reason !== undefined ? { reason: r.reason } : {}),
         ...(r.resumedFrom ? { resumedFrom: r.resumedFrom } : {}),
         ...(r.resumedBy ? { resumedBy: r.resumedBy } : {}),
@@ -74,6 +77,27 @@ export interface HistoryFilter {
   group?: HistoryGroup;
   diagramId?: string;
   text?: string;
+  /** Solo las caras, las largas o las que reintentaron [R77.19]. */
+  measure?: HistoryMeasure;
+}
+
+/** Filtros por coste, duración y reintentos [R77.19]. */
+export type HistoryMeasure = 'all' | 'costly' | 'long' | 'retried';
+export const HISTORY_MEASURES: readonly HistoryMeasure[] = ['all', 'costly', 'long', 'retried'];
+/** Desde cuánto una ejecución es «cara» (1 $) o «larga» (10 min) [R77.19]. */
+export const COSTLY_USD = 1;
+export const LONG_S = 600;
+/** Orden del historial [R77.19]. */
+export type HistorySort = 'recent' | 'cost' | 'duration' | 'retries';
+export const HISTORY_SORTS: readonly HistorySort[] = ['recent', 'cost', 'duration', 'retries'];
+
+const measured = (r: HistoryRow, m: HistoryMeasure | undefined) => !m || m === 'all' || (m === 'costly' ? r.costUsd >= COSTLY_USD : m === 'long' ? r.durationS >= LONG_S : r.retries > 0);
+
+/** Ordena el historial; a igualdad, la más reciente primero [R77.19]. */
+export function sortHistory(rows: readonly HistoryRow[], by: HistorySort = 'recent'): HistoryRow[] {
+  const recent = (a: HistoryRow, b: HistoryRow) => (ms(b.startedAt) ?? 0) - (ms(a.startedAt) ?? 0);
+  const key = (r: HistoryRow) => (by === 'cost' ? r.costUsd : by === 'duration' ? r.durationS : by === 'retries' ? r.retries : 0);
+  return [...rows].sort((a, b) => key(b) - key(a) || recent(a, b));
 }
 
 /** Filtra por grupo de estado, diagrama y texto (sin mayúsculas ni acentos) [R35.2]. */
@@ -83,7 +107,8 @@ export function filterHistory(rows: readonly HistoryRow[], f: HistoryFilter): Hi
     (r) =>
       (!f.group || f.group === 'all' || groupOf(r.status) === f.group) &&
       (!f.diagramId || r.diagramId === f.diagramId) &&
-      (q === '' || fold(r.input).includes(q) || fold(r.diagramName ?? '').includes(q)),
+      (q === '' || fold(r.input).includes(q) || fold(r.diagramName ?? '').includes(q)) &&
+      measured(r, f.measure),
   );
 }
 

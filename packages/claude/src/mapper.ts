@@ -24,7 +24,17 @@ function textOf(content: unknown): string {
 /** Traduce mensajes del SDK en eventos del orquestador, recordando qué herramienta es cada resultado [R27.5][R27.6]. */
 export class MessageMapper {
   private readonly tools = new Map<string, string>();
-  constructor(private readonly secret?: string) {}
+  constructor(
+    private readonly secret?: string,
+    /** Presupuesto del intento, para decirlo si se pasa [R77.9]. */
+    private readonly maxBudgetUsd?: number,
+  ) {}
+
+  /** El uso de un resultado, aunque sea un error: lo gastado cuenta igual [R77.9]. */
+  usageOf(msg: SdkMessage): AgentStreamEvent[] {
+    if (msg.type !== 'result' || !msg.usage) return [];
+    return [{ type: 'usage', inputTokens: msg.usage.input_tokens ?? 0, outputTokens: msg.usage.output_tokens ?? 0, ...(typeof msg.total_cost_usd === 'number' ? { costUsd: msg.total_cost_usd } : {}) }];
+  }
 
   map(msg: SdkMessage): AgentStreamEvent[] {
     if (msg.type === 'assistant') {
@@ -55,7 +65,7 @@ export class MessageMapper {
       return out;
     }
     if (msg.type === 'result') {
-      if (msg.is_error || (msg.subtype && msg.subtype !== 'success')) throw explainResult(msg.subtype, msg.errors, msg.result, this.secret);
+      if (msg.is_error || (msg.subtype && msg.subtype !== 'success')) throw explainResult(msg.subtype, msg.errors, msg.result, this.secret, this.maxBudgetUsd);
       if (typeof msg.result !== 'string') throw new AgentError('Claude terminó sin devolver un resultado.', false);
       const out: AgentStreamEvent[] = [];
       if (msg.usage) {

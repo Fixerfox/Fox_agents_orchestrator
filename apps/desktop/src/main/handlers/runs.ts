@@ -1,9 +1,11 @@
 import { promises as fsp } from 'node:fs';
 import { basename, isAbsolute, relative, sep } from 'node:path';
 import { isSensitivePath } from '@orquestador/claude';
-import type { RunEvent } from '@orquestador/core';
+import { CHECK_TIMEOUT_SEC, clipMiddle, redactString, type CheckResult, type RunEvent, type StepCheck } from '@orquestador/core';
+import { checkRunnerFor } from '../checks';
+import type { ProjectStore } from '@orquestador/store';
 import { CHANNELS, type RunAction, type StartRunRequest } from '@orquestador/editor';
-import { Batcher } from '@orquestador/runtime';
+import { Batcher, type RunService } from '@orquestador/runtime';
 import { MAX_ATTACHMENT_BYTES, MAX_INPUT_FILES, StoreError } from '@orquestador/store';
 import { UNHANDLED, requireRuns, requireStore, type HandlerState } from './state';
 
@@ -62,6 +64,25 @@ export async function handleRuns(h: HandlerState, channel: string, arg: unknown)
       const { runId, by, reason } = arg as { runId: string; by: 'user' | 'assistant'; reason: string };
       return requireRuns(h).accept(runId, { by, reason });
     }
+    case CHANNELS.supervisorFeedback: {
+      const { runId, ...req } = arg as { runId: string; alertSeq: number; verdict: 'false-alarm' | 'confirmed'; note?: string };
+      return requireRuns(h).supervisorFeedback(runId, req);
+    }
+    case CHANNELS.supervisorStats:
+      return requireRuns(h).supervisorStats(arg as string);
+    case CHANNELS.decideMemory: {
+      const { runId, ...req } = arg as { runId: string; proposalId: string; decision: 'save' | 'discard'; edited?: { title?: string; text?: string } };
+      return requireRuns(h).decideMemory(runId, req);
+    }
+    case CHANNELS.projectMemory:
+      return requireRuns(h).projectMemory();
+    case CHANNELS.saveMemoryEntry: {
+      // Lo que guarda el asistente queda como suyo [R76.12].
+      const { by, ...entry } = arg as Parameters<RunService['saveMemoryEntry']>[0] & { by?: 'user' | 'assistant' };
+      return requireRuns(h).saveMemoryEntry(entry, by ?? 'user');
+    }
+    case CHANNELS.tryCheck:
+      return tryCheck(requireStore(h), h.root ?? requireStore(h).paths.root, arg as StepCheck);
     case CHANNELS.controlRun: {
       const { runId, action } = arg as { runId: string; action: RunAction };
       const runs = requireRuns(h);
@@ -138,4 +159,25 @@ export async function handleRuns(h: HandlerState, channel: string, arg: unknown)
     default:
       return UNHANDLED;
   }
+}
+
+/**
+ * «Ejecutar ahora» desde el lateral [R75.24]: la persona escribe y lanza el comando, así que queda aprobado. Las que
+ * miran la salida del paso solo se pueden probar al ejecutarlo.
+ */
+export async function tryCheck(store: ProjectStore, root: string, check: StepCheck): Promise<CheckResult> {
+  const runner = checkRunnerFor(store, root);
+  const started = Date.now();
+  const base = { checkId: check.id, label: check.label, kind: check.kind };
+  if (check.kind === 'command') {
+    await runner.approve(check.run);
+    const r = await runner.command({ run: check.run, timeoutSec: check.timeoutSec ?? CHECK_TIMEOUT_SEC }, new AbortController().signal);
+    const ok = !r.timedOut && r.exitCode === (check.expectExit ?? 0);
+    return { ...base, ok, detail: redactString(clipMiddle(r.output, 2000)), durationMs: r.durationMs };
+  }
+  if (check.kind === 'files') {
+    const missing = await runner.missing(check.mustExist ?? []);
+    return { ...base, ok: missing.length === 0, detail: missing.length === 0 ? 'Todo en su sitio' : `No existe: ${missing.join(', ')}`, durationMs: Date.now() - started };
+  }
+  return { ...base, ok: false, detail: 'Esta comprobación mira la salida del paso: se prueba al ejecutarlo.', durationMs: 0 };
 }

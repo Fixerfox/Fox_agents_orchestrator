@@ -208,9 +208,11 @@ describe('SPEC-032 · M7b panel del nodo, inicio y ajustes', () => {
     await mount();
     await userEvent.click(screen.getByRole('button', { name: '+ Router' }));
     await screen.findByText('Paso', { selector: '.orq-side__title' });
+    expect(screen.getByRole('complementary', { name: 'Propiedades' })).toBeTruthy();
     await userEvent.click(screen.getByRole('button', { name: 'Cerrar el panel' }));
     await waitFor(() => expect(screen.queryByText('Paso', { selector: '.orq-side__title' })).toBeNull());
-    expect(screen.getByText('Selecciona un nodo o una conexión')).toBeTruthy();
+    // Sin selección el panel derecho no se ve [R33.6].
+    expect(screen.queryByRole('complementary', { name: 'Propiedades' })).toBeNull();
   });
 
   it('[R32.24] el inicio pregunta qué orquestar, ofrece tres caminos y los recientes como tabla', async () => {
@@ -236,7 +238,7 @@ describe('SPEC-032 · M7b panel del nodo, inicio y ajustes', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Ajustes' }));
     const page = within(await screen.findByRole('region', { name: 'Ajustes' }));
     await page.findByRole('heading', { name: 'Claude' });
-    expect([...document.querySelectorAll('.orq-setnav__title')].map((a) => a.textContent)).toEqual(['Claude', 'Permisos de los agentes', 'Supervisor', 'Ejecución y presupuesto', 'Apariencia']);
+    expect([...document.querySelectorAll('.orq-setnav__title')].map((a) => a.textContent)).toEqual(['Claude', 'Permisos de los agentes', 'Supervisor', 'Ejecución y presupuesto', 'Límites de tiempo', 'Memoria', 'Apariencia']);
     expect(page.getByText(/Los cambios se guardan al momento/)).toBeTruthy();
     await userEvent.click(await page.findByRole('radio', { name: /Claude \(real\)/ }));
     await settingsSaved();
