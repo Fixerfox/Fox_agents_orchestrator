@@ -1,7 +1,7 @@
 # Aplica los rulesets de .github/rulesets/ al repositorio de GitHub (SPEC-094).
 # Idempotente: si un ruleset con ese nombre ya existe lo actualiza; si no, lo crea.
 # Requiere GitHub CLI con sesión de un administrador del repo: gh auth login
-param([string]$Repo = 'Fixerfox/Fox_orchestrator')
+param([string]$Repo = 'Fixerfox/Fox_agents_orchestrator')
 $ErrorActionPreference = 'Stop'
 
 $existing = gh api "repos/$Repo/rulesets" | ConvertFrom-Json
