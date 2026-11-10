@@ -1,3 +1,4 @@
+import { runsInlineCode, uploads } from './command-risks';
 import { protectedName } from './protected';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
@@ -209,7 +210,25 @@ export const DANGER = {
   delete: 'borra o descarta cambios',
   outside: 'puede afectar a algo fuera de la carpeta del proyecto',
   publish: 'publica fuera del equipo',
+  code: 'ejecuta código que no se puede revisar',
 } as const;
+
+/**
+ * Intérprete al que el comando pasa código en línea, para «Permitir código en línea de «node» en esta ejecución»:
+ * así no se pregunta cada comprobación rápida [R89.11].
+ */
+export function inlineInterpreter(command: string): string | null {
+  for (const seg of segmentsOf(command.trim())) {
+    const words = tokenize(seg.text) ?? seg.text.split(/\s+/).filter(Boolean);
+    while (words.length > 0 && /^[A-Za-z_][A-Za-z0-9_]*=/.test(words[0]!)) words.shift();
+    if (words.length === 0) continue;
+    const prog = programOf(words[0]!);
+    const args = words.slice(1);
+    if (runsInlineCode(prog, args)) return prog;
+  }
+  return null;
+}
+
 export type Danger = (typeof DANGER)[keyof typeof DANGER];
 
 const SENSITIVE_PROGRAMS: Record<string, Danger> = {
@@ -330,6 +349,11 @@ export function sensitiveCommand(command: string, root: string, cwd: string = ro
     const args = words.slice(1);
     const reason = SENSITIVE_PROGRAMS[prog];
     if (reason) return reason;
+    // Código en línea y subidas: también en automático [R89.1][R89.2].
+    if (runsInlineCode(prog, args)) return DANGER.code;
+    if (uploads(prog, args)) return DANGER.publish;
+    // Nada que nombre .orquestador, el estado de la app [R89.3].
+    if (args.some((a) => a.replace(/\\/g, '/').split('/').some((s) => protectedName(s) && s.toLowerCase().startsWith('.orq')))) return DANGER.outside;
     if (seg.piped && (SHELLS.has(prog) || ['python', 'python3', 'node', 'perl', 'ruby'].includes(prog))) return DANGER.outside;
     if (SHELLS.has(prog) && args.some((a) => /^-(e|enc|encodedcommand)$/i.test(a) && prog !== 'bash' && prog !== 'sh')) return DANGER.outside;
     if (SHELLS.has(prog)) {

@@ -6,7 +6,8 @@ import type { MemoryApi, MemoryApiOptions, MemoryState } from './types';
 /** Ajustes de la app y clave API. */
 export function memorySettings(s: MemoryState, options: MemoryApiOptions) {
   let keyStored = false;
-  const view = (): SettingsView => ({ ...s.settings, apiKeyStored: keyStored });
+  let recovered = options.settingsRecovered === true;
+  const view = (): SettingsView => ({ ...s.settings, apiKeyStored: keyStored, ...(recovered ? { recovered: true } : {}) });
 
   return {
     async getSettings() {
@@ -19,6 +20,7 @@ export function memorySettings(s: MemoryState, options: MemoryApiOptions) {
       const problems = validateSettings(next);
       if (problems.length > 0) return invalid(problems);
       s.settings = normalizeSettings(next);
+      recovered = false;
       return ok(view());
     },
     async setApiKey(key) {

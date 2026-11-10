@@ -5,7 +5,7 @@ import { StoreError } from '@orquestador/store';
 import { UNHANDLED, type HandlerState } from './state';
 
 async function settingsView(h: HandlerState): Promise<SettingsView> {
-  return { ...h.settings, apiKeyStored: (await h.deps.vault?.has()) ?? false };
+  return { ...h.settings, apiKeyStored: (await h.deps.vault?.has()) ?? false, ...(h.deps.settings?.recovered ? { recovered: true } : {}) };
 }
 
 export async function handleSettings(h: HandlerState, channel: string, arg: unknown): Promise<unknown> {

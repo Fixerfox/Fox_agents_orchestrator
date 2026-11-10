@@ -20,6 +20,16 @@ beforeEach(async () => {
 });
 afterEach(() => rm(dir, { recursive: true, force: true }));
 
+describe('SPEC-087 · ~/.claude entero', () => {
+  it('[R87.5] lo de Claude Code en ~/.claude se lee sin preguntar; su .credentials.json no', async () => {
+    const asked: AgentQuestion[] = [];
+    const canUse = createWritePolicy({ root: work, level: 'readonly', readRoots: [join(homedir(), '.claude')], ask: async (q) => (asked.push(q), DENY), backup: async () => undefined });
+    expect(await canUse('Read', { file_path: join(homedir(), '.claude', 'projects', 'x', 'salida.txt') })).toMatchObject({ behavior: 'allow' });
+    expect(await canUse('Read', { file_path: join(homedir(), '.claude', '.credentials.json') })).toMatchObject({ behavior: 'deny' });
+    expect(asked).toHaveLength(0);
+  });
+});
+
 function policy(level: PermissionLevel, answers: string[] = [], root = work) {
   const asked: AgentQuestion[] = [];
   const notes: { kind: string; path: string; reason?: string }[] = [];

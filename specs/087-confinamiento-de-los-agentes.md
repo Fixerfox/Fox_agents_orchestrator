@@ -10,7 +10,7 @@ La auditoría para la 1.0 (09/11/2026) encontró dos fallos altos en la polític
 
 ## Decisiones (09/11/2026, del usuario)
 1. **Rutas sensibles, nunca.** Las mismas que ya protegen al asistente (SPEC-029: `.ssh`, `.aws`, `.gnupg`, claves, `.env`, credenciales…) más la carpeta de datos de la app. Se deniegan en todos los niveles, también dentro de la carpeta de trabajo.
-2. **Fuera de la carpeta, según el nivel.** Dentro de la carpeta de trabajo, del proyecto y de `~/.claude` (skills, agentes, comandos y plugins de Claude Code) se lee sin preguntar. Fuera: se pregunta en «Solo lectura» y «Preguntar»; en «Automático» y «Sin preguntar nunca», se permite.
+2. **Fuera de la carpeta, según el nivel.** Dentro de la carpeta de trabajo, del proyecto y de `~/.claude` (lo de Claude Code; su `.credentials.json` sigue protegido) se lee sin preguntar. Fuera: se pregunta en «Solo lectura» y «Preguntar»; en «Automático» y «Sin preguntar nunca», se permite.
 3. **Web por dominio.** En «Solo lectura» y «Preguntar», la primera vez que una ejecución usa un dominio con `WebFetch` se pregunta, y la respuesta vale para el resto de la ejecución. `WebSearch` pregunta una vez por ejecución. En «Automático» y «Sin preguntar nunca», sin preguntar.
 
 ## Requisitos
@@ -22,7 +22,7 @@ La auditoría para la 1.0 (09/11/2026) encontró dos fallos altos en la polític
 ### A1 · Lecturas
 - **R87.3** [M16f] En los pasos de agente, `Read`, `Glob` y `Grep` pasan por la política: ya no están en `allowedTools` y el gancho `PreToolUse` no las salta. Las consultas sin herramientas (decisiones, borradores) no cambian.
 - **R87.4** [M16f] Una lectura cuya ruta o patrón (`file_path`, `path`, `pattern`, `glob`) es sensible (`isSensitivePath`, con la carpeta de datos de la app como protegida) se deniega en todos los niveles con `SENSITIVE_DENY` y queda registrada.
-- **R87.5** [M16f] Una lectura dentro de la carpeta de trabajo, de la carpeta del proyecto o de `~/.claude` se permite sin preguntar. Un patrón sin ruta (Glob o Grep sin `path`) busca en la carpeta de trabajo.
+- **R87.5** [M16f] Una lectura dentro de la carpeta de trabajo, de la carpeta del proyecto o de `~/.claude` (entera: Claude Code guarda ahí lo suyo; `.credentials.json` sigue siendo un secreto) se permite sin preguntar. Un patrón sin ruta (Glob o Grep sin `path`) busca en la carpeta de trabajo.
 - **R87.6** [M16f] Una lectura fuera de esas carpetas: en «Automático» y «Sin preguntar nunca» se permite; en «Solo lectura» y «Preguntar» se pregunta «¿Puedo leer fuera de la carpeta de trabajo? <ruta>» con «Permitir», «Permitir en esta ejecución» y «Denegar». «Permitir en esta ejecución» vale para todas las lecturas de fuera de esa ejecución.
 - **R87.7** [M16f] `.credentials.json` cuenta como sensible.
 

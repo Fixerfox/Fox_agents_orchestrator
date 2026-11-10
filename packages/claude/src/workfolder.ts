@@ -3,7 +3,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import type { AgentQuestion } from '@orquestador/core';
 import type { PermissionLevel } from '@orquestador/core';
-import { APP_KILL_DENY, ISOLATED_GIT_DENY, allowCommandForRun, killsAppProcess, classifyCommand, grantKey, sensitiveCommand, writesGit } from './commands';
+import { APP_KILL_DENY, DANGER, ISOLATED_GIT_DENY, allowCommandForRun, inlineInterpreter, killsAppProcess, classifyCommand, grantKey, sensitiveCommand, writesGit } from './commands';
 import { AUTO_TOOLS } from './connection';
 import { ALLOW_ONCE, ALLOW_RUN, DENY, READ_TOOLS_LOCAL, WEB_TOOLS, createReadPolicy } from './read-policy';
 import { protectedName, sameOrInside } from './protected';
@@ -140,6 +140,22 @@ export interface WritePolicyDeps {
   protectedDirs?: readonly string[];
 }
 
+
+/** Texto de «Permitir código en línea de «node» en esta ejecución» [R89.11]. */
+export const allowInlineForRun = (interpreter: string): string => `Permitir código en línea de «${interpreter}» en esta ejecución`;
+
+/** Motivo al tocar la carpeta de datos de la app con «Sin preguntar nunca» [R89.4]. */
+export const APP_DATA_DENY =
+  'Esa es la carpeta de datos de la aplicación (ajustes, clave y secretos cifrados): los agentes no la leen ni la escriben, con ningún permiso.';
+
+/**
+ * ¿Nombra el comando la carpeta `dir` fuera de la carpeta de trabajo `root`? Una rama aislada vive dentro de los datos
+ * de la app y puede nombrar su propia ruta [R89.4].
+ */
+export function namesOutside(command: string, dir: string, root: string, platform: NodeJS.Platform = process.platform): boolean {
+  const n = (s: string) => (platform === 'win32' ? s.toLowerCase().replaceAll('\\', '/') : s);
+  return n(command).split(n(root)).join('').includes(n(dir));
+}
 
 /** Motivo al escribir en `.orquestador` [R50.5]. */
 export const APP_DIR_DENY =
@@ -319,6 +335,10 @@ export function createWritePolicy(deps: WritePolicyDeps): (tool: string, input: 
           deps.note?.({ kind: 'denied', path: target, reason: APP_DIR_DENY });
           return deny(APP_DIR_DENY);
         }
+        if ((deps.protectedDirs ?? []).some((d) => sameOrInside(abs, d))) {
+          deps.note?.({ kind: 'denied', path: target, reason: APP_DATA_DENY });
+          return deny(APP_DATA_DENY);
+        }
         return allow(input);
       }
       if (!spot) {
@@ -348,7 +368,13 @@ export function createWritePolicy(deps: WritePolicyDeps): (tool: string, input: 
 
     if (tool === 'Bash') {
       const command = typeof input['command'] === 'string' ? (input['command'] as string) : '';
-      if (deps.level === 'full') return allow(input);
+      if (deps.level === 'full') {
+        if ((deps.protectedDirs ?? []).some((d) => namesOutside(command, d, deps.root))) {
+          deps.note?.({ kind: 'denied', path: command, reason: APP_DATA_DENY });
+          return deny(APP_DATA_DENY);
+        }
+        return allow(input);
+      }
       // Solo lectura: solo lo sencillo que no crea nada, y sin preguntar [R47.9].
       if (deps.level === 'readonly') {
         if ((await classifyCommand(command, deps.root, deps.root, { readOnly: true })).safe) return allow(input);
@@ -360,9 +386,11 @@ export function createWritePolicy(deps: WritePolicyDeps): (tool: string, input: 
       const danger = sensitiveCommand(command, deps.root);
       // En automático solo preguntan los delicados [R47.9].
       if (deps.level === 'auto' && danger === null) return allow(input);
-      const key = danger === null ? grantKey(command) : null;
+      // El código en línea se puede permitir para toda la ejecución, por intérprete [R89.11].
+      const interpreter = danger === DANGER.code ? inlineInterpreter(command) : null;
+      const key = danger === null ? grantKey(command) : interpreter !== null ? `codigo:${interpreter}` : null;
       if (key !== null && deps.commandGrants?.has(key)) return allow(input);
-      const forRun = key !== null && deps.commandGrants ? allowCommandForRun(key) : undefined;
+      const forRun = key !== null && deps.commandGrants ? (interpreter !== null ? allowInlineForRun(interpreter) : allowCommandForRun(key)) : undefined;
       const text = danger === null ? `¿Puedo ejecutar este comando?\n${command}` : `¿Puedo ejecutar este comando? (${danger})\n${command}`;
       const answer = (await deps.ask({ text, options: [ALLOW_ONCE, ...(forRun ? [forRun] : []), DENY], kind: 'permission', fallback: DENY })).trim();
       if (answer === ALLOW_ONCE) return allow(input);
