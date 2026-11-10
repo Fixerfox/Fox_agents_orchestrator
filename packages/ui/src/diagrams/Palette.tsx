@@ -54,7 +54,7 @@ interface Props {
   onOpenDiagram?: (id: string) => void;
   diagramMenu?: (id: string) => MenuItem[];
   /** Skills, contextos y MCP que se arrastran sobre un agente [R33.11]. */
-  resources?: { kind: 'skillIds' | 'contextIds' | 'mcpIds'; id: string; name: string }[];
+  resources?: { kind: 'skillIds' | 'contextIds' | 'mcpIds'; id: string; name: string; /** Carpeta de la biblioteca («Arte/Píxel»; vacía, la raíz) [R93.1]. */ folder?: string }[];
   /** «+ Nuevo agente»: abre Agentes con un formulario vacío. */
   onNewAgent?: () => void;
   open?: boolean;
@@ -273,28 +273,48 @@ export function Palette({ agents, examples, usage, onAdd, onPickAgent, onAddAgen
         const key = `res-${g.kind}`;
         // la explicación va solo en el primer grupo que se ve [R33.11]
         const first = RES_GROUPS.findIndex((x) => shownRes.some((r) => r.kind === x.kind)) === gi;
+        const row = (r: (typeof list)[number], depth: number) => (
+          <div
+            key={`${r.kind}:${r.id}`}
+            className={`orq-pal__row orq-pal__res${r.kind === 'mcpIds' ? ' is-mcp' : ''}`}
+            style={depth > 0 ? { paddingLeft: `${12 + depth * 14}px` } : undefined}
+            role="listitem"
+            aria-label={t('pal.res.drag', { name: r.name })}
+            draggable={!locked}
+            onDragStart={(e) => {
+              e.dataTransfer.setData(DRAG_TYPE, `res:${r.kind}:${r.id}`);
+              e.dataTransfer.effectAllowed = 'copy';
+            }}
+          >
+            <g.icon {...SZ} />
+            <span className="orq-pal__name">{r.name}</span>
+          </div>
+        );
+        // Primero lo de la raíz, después cada carpeta por nombre, con sus subcarpetas debajo [R93.1].
+        const folderKey = (f: string) => `${key}-dir:${f}`;
+        const ancestorsOpen = (f: string) => f.split('/').every((_, i, segs) => isOpen(folderKey(segs.slice(0, i + 1).join('/'))));
+        const folders = [...new Set(list.flatMap((r) => (r.folder ? r.folder.split('/').map((_, i, segs) => segs.slice(0, i + 1).join('/')) : [])))].sort((a, b) => a.localeCompare(b, 'es'));
+        const inFolder = (f: string) => list.filter((r) => r.folder === f || r.folder?.startsWith(`${f}/`));
         return (
           <section key={g.kind} aria-label={t(g.label)}>
             <Fold id={key} label={t(g.label)} count={list.length} open={isOpen(key)} onToggle={() => toggle(key)} />
             {isOpen(key) && (
               <div id={`pal-${key}`} role="list">
                 {first && <p className="orq-hint orq-pal__note">{t('pal.res.hint')}</p>}
-                {list.map((r) => (
-                  <div
-                    key={`${r.kind}:${r.id}`}
-                    className={`orq-pal__row orq-pal__res${r.kind === 'mcpIds' ? ' is-mcp' : ''}`}
-                    role="listitem"
-                    aria-label={t('pal.res.drag', { name: r.name })}
-                    draggable={!locked}
-                    onDragStart={(e) => {
-                      e.dataTransfer.setData(DRAG_TYPE, `res:${r.kind}:${r.id}`);
-                      e.dataTransfer.effectAllowed = 'copy';
-                    }}
-                  >
-                    <g.icon {...SZ} />
-                    <span className="orq-pal__name">{r.name}</span>
-                  </div>
-                ))}
+                {list.filter((r) => !r.folder).map((r) => row(r, 0))}
+                {folders.map((f) => {
+                  const segs = f.split('/');
+                  const parent = segs.slice(0, -1).join('/');
+                  if (parent && !ancestorsOpen(parent)) return null;
+                  const depth = segs.length - 1;
+                  const own = list.filter((r) => r.folder === f);
+                  return (
+                    <div key={folderKey(f)} className="orq-pal__dir" style={depth > 0 ? { paddingLeft: `${depth * 14}px` } : undefined}>
+                      <Fold id={folderKey(f)} label={segs.at(-1)!} count={inFolder(f).length} open={isOpen(folderKey(f))} onToggle={() => toggle(folderKey(f))} small />
+                      {isOpen(folderKey(f)) && <div id={`pal-${folderKey(f)}`}>{own.map((r) => row(r, depth + 1))}</div>}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </section>
