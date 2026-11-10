@@ -236,6 +236,7 @@ describe('SPEC-091 · prueba de humo y releases', () => {
     expect(wf).toContain('xvfb-run');
     expect(wf).toContain('scripts/smoke.mjs');
     expect(wf).toContain("if: startsWith(github.ref, 'refs/tags/v')");
+    expect(wf).toContain('case "$TAG" in *-*) PRE="--prerelease"');
     for (const f of ['Orquestador-Windows-x64.exe', 'Orquestador-Linux-x86_64.AppImage', 'Orquestador-macOS-arm64.dmg', 'Orquestador-macOS-x64.dmg']) expect(wf).toContain(`out/${f}`);
   });
 
