@@ -206,6 +206,7 @@
   "filterHistory",
   "filterJobs",
   "formatDuration",
+  "formatTokens",
   "getLevel",
   "groupOf",
   "hasSpecKit",
@@ -273,5 +274,6 @@
   "transformSubtitle",
   "updateLevel",
   "updateNode",
+  "usageText",
   "validPath"
 ]

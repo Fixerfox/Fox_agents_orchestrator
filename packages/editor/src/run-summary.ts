@@ -37,7 +37,7 @@ export interface RunSummaryView {
   startedAt?: string;
   finishedAt?: string;
   durationSec: number;
-  usage: { inputTokens: number; outputTokens: number; costUsd: number };
+  usage: { inputTokens: number; outputTokens: number; costUsd: number; /** Leídos de la caché [R83.5]. */ cachedTokens?: number };
   steps: RunStepSummary[];
   reviews: RunReviewSummary[];
   questions: { label: string; text: string; answer?: string }[];
@@ -77,7 +77,7 @@ export function summarizeRun(events: readonly RunEvent[], labelOf: (nodeId: stri
   let supervisor: RunSummaryView['supervisor'];
   const watched = () => (supervisor ??= { alerts: [], notes: [] });
   const watch = supervisorView(events, false, labelOf);
-  const usage = { inputTokens: 0, outputTokens: 0, costUsd: 0 };
+  const usage: RunSummaryView['usage'] = { inputTokens: 0, outputTokens: 0, costUsd: 0 };
   let status: RunSummaryView['status'] = 'running';
   let reason: string | undefined;
   let accepted: RunSummaryView['accepted'];
@@ -168,6 +168,7 @@ export function summarizeRun(events: readonly RunEvent[], labelOf: (nodeId: stri
         usage.inputTokens += e.inputTokens;
         usage.outputTokens += e.outputTokens;
         usage.costUsd += e.costUsd ?? 0;
+        if (e.cachedTokens) usage.cachedTokens = (usage.cachedTokens ?? 0) + e.cachedTokens;
         break;
       default:
         break;
