@@ -1,0 +1,55 @@
+{
+  "$comment": "SPEC-091. Las rutas son relativas a la raíz del repositorio; scripts/dist.mjs prepara release/app.",
+  "appId": "com.fixerfox.orquestador",
+  "productName": "Orquestador",
+  "copyright": "© 2026 Nicolas Corta Avila",
+  "directories": {
+    "app": "release/app",
+    "output": "release/dist",
+    "buildResources": "apps/desktop/build"
+  },
+  "files": ["dist/**/*", "package.json", "node_modules/**/*", "!**/*.map"],
+  "asar": true,
+  "asarUnpack": ["node_modules/@anthropic-ai/claude-agent-sdk*/**", "node_modules/@lydell/node-pty*/**"],
+  "extraResources": [
+    { "from": "LICENSE", "to": "LICENSE" },
+    { "from": "release/THIRD_PARTY_NOTICES.txt", "to": "THIRD_PARTY_NOTICES.txt" },
+    { "from": "apps/desktop/assets/icon.png", "to": "icon.png" }
+  ],
+  "npmRebuild": false,
+  "nodeGypRebuild": false,
+  "publish": null,
+  "win": {
+    "target": [{ "target": "nsis", "arch": ["x64"] }],
+    "icon": "apps/desktop/build/icon.png",
+    "artifactName": "Orquestador-Windows-${arch}.${ext}"
+  },
+  "nsis": {
+    "oneClick": false,
+    "perMachine": false,
+    "allowToChangeInstallationDirectory": true,
+    "shortcutName": "Orquestador",
+    "license": "LICENSE"
+  },
+  "linux": {
+    "target": [{ "target": "AppImage", "arch": ["x64"] }],
+    "icon": "apps/desktop/build/icon.png",
+    "category": "Development",
+    "executableName": "orquestador",
+    "synopsis": "Orquesta agentes de IA con diagramas",
+    "artifactName": "Orquestador-Linux-x86_64.${ext}"
+  },
+  "mac": {
+    "target": [{ "target": "dmg" }],
+    "icon": "apps/desktop/build/icon.png",
+    "category": "public.app-category.developer-tools",
+    "hardenedRuntime": true,
+    "gatekeeperAssess": false,
+    "entitlements": "apps/desktop/build/entitlements.mac.plist",
+    "entitlementsInherit": "apps/desktop/build/entitlements.mac.plist",
+    "artifactName": "Orquestador-macOS-${arch}.${ext}"
+  },
+  "dmg": {
+    "artifactName": "Orquestador-macOS-${arch}.${ext}"
+  }
+}

@@ -1,5 +1,5 @@
 import { defaultSettings, type AppSettings, type Diagram, type ImportPlan, type Orchestrator, type RunEvent } from '@orquestador/core';
-import type { AssistantEvent, ImportKind } from '@orquestador/editor';
+import type { AppInfo, AssistantEvent, ImportKind } from '@orquestador/editor';
 import type { CreateAppServer, QueryFn } from '@orquestador/claude';
 import { createHash } from 'node:crypto';
 import type { Batcher, RunService } from '@orquestador/runtime';
@@ -23,6 +23,8 @@ export interface DesktopDeps {
   createOrchestrator(ctx: OrchestratorContext): Orchestrator;
   /** Consulta al SDK de Claude; se inyecta para probar sin red [R27.12]. */
   claudeQuery?: QueryFn;
+  /** Versión y sistema, para Ajustes [R91.11]. */
+  appInfo?: AppInfo;
   /** Ajustes globales y clave API cifrada (carpeta de datos de la app) [R23.2][R23.3]. */
   settings?: SettingsStore;
   /** Proyectos recientes en la carpeta de datos de la app [R28.2]. */

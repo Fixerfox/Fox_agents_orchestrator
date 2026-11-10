@@ -1,5 +1,8 @@
 import { afterEach } from 'vitest';
-import { cleanup } from '@testing-library/react';
+import { cleanup, configure } from '@testing-library/react';
+
+// Las máquinas de la CI (sobre todo Windows) son lentas: más margen para que aparezca lo esperado.
+configure({ asyncUtilTimeout: 5000 });
 
 class RO {
   private cb: (entries: unknown[], o: unknown) => void;

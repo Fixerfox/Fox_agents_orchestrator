@@ -1,4 +1,5 @@
 // Empaqueta la app de escritorio con esbuild: main y preload (CommonJS) + renderer (IIFE).
+// `--release`: sin sourcemaps y sin el modo prueba [R91.8]. `--out <carpeta>`: dónde dejarlo (por defecto apps/desktop/dist).
 import { build } from 'esbuild';
 import { copyFileSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -6,12 +7,15 @@ import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const app = join(root, 'apps', 'desktop');
-const out = join(app, 'dist');
+const argv = process.argv.slice(2);
+const release = argv.includes('--release');
+const outAt = argv.indexOf('--out');
+const out = outAt >= 0 && argv[outAt + 1] ? join(root, argv[outAt + 1]) : join(app, 'dist');
 mkdirSync(join(out, 'renderer'), { recursive: true });
 
-const common = { bundle: true, sourcemap: true, logLevel: 'info', absWorkingDir: root };
+const common = { bundle: true, sourcemap: !release, logLevel: 'info', absWorkingDir: root };
 
-await build({ ...common, entryPoints: [join(app, 'src/main/main.ts')], outfile: join(out, 'main.cjs'), platform: 'node', format: 'cjs', target: 'node22', external: ['electron', '@anthropic-ai/claude-agent-sdk', '@lydell/node-pty'] });
+await build({ ...common, entryPoints: [join(app, 'src/main/main.ts')], outfile: join(out, 'main.cjs'), platform: 'node', format: 'cjs', target: 'node22', define: { __ORQ_TEST_MCP__: String(!release) }, minifySyntax: release, external: ['electron', '@anthropic-ai/claude-agent-sdk', '@lydell/node-pty'] });
 await build({ ...common, entryPoints: [join(app, 'src/preload/preload.ts')], outfile: join(out, 'preload.cjs'), platform: 'node', format: 'cjs', target: 'node22', external: ['electron'] });
 await build({
   ...common,

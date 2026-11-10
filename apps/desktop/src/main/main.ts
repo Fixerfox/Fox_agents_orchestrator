@@ -1,10 +1,11 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, net, Notification, protocol, safeStorage, session, shell, Tray } from 'electron';
-import { appendFile, mkdir } from 'node:fs/promises';
-import { join } from 'node:path';
+import { existsSync } from 'node:fs';
+import { appendFile, mkdir, rm, writeFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { execFile, spawn } from 'node:child_process';
 import { ASSISTANT_EVENTS_CHANNEL, CHANNELS, OPEN_RUN_CHANNEL, RUN_EVENTS_CHANNEL, TERMINAL_EVENTS_CHANNEL, TEST_ARG, TEST_CALL_CHANNEL, TEST_READY_CHANNEL, TEST_REPLY_CHANNEL } from '@orquestador/editor';
-import { sdkCreateAppServer, sdkQuery } from '@orquestador/claude';
+import { resolveClaudeExecutable, sdkCreateAppServer, sdkQuery, setClaudeExecutable } from '@orquestador/claude';
 import { ApiKeyVault, McpSecretVault, ProjectTrustStore, RecentStore, SettingsStore } from '@orquestador/store';
 import { crashLine } from './crash';
 import { Background } from './background';
@@ -13,29 +14,49 @@ import { openOutside, previewResponse } from './preview-protocol';
 import { secureStorageAvailable } from './secure-storage';
 import { IPC_FRAME_DENY, fromMainFrame } from './ipc-guard';
 import { DesktopHandlers } from './handlers';
-import { TerminalService, type SpawnPty } from './terminal';
+import { TerminalService, withClaudeOnPath, type SpawnPty } from './terminal';
 import { parseWindowTone, secureWebContents, titleBarOverlay, windowOptions, TITLEBAR, WINDOW_TONE_CHANNEL } from './window';
 import { APP_USER_MODEL_ID, appIdRegistration } from './windows-app-id';
 import { ConsoleLog, DialogQueue, RendererBridge, consoleEntry } from './test-mcp/bridge';
-import { TEST_DATA_FOLDER, loadToken, startTestServer, testMode } from './test-mcp/server';
-import { testTools } from './test-mcp/tools';
+import { TEST_DATA_FOLDER, testMode } from './test-mcp/mode';
+import { APP_NAME, migrateDataFolder } from './data-folder';
+import { isSmoke, runSmoke, smokeLine } from './smoke';
+
+/** `false` en la compilación de release: el servidor del modo prueba no entra en el paquete [R91.8]. */
+declare const __ORQ_TEST_MCP__: boolean;
 
 // Modo prueba: con sus propios datos, antes de pedir la instancia única, para convivir con la app normal [R82.1][R82.2].
 const test = testMode(process.argv, app.isPackaged);
+const smoke = isSmoke(process.argv);
 if (test) app.setPath('userData', join(app.getPath('appData'), TEST_DATA_FOLDER));
+else {
+  // El nombre de la app es el de su carpeta de datos; lo de antes se copia una vez [R91.1][R91.2].
+  app.setName(APP_NAME);
+  app.setPath('userData', join(app.getPath('appData'), APP_NAME));
+  try {
+    migrateDataFolder(app.getPath('appData'));
+  } catch (e) {
+    console.error(`No se pudieron copiar los datos de la versión anterior: ${e instanceof Error ? e.message : String(e)}`);
+  }
+}
+// El binario de Claude del paquete (fuera del asar) o el del PATH [R91.6][R91.7].
+const claudeExecutable = resolveClaudeExecutable({ platform: process.platform, arch: process.arch, resolve: (id) => require.resolve(id), exists: existsSync, packaged: app.isPackaged, envPath: process.env.PATH, pathExt: process.env.PATHEXT });
+if (claudeExecutable) setClaudeExecutable(claudeExecutable);
 /** Respuestas para los diálogos de archivos; solo se llena en modo prueba [R82.11]. */
 const dialogs = new DialogQueue();
 /** Errores y avisos de la interfaz, para el modo prueba [R82.15]. */
 const consoleLog = new ConsoleLog();
 
 // Una sola instancia: abrir la app otra vez enseña la ventana que ya existe [R61.6].
-if (!app.requestSingleInstanceLock()) app.exit(0);
+// La prueba de humo no cede ante otra instancia: daría por buena una app que no ha arrancado [R91.14].
+if (!smoke && !app.requestSingleInstanceLock()) app.exit(0);
 let mainWindow: BrowserWindow | undefined;
 let tray: Tray | undefined;
 let trayBase: { open(): void; quit(): void } | undefined;
 /** Electron suelta el aviso si nadie lo guarda, y entonces pulsarlo no hace nada [R61.11]. */
 const notices = new Set<Notification>();
-const ICON = join(__dirname, 'icon.png');
+// Empaquetada, el icono está en los recursos, fuera del asar: Windows lo lee del disco para los avisos [R91.13].
+const ICON = app.isPackaged ? join(process.resourcesPath, 'icon.png') : join(__dirname, 'icon.png');
 
 /** Deja constancia de lo que no se ve: si la interfaz se cae, nadie llega a leer su consola [R19.11]. */
 const noteCrash = (what: string): void => {
@@ -58,11 +79,14 @@ const cipher = {
 };
 // node-pty se carga en tiempo de ejecución (módulo nativo, fuera del paquete) [R30.13]
 const nativeImport = new Function('specifier', 'return import(specifier)') as (s: string) => Promise<{ spawn: SpawnPty; default?: { spawn: SpawnPty } }>;
+const loadPty = async (): Promise<SpawnPty> => {
+  const mod = await nativeImport('@lydell/node-pty');
+  return (mod.spawn ?? mod.default!.spawn) as SpawnPty;
+};
 const terminals = new TerminalService({
-  loadPty: async () => {
-    const mod = await nativeImport('@lydell/node-pty');
-    return (mod.spawn ?? mod.default!.spawn) as SpawnPty;
-  },
+  loadPty,
+  // Sin Claude instalado, la terminal usa el del paquete [R91.17].
+  env: withClaudeOnPath(process.env, claudeExecutable ? dirname(claudeExecutable) : undefined, process.platform),
   // si no hay pseudoterminal, la terminal del sistema [R30.14]
   openExternal: ({ file, args, cwd, env, verbatim }) =>
     new Promise((resolve, reject) => {
@@ -89,6 +113,7 @@ const handlers = new DesktopHandlers({
   // Los espacios de las ramas en paralelo, en los datos de la app [R73.6].
   createOrchestrator: (ctx) => composeOrchestrator({ ...ctx, spacesRoot: join(dataDir(), 'spaces'), appDataDir: dataDir(), createAppServer: sdkCreateAppServer }, sdkQuery),
   preinstallSpecKit: true,
+  appInfo: { version: app.getVersion(), platform: process.platform, arch: process.arch },
   settings: new SettingsStore(join(dataDir(), 'config')),
   recents: new RecentStore(join(dataDir(), 'config')),
   vault: new ApiKeyVault(join(dataDir(), 'config'), cipher),
@@ -189,7 +214,7 @@ const background = new Background({
 });
 
 function createWindow(): void {
-  const win = new BrowserWindow(windowOptions(join(__dirname, 'preload.cjs'), process.platform, ICON, test ? { title: 'Orquestador · modo prueba', args: [TEST_ARG] } : undefined));
+  const win = new BrowserWindow(windowOptions(join(__dirname, 'preload.cjs'), process.platform, ICON, test ? { title: 'Orquestador · modo prueba', args: [TEST_ARG] } : undefined, !app.isPackaged));
   mainWindow = win;
   // El título del modo prueba no lo cambia la página [R82.3].
   if (test) win.on('page-title-updated', (e) => e.preventDefault());
@@ -218,8 +243,13 @@ function createWindow(): void {
   void win.loadURL(indexUrl);
 }
 
-/** Servidor MCP del modo prueba: las acciones de la app y las de prueba [R82.4]–[R82.17]. */
-async function startTestMcp(port: number): Promise<void> {
+/**
+ * Servidor MCP del modo prueba: las acciones de la app y las de prueba [R82.4]–[R82.17]. En release no existe, y sus
+ * módulos, que se cargan aquí dentro, no entran en el paquete [R91.8].
+ */
+const startTestMcp = __ORQ_TEST_MCP__ ? async (port: number): Promise<void> => {
+  const { loadToken, startTestServer } = await import('./test-mcp/server');
+  const { testTools } = await import('./test-mcp/tools');
   const fromWindow = (sender: Electron.WebContents) => mainWindow !== undefined && !mainWindow.isDestroyed() && sender === mainWindow.webContents;
   const bridge = new RendererBridge((call) => {
     if (!mainWindow || mainWindow.isDestroyed()) return false;
@@ -255,6 +285,32 @@ async function startTestMcp(port: number): Promise<void> {
     // Con el puerto ocupado la app sigue, sin servidor [R82.6].
     console.error(`[modo prueba] No se pudo abrir el MCP en ${url}: ${e instanceof Error ? e.message : String(e)}`);
   }
+} : undefined;
+
+/** Comprueba lo empaquetado, lo escribe y sale [R91.14]. */
+async function smokeTest(win: BrowserWindow | undefined): Promise<void> {
+  const result = await runSmoke({
+    dataDir: dataDir(),
+    windowLoaded: () => (!win ? Promise.reject(new Error('sin ventana')) : win.webContents.isLoading() ? new Promise<void>((resolve, reject) => {
+      win.webContents.once('did-finish-load', () => resolve());
+      win.webContents.once('did-fail-load', (_e, code, desc) => reject(new Error(`${desc} (${code})`)));
+    }) : Promise.resolve()),
+    writeFile: async (file, text) => {
+      await mkdir(dataDir(), { recursive: true });
+      await writeFile(file, text);
+    },
+    removeFile: (file) => rm(file, { force: true }),
+    claude: claudeExecutable,
+    exists: existsSync,
+    claudeVersion: (file) => new Promise((resolve, reject) => {
+      execFile(file, ['--version'], { timeout: 30_000, windowsHide: true }, (error, stdout) => (error ? reject(error) : resolve(stdout)));
+    }),
+    loadPty,
+  });
+  const line = smokeLine(result);
+  console.log(line);
+  if (process.env.ORQ_SMOKE_OUT) await writeFile(process.env.ORQ_SMOKE_OUT, `${line}\n`).catch(() => undefined);
+  app.exit(result.ok ? 0 : 1);
 }
 
 // Los botones de ventana siguen el tema de la app [R19.8].
@@ -276,7 +332,11 @@ app.whenReady().then(() => {
   // La CSP va en la propia respuesta [R89.9].
   protocol.handle('orq-preview', async (req) => previewResponse(await handlers.previewAsset(req.url), (url) => net.fetch(url)));
   createWindow();
-  if (test) void startTestMcp(test.port);
+  if (smoke) {
+    void smokeTest(mainWindow);
+    return;
+  }
+  if (test && startTestMcp) void startTestMcp(test.port);
   // Espacios de ramas que quedaron de un cierre inesperado [R73.18].
   void new RecentStore(join(dataDir(), 'config')).list().then((recent) => cleanupSpaces(join(dataDir(), 'spaces'), recent.map((r) => r.root)));
   // La bandeja es para Windows y Linux, los sistemas de la app.

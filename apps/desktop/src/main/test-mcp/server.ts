@@ -4,19 +4,9 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { dirname } from 'node:path';
 import { RPC, handleMcp, type TestTool } from './protocol';
 
-export const DEFAULT_TEST_PORT = 47321;
-/** Carpeta de datos del modo prueba, junto a la normal [R82.2]. */
-export const TEST_DATA_FOLDER = 'Orquestador-test';
+export { DEFAULT_TEST_PORT, TEST_DATA_FOLDER, testMode } from './mode';
 /** Más de esto en una petición no es una llamada de herramienta. */
 const MAX_BODY = 5 * 1024 * 1024;
-
-/** ¿Arranca en modo prueba, y en qué puerto? Nunca en la app empaquetada [R82.1]. */
-export function testMode(argv: readonly string[], packaged: boolean): { port: number } | undefined {
-  if (packaged || !argv.includes('--test-mcp')) return undefined;
-  const raw = argv.find((a) => a.startsWith('--test-mcp-port='))?.split('=')[1];
-  const port = raw !== undefined && /^\d+$/.test(raw) && Number(raw) > 0 && Number(raw) < 65536 ? Number(raw) : DEFAULT_TEST_PORT;
-  return { port };
-}
 
 /** El token del modo prueba: se crea una vez y se guarda con la dirección [R82.6]. */
 export async function loadToken(file: string, url: string): Promise<string> {

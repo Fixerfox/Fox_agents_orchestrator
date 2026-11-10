@@ -17,7 +17,7 @@ La auditoría para la 1.0 (09/11/2026) encontró dos fallos altos en la polític
 
 ### A2 · Carpetas protegidas en Windows
 - **R87.1** [M16f] `protectedName(segment, platform)` reconoce `.git`, `node_modules` y `.orquestador` en cualquier combinación de mayúsculas. En Windows, además, quita los puntos y espacios del final y lo que va desde `:` (flujos alternativos). `confine` y las redirecciones de Bash (`isProtected`) lo usan: `.GIT/hooks/x`, `.Orquestador/agents/a.json`, `.git./config` y `.git::$INDEX_ALLOCATION/x` quedan fuera.
-- **R87.2** [M16f] Con «Sin preguntar nunca», la carpeta de la app (`appDirs`) también se reconoce así: `.ORQUESTADOR/x` o `.orquestador./x` se deniegan.
+- **R87.2** [M16f] Con «Sin preguntar nunca», la carpeta de la app (`appDirs`) también se reconoce como la ve el sistema: en Windows, `.ORQUESTADOR/x` o `.orquestador./x` se deniegan; en macOS, cuyo disco no distingue mayúsculas por defecto, `.ORQUESTADOR/x` también. En Linux distingue mayúsculas: `.ORQUESTADOR` es otra carpeta y no se toca.
 
 ### A1 · Lecturas
 - **R87.3** [M16f] En los pasos de agente, `Read`, `Glob` y `Grep` pasan por la política: ya no están en `allowedTools` y el gancho `PreToolUse` no las salta. Las consultas sin herramientas (decisiones, borradores) no cambian.
