@@ -12,6 +12,7 @@
   "AgentUse",
   "ApiError",
   "ApiResult",
+  "AppInfo",
   "AssistantEvent",
   "AssistantMessage",
   "AssistantParam",

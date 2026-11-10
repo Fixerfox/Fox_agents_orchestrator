@@ -43,9 +43,11 @@ export interface SecureWebPreferences {
   preload: string;
   /** Solo en modo prueba: el preload expone el puente [R82.7]. */
   additionalArguments?: string[];
+  /** Empaquetada, sin DevTools [R91.9]. */
+  devTools: boolean;
 }
 
-export function windowOptions(preload: string, platform: string = process.platform, icon?: string, test?: { title: string; args: string[] }) {
+export function windowOptions(preload: string, platform: string = process.platform, icon?: string, test?: { title: string; args: string[] }, devTools = true) {
   const webPreferences: SecureWebPreferences = {
     contextIsolation: true,
     sandbox: true,
@@ -53,6 +55,7 @@ export function windowOptions(preload: string, platform: string = process.platfo
     webSecurity: true,
     allowRunningInsecureContent: false,
     preload,
+    devTools,
     ...(test ? { additionalArguments: test.args } : {}),
   };
   return {

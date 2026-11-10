@@ -7,6 +7,7 @@ import { fieldErrors } from '../common';
 import { applyTheme, loadTheme, saveTheme, type Theme } from './theme';
 import { Choice, PermMatrix, RULES, Row, Shell, type Section, type SectionId } from './SettingsParts';
 import { TrustRow } from './TrustDialog';
+import { AboutLine } from './AboutLine';
 
 interface Props {
   api: ProjectApi;
@@ -427,6 +428,7 @@ export function SettingsDialog({ api, onClose, onSaved }: Props) {
       summary: t(`theme.${theme}` as MessageKey),
       intro: t('settings.look.intro'),
       content: (
+        <>
         <fieldset className="orq-field orq-setseg">
           <legend>{t('settings.theme')}</legend>
           <div className="orq-setseg__opts" role="radiogroup">
@@ -447,6 +449,8 @@ export function SettingsDialog({ api, onClose, onSaved }: Props) {
             ))}
           </div>
         </fieldset>
+        <AboutLine app={view.app} />
+        </>
       ),
     },
   ];

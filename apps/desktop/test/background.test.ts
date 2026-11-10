@@ -153,7 +153,7 @@ describe('bandeja del sistema [R61.1]', () => {
 
   it('[R61.6] la segunda instancia termina y la primera enseña su ventana', () => {
     const main = readFileSync(join(__dirname, '..', 'src', 'main', 'main.ts'), 'utf8');
-    expect(main).toMatch(/if \(!app\.requestSingleInstanceLock\(\)\) app\.exit\(0\)/);
+    expect(main).toMatch(/if \((?:!smoke && )?!app\.requestSingleInstanceLock\(\)\) app\.exit\(0\)/);
     expect(main).toMatch(/app\.on\('second-instance', \(\) => background\.open\(\)\)/);
   });
 });
