@@ -7,6 +7,7 @@ export * from './templates';
 export * from './session';
 export * from './api';
 export * from './live';
+export * from './usage-text';
 export * from './run-client';
 export * from './log-view';
 export * from './usage';

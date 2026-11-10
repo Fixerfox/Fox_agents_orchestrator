@@ -29,7 +29,7 @@ Hoy una skill, un contexto de archivo o URL, o un MCP añadido a un paso solo se
 - **R36.6** [M9a] Un contexto obligatorio de tipo texto se entrega bajo «Contexto obligatorio»; uno de tipo archivo del proyecto se incluye con su contenido (texto). Un archivo que no sea texto, no se pueda leer o esté fuera de la carpeta cuenta como «verificado» (R36.8). Un contexto de texto va siempre en el prompt (también el opcional, como hasta ahora) y, si es obligatorio, gasta del tope de R36.7.
 - **R36.7** [M9a] Lo incluido (R36.5 y R36.6) comparte un tope de 30 000 caracteres por intento. Lo que no quepa pasa a «verificado» y el prompt lo dice con su ruta. Se reparte en este orden: contextos de texto, skills y contextos de archivo.
 - **R36.8** [M9a] Lo «verificado» (URL, MCP, archivos no incluibles, lo que supere el tope) aparece en el prompt como «OBLIGATORIO: úsalo antes de responder» con la ruta, la URL o el nombre del servidor.
-- **R36.9** [M9a] La ruta que se da al agente se puede leer desde su directorio actual: si la carpeta de trabajo no es la raíz del proyecto, la ruta de la skill o del contexto de archivo se entrega absoluta.
+- **R36.9** [M9a] La ruta que se da al agente se puede leer desde su directorio actual. Desde SPEC-092, la de cada skill y cada contexto de archivo se entrega siempre absoluta (R92.1, R92.3).
 
 ### Detección de uso y verificación
 - **R36.10** [M9a] Se cuenta como uso: una llamada `Read`, `Grep` o `Glob` cuya ruta (normalizadas las `\` y sin distinguir mayúsculas) esté dentro de la carpeta de la skill o sea el archivo del contexto; un `WebFetch` o `WebSearch` a esa URL (sin barra final ni fragmento); cualquier herramienta `mcp__<servidor>__*` de ese MCP. Lo incluido cuenta como usado sin comprobar nada.

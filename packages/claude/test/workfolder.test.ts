@@ -213,7 +213,6 @@ describe('SPEC-031 · el adaptador usa la carpeta de trabajo', () => {
     expect(system).toContain('Un juego de naves.');
     expect(system).toContain('crear archivos y carpetas nuevos');
     expect(system).not.toContain('Solo puedes leer');
-    expect(system).not.toContain(dir);
   });
 
   it('[R31.11] ofrece herramientas de escritura y la política corresponde a la carpeta', async () => {
