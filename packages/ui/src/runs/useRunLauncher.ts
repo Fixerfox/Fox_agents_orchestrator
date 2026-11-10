@@ -30,8 +30,11 @@ export function useRunLauncher({ api, session, project, client, save, fail, setM
   const [lastInput, setLastInput] = useState('');
   const [maxTokens, setMaxTokens] = useState<number>();
 
-  const onStart = async (order: string, limit?: number, deliverable?: DeliverableSpec | null, inputs?: RunInputs) => {
-    if (project === undefined) return fail(t('run.noProject'));
+  const onStart = async (order: string, limit?: number, deliverable?: DeliverableSpec | null, inputs?: RunInputs): Promise<string | undefined> => {
+    if (project === undefined) {
+      fail(t('run.noProject'));
+      return undefined;
+    }
     setLastInput(order);
     await save();
     setMaxTokens(limit);
@@ -43,6 +46,7 @@ export function useRunLauncher({ api, session, project, client, save, fail, setM
       setRunsNav({ section: 'live', runId: id });
       refreshRuns();
     }
+    return id;
   };
   /** «Lanzar» de Trabajos o «Lanzar…» del Diseñador: abre el diálogo con ese diagrama [R52.7]. */
   const openLaunch = async (diagramId: string) => {

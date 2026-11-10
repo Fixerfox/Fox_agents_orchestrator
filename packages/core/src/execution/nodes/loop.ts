@@ -11,7 +11,19 @@ export const loopHandler: NodeHandler = {
     const cfg = node.loop!;
     const max = cfg.mode === 'count' ? Math.min(cfg.count ?? 1, cfg.maxIterations) : cfg.maxIterations;
     let current = input;
+    const key = [...path, node.id].join('/');
+    let lastReason: string | undefined;
     for (let n = 1; n <= max; n++) {
+      // Lo que saben los agentes del cuerpo en esta vuelta [R84.3].
+      step.loops?.set(key, {
+        label: node.label ?? node.id,
+        round: n,
+        max,
+        mode: cfg.mode,
+        ...(cfg.mode === 'ai-judge' && cfg.prompt ? { criterion: cfg.prompt } : {}),
+        request: input.text,
+        ...(lastReason ? { lastReason } : {}),
+      });
       const r = await step.execute(cfg.body, current, [...path, node.id], depth + 1, step.stack, step.space);
       if (r.status === 'cancelled') return { status: 'cancelled' };
       if (r.status === 'failed' || !r.output) return { status: 'failed' };
@@ -26,12 +38,14 @@ export const loopHandler: NodeHandler = {
         chargeDecision(step, node, path, usage);
         if (signal.aborted) return { status: 'cancelled' };
         reason = verdict.reason;
+        lastReason = verdict.reason;
         if (verdict.done) done = true;
         else if (n >= max) reason = `${reason} · máximo de iteraciones alcanzado`;
       }
       emitter.emit({ type: 'loop.iteration', loopId: node.id, n, max, verdict: done ? 'done' : 'continue', ...(reason !== undefined ? { reason } : {}) }, path);
       if (done) break;
     }
+    step.loops?.delete(key);
     return { status: 'succeeded', output: current };
   },
 };

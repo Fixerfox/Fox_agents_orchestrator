@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { MessageCircleQuestion, Pause, Radio } from 'lucide-react';
 import type { Diagram, RunEvent } from '@orquestador/core';
-import { isOpenStatus, t, type LiveView, type MessageKey } from '@orquestador/editor';
+import { isOpenStatus, t, usageText, type LiveView, type MessageKey } from '@orquestador/editor';
 import { nodeLabel } from './runFormat';
 
 /** Pasos activos y cuenta de hechos a partir del estado en vivo [R38.12]. */
@@ -35,7 +35,6 @@ export function LiveSummary({ live, events, diagram, onOpen }: { live: LiveView;
   const { active, done, total } = liveSteps(live, diagram);
   const waiting = live.pending.length > 0;
   const start = events[0]?.ts ? Date.parse(events[0].ts) : now;
-  const tokens = live.usage.inputTokens + live.usage.outputTokens;
   const state = waiting ? t('live.side.waiting') : live.paused ? t('run.status.paused') : t('run.status.running');
   return (
     <section className={`orq-livecard${waiting ? ' is-waiting' : live.paused ? ' is-paused' : ''}`} aria-label={t('live.side.title')}>
@@ -72,8 +71,8 @@ export function LiveSummary({ live, events, diagram, onOpen }: { live: LiveView;
           <span className="orq-hint">{t('live.side.done', { done, total })}</span>
         </div>
       )}
-      <p className="orq-livecard__figures orq-mono">
-        {clock(Math.max(0, (now - start) / 1000))} · {tokens.toLocaleString('es-ES')} tokens · {money(live.usage.costUsd)}
+      <p className="orq-livecard__figures orq-mono" title={t('usage.hint')}>
+        {clock(Math.max(0, (now - start) / 1000))} · {usageText(live.usage)} · {money(live.usage.costUsd)}
       </p>
       <button type="button" className="orq-btn orq-btn--small orq-btn--primary" onClick={onOpen}>
         {t('live.side.open')}

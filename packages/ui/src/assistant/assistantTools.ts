@@ -1,5 +1,5 @@
 import { COORDINATOR_ID } from '@orquestador/core';
-import { canResume, deliverableProblems, newAgent, newContext, newMcpServer, newSkill, slugify, type AgentDefinition, type DeliverableItem, type DeliverableSpec, type Diagram, type McpServerDefinition, type MemoryKind } from '@orquestador/core';
+import { canResume, deliverableProblems, validateDiagram, newAgent, newContext, newMcpServer, newSkill, slugify, type AgentDefinition, type DeliverableItem, type DeliverableSpec, type Diagram, type McpServerDefinition, type MemoryKind } from '@orquestador/core';
 import { ASSISTANT_TOOLS, deliverableLabel, summarizeRun, t, type EditorSession, type McpView, type ProjectApi, type TerminalProgram } from '@orquestador/editor';
 import { nodeLabel } from '../runs';
 
@@ -10,7 +10,8 @@ export interface AssistantHost {
   /** Crea un diagrama nuevo vacío con ese nombre y lo abre. */
   newDiagram: (name: string) => Promise<void>;
   /** Ejecuta el diagrama abierto con una entrada. */
-  run: (input: string) => Promise<void>;
+  /** Lanza el diagrama abierto; devuelve el id de la ejecución, o nada si no arrancó [R85.6]. */
+  run: (input: string) => Promise<string | undefined>;
   /** Tras cambiar agentes, skills o contextos, para que la interfaz se actualice. */
   refresh: () => void;
   /** Algo nuevo creado por el asistente, para abrirlo si se está viendo esa lista [R38.7]. */
@@ -88,8 +89,39 @@ function edgeAfter(level: Diagram, after: string): string {
     return out[0]!.id;
   }
   const toOutput = level.edges.filter((e) => level.nodes.find((n) => n.id === e.to)?.kind === 'output');
-  if (toOutput.length !== 1) throw new Error('Indica tras qué paso va (after): hay varias conexiones que llegan a Salida.');
+  // Sin ninguna o con varias, el mensaje dice cuál de las dos pasa [R85.4].
+  if (toOutput.length === 0) throw new Error('Ninguna conexión llega a la Salida: indica tras qué paso va (after).');
+  if (toOutput.length > 1) throw new Error('Indica tras qué paso va (after): hay varias conexiones que llegan a Salida.');
   return toOutput[0]!.id;
+}
+
+/** Quita un paso; si estaba en medio de una cadena, une el anterior con el siguiente [R85.1]–[R85.3]. */
+function removeStep(session: AssistantHost['session'], nodeId: string): { reconnected?: { from: string; to: string }; disconnected?: string[] } {
+  const level = session.getSnapshot().level;
+  const node = level.nodes.find((n) => n.id === nodeId);
+  if (!node) throw new Error(`No existe el paso «${nodeId}».`);
+  if (node.kind === 'entry' || node.kind === 'output') throw new Error('La Entrada y la Salida no se pueden quitar.');
+  const ins = level.edges.filter((e) => e.to === nodeId && e.from !== nodeId);
+  const outs = level.edges.filter((e) => e.from === nodeId && e.to !== nodeId);
+  session.removeSelection({ nodes: [nodeId] });
+  if (ins.length === 1 && outs.length === 1) {
+    const [inEdge, outEdge] = [ins[0]!, outs[0]!];
+    const after = session.getSnapshot().level;
+    if (after.edges.some((e) => e.from === inEdge.from && e.to === outEdge.to && e.port === inEdge.port)) return {};
+    const r = session.tryConnect(inEdge.from, outEdge.to, inEdge.port);
+    if (r.ok) {
+      if (inEdge.condition) session.setCondition(r.edgeId, inEdge.condition);
+      return { reconnected: { from: inEdge.from, to: outEdge.to } };
+    }
+  }
+  const after = session.getSnapshot().level;
+  const disconnected = [
+    ...new Set([
+      ...ins.map((e) => e.from).filter((id) => !after.edges.some((e) => e.from === id)),
+      ...outs.map((e) => e.to).filter((id) => !after.edges.some((e) => e.to === id)),
+    ]),
+  ];
+  return disconnected.length > 0 ? { disconnected } : {};
 }
 
 /** Ejecuta una herramienta del asistente con el mismo contrato que usa el usuario [R29.1][R29.2]. */
@@ -270,9 +302,10 @@ export async function runAssistantTool(host: AssistantHost, name: string, args: 
       case 'create_diagram':
         await host.newDiagram(str(args['name']));
         return { ok: true, summary: t('as.tool.newDiagram', { name: str(args['name']) }), result: { id: session.diagram.id } };
-      case 'remove_step':
-        session.removeSelection({ nodes: [str(args['nodeId'])] });
-        return { ok: true, summary: t('as.tool.removedStep', { node: str(args['nodeId']) }), result: { ok: true } };
+      case 'remove_step': {
+        const r = removeStep(session, str(args['nodeId']));
+        return { ok: true, summary: t('as.tool.removedStep', { node: str(args['nodeId']) }), result: { ok: true, ...r } };
+      }
       case 'delete_agent':
         must(await api.deleteAgent(str(args['id'])));
         host.refresh();
@@ -352,9 +385,14 @@ export async function runAssistantTool(host: AssistantHost, name: string, args: 
         const r = await host.openTerminal(program, program === 'claude' ? str(args['prompt']) : undefined);
         return { ok: true, summary: t(r.external ? 'as.tool.terminalExternal' : 'as.tool.terminal'), result: { opened: true, external: r.external } };
       }
-      case 'run_diagram':
-        await host.run(str(args['input']));
-        return { ok: true, summary: t('as.tool.ran'), result: { started: true } };
+      case 'run_diagram': {
+        // Lo mismo que comprueba el lanzador, con todos los problemas [R85.5].
+        const issues = validateDiagram(session.diagram);
+        if (issues.length > 0) throw new Error(`El diagrama no se puede ejecutar:\n${issues.map((i) => `- ${i.message}`).join('\n')}`);
+        const runId = await host.run(str(args['input']));
+        if (!runId) throw new Error('No se pudo lanzar la ejecución: la app enseña el motivo.');
+        return { ok: true, summary: t('as.tool.ran'), result: { started: true, runId } };
+      }
       default:
         throw new Error(`Herramienta desconocida: ${name}`);
     }

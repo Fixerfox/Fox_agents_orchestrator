@@ -1,6 +1,6 @@
 import { AlertTriangle, CheckCircle2, Loader2, MessageCircle, ThumbsUp, X, XCircle } from 'lucide-react';
 import type { RunEvent } from '@orquestador/core';
-import { formatDuration, summarizeRun, t } from '@orquestador/editor';
+import { formatDuration, summarizeRun, t, usageText } from '@orquestador/editor';
 import { PrLink } from '../common';
 
 const money = (usd: number) => `${usd.toFixed(3).replace('.', ',')} $`;
@@ -14,7 +14,6 @@ export function RunDoneBanner({ events, labelOf, onSummary, onOpenRuns, onClose,
   const status = running ? 'running' : s.status;
   // Terminó bien, pero queda algo para una persona: atención, no éxito sin más [R65.4].
   const attention = status === 'succeeded' && !s.accepted && !!s.supervisor?.final?.forPerson;
-  const tokens = s.usage.inputTokens + s.usage.outputTokens;
   return (
     <section className={`orq-done is-${attention ? 'attention' : status}`} aria-label={running ? t('rmodal.live') : t('rmodal.done')}>
       <span className="orq-done__icon" aria-hidden="true">
@@ -22,8 +21,8 @@ export function RunDoneBanner({ events, labelOf, onSummary, onOpenRuns, onClose,
       </span>
       <div className="orq-done__text">
         <strong>{s.headline}</strong>
-        <span className="orq-mono">
-          {formatDuration(s.durationSec)} · {tokens.toLocaleString('es-ES')} tokens · {money(s.usage.costUsd)}
+        <span className="orq-mono" title={t('usage.hint')}>
+          {formatDuration(s.durationSec)} · {usageText(s.usage)} · {money(s.usage.costUsd)}
           {s.files.length > 0 ? ` · ${s.files.length === 1 ? t('rsum.files.one') : t('rsum.files.many', { count: s.files.length })}` : ''}
         </span>
       </div>

@@ -16,6 +16,8 @@ export interface EngineContext {
   evidence?: EvidenceSource;
   /** Agentes y decisiones a la vez en toda la app, y enfriamiento del proveedor; uno por app [R77.1][R77.4]. */
   resources?: AppResources;
+  /** Secretos que la app conoce, para ocultarlos tal cual en los eventos [R90.6]. */
+  secretValues?(): readonly string[];
 }
 
 /** Ficha de un agente con lo enchufado a su paso, para quien reparte [R59.18]. */
@@ -111,6 +113,8 @@ export function createEngineOrchestrator(ctx: EngineContext, engines: readonly A
     coalesceTokens: { ms: TOKEN_GROUP_MS, chars: TOKEN_GROUP_CHARS },
     // El tope de la memoria de la ejecución, de Ajustes [R72.15].
     memory: { tokens: () => ctx.settings().memoryTokens },
+    loopContext: true,
+    ...(ctx.secretValues ? { secretValues: ctx.secretValues } : {}),
     // Cada paso sabe quién recibe su salida, qué revisión le espera y en qué vuelta va [R80.10].
     flow: true,
     agentProfile: (id, extra, runId) => profileOf(ctx.library, id, extra, runId),

@@ -11,6 +11,7 @@ export function memoryProject(s: MemoryState, options: MemoryApiOptions) {
   const terminals: MemoryApi['terminals'] = new Map();
   const terminalListeners = new Set<(id: string, event: TerminalEvent) => void>();
   let termSeq = 0;
+  let trust: 'trusted' | 'ignored' | null = null;
   const termEmit = (id: string, event: TerminalEvent) => {
     for (const l of terminalListeners) l(id, event);
   };
@@ -45,6 +46,12 @@ export function memoryProject(s: MemoryState, options: MemoryApiOptions) {
       return ok(true);
     },
     currentProject: async () => ok(null),
+    projectTrust: async () => ok({ items: s.open ? structuredClone(options.trustItems ?? []) : [], decision: (options.trustItems ?? []).length > 0 ? trust : null }),
+    async setProjectTrust(decision) {
+      if (!s.open) return fail('not-found', 'No hay un proyecto abierto');
+      trust = decision;
+      return ok(null);
+    },
     onTerminalEvents(listener) {
       terminalListeners.add(listener);
       return () => void terminalListeners.delete(listener);

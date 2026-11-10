@@ -1,6 +1,6 @@
 import { type ReactNode, useState, useRef } from 'react';
 import { Cpu, MessageCircleQuestion, Play, Pause, Square, Sparkles, PanelRight, AlertTriangle, ChevronDown, FolderPlus, FolderOpen, FolderX } from 'lucide-react';
-import { type ProblemsView, type LiveView, EMPTY_LIVE, budgetRemaining, type MessageKey, t } from '@orquestador/editor';
+import { type ProblemsView, type LiveView, EMPTY_LIVE, budgetRemaining, type MessageKey, t, usageText } from '@orquestador/editor';
 import { ProblemsPanel } from '../diagrams';
 import { type DiagramControlsProps, EditButtons } from '../diagrams';
 import { useOutside } from '../common';
@@ -71,8 +71,8 @@ export function Toolbar(p: Props) {
   const runInfo = (
     <>
       <span className="orq-runstatus">{t(statusKey)}</span>
-      <span className="orq-usage">
-        {t('run.usage', { tokens, cost: live.usage.costUsd.toFixed(3).replace('.', ',') })}
+      <span className="orq-usage" title={t('usage.hint')}>
+        {t('run.usage', { tokens: usageText(live.usage), cost: live.usage.costUsd.toFixed(3).replace('.', ',') })}
         {left !== undefined && ` · ${live.budgetReached ? t('run.budget.reached') : left === 1 ? t('run.budget.left.one') : t('run.budget.left', { tokens: left })}`}
       </span>
       {p.maxTokens !== undefined && (

@@ -3,6 +3,7 @@
 dist/
 node_modules/
 out/
+release/
 dist-preview/
 _to_delete/
 _pendiente/

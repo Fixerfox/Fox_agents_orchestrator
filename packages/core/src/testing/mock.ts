@@ -7,7 +7,7 @@ export interface MockAgentScript {
   asks?: { question: string; options?: string[] }[];
   tokens?: string[];
   tools?: { tool: string; input?: unknown; ok?: boolean; output?: string }[];
-  usage?: { inputTokens: number; outputTokens: number; costUsd?: number };
+  usage?: { inputTokens: number; outputTokens: number; cachedTokens?: number; costUsd?: number };
   files?: string[];
   /** Acciones que simula que le frenaron [R60.16]. */
   blocked?: string[];

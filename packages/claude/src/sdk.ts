@@ -4,10 +4,19 @@ import type { AppToolDef } from './assistant';
 // `import()` nativo: el paquete del SDK es ESM y el proceso principal se empaqueta en CommonJS.
 const nativeImport = new Function('specifier', 'return import(specifier)') as (s: string) => Promise<{ query(a: { prompt: string; options?: unknown }): AsyncIterable<unknown> }>;
 
+/** Binario de Claude que usan las consultas, si la app lo ha encontrado [R91.7]. */
+let claudeExecutable: string | undefined;
+export const setClaudeExecutable = (file: string | undefined): void => {
+  claudeExecutable = file;
+};
+/** Las opciones de una consulta con el binario encontrado, salvo que traigan otro [R91.7]. */
+export const withExecutable = <T extends object>(options: T): T =>
+  claudeExecutable && !('pathToClaudeCodeExecutable' in options && (options as { pathToClaudeCodeExecutable?: string }).pathToClaudeCodeExecutable) ? { ...options, pathToClaudeCodeExecutable: claudeExecutable } : options;
+
 /** Consulta real al Agent SDK de Claude. No se prueba en CI: las pruebas inyectan un `QueryFn` simulado. */
 export const sdkQuery: QueryFn = async function* ({ prompt, options }: { prompt: string; options: ClaudeQueryOptions }) {
   const sdk = await nativeImport('@anthropic-ai/claude-agent-sdk');
-  for await (const msg of sdk.query({ prompt, options })) yield msg as SdkMessage;
+  for await (const msg of sdk.query({ prompt, options: withExecutable(options) })) yield msg as SdkMessage;
 };
 
 type ZodLike = {

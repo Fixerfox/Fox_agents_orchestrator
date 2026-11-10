@@ -3,12 +3,12 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import type { AgentQuestion } from '@orquestador/core';
 import type { PermissionLevel } from '@orquestador/core';
-import { APP_KILL_DENY, ISOLATED_GIT_DENY, allowCommandForRun, killsAppProcess, classifyCommand, grantKey, sensitiveCommand, writesGit } from './commands';
+import { APP_KILL_DENY, DANGER, ISOLATED_GIT_DENY, allowCommandForRun, hardenReadOnlyGit, inlineInterpreter, killsAppProcess, classifyCommand, grantKey, sensitiveCommand, writesGit } from './commands';
 import { AUTO_TOOLS } from './connection';
+import { ALLOW_ONCE, ALLOW_RUN, DENY, READ_TOOLS_LOCAL, WEB_TOOLS, createReadPolicy } from './read-policy';
+import { protectedName, sameOrInside } from './protected';
 import type { CanUseTool, PermissionResult, PreToolUseHook } from './sdk-types';
 
-/** Carpetas que nunca se resumen ni se pueden escribir [R31.2][R31.5]. */
-const HIDDEN = new Set(['.git', 'node_modules', '.orquestador']);
 const BINARY = /\.(png|jpe?g|gif|webp|bmp|ico|psd|zip|7z|rar|gz|tar|exe|dll|so|dylib|bin|pdf|mp3|wav|ogg|flac|mp4|mov|avi|webm|ttf|otf|woff2?|pyc)$/i;
 const MANIFESTS = ['README.md', 'CLAUDE.md', 'package.json', 'pyproject.toml', 'Cargo.toml'];
 const MAX_ENTRIES = 5000;
@@ -23,7 +23,8 @@ export interface FolderSummary {
   text: string;
 }
 
-const isHidden = (name: string) => HIDDEN.has(name);
+/** Carpetas que nunca se resumen ni se pueden escribir, como las ve el sistema [R31.2][R31.5][R87.1]. */
+const isHidden = (name: string) => protectedName(name);
 
 /** Cuenta los archivos de una carpeta sin entrar en las ocultas ni pasar de un tope. */
 async function walk(dir: string, depth: number, rel: string, tree: string[], count: { n: number }): Promise<void> {
@@ -109,9 +110,7 @@ export const WORK_TOOLS = [...READ_TOOLS, ...WRITE_TOOLS, 'Bash', 'AskUserQuesti
 /** Las de Claude Code que además tiene cada paso de agente; `Skill` solo si se carga su configuración [R50.2]. */
 export const agentTools = (claudeConfig: boolean): string[] => [...WORK_TOOLS, 'Agent', 'TodoWrite', ...(claudeConfig ? ['Skill'] : [])];
 
-export const ALLOW_ONCE = 'Permitir';
-export const ALLOW_RUN = 'Permitir en esta ejecución';
-export const DENY = 'Denegar';
+export { ALLOW_ONCE, ALLOW_RUN, DENY, READ_OUTSIDE_GRANT, READ_TOOLS_LOCAL, SENSITIVE_DENY, WEB_SEARCH_GRANT, WEB_TOOLS, webGrant } from './read-policy';
 
 export interface WritePolicyDeps {
   root: string;
@@ -135,18 +134,33 @@ export interface WritePolicyDeps {
    * Carpetas `.orquestador` que nunca se escriben, tampoco con «Sin preguntar nunca» [R50.5]. Sin valor, la de `root`.
    */
   appDirs?: readonly string[];
+  /** Carpetas, además de `root`, donde se lee sin preguntar: la del proyecto y `~/.claude` [R87.5]. */
+  readRoots?: readonly string[];
+  /** Carpeta de datos de la app: nunca se lee fuera de la carpeta de trabajo del paso [R87.4]. */
+  protectedDirs?: readonly string[];
+}
+
+
+/** Texto de «Permitir código en línea de «node» en esta ejecución» [R89.11]. */
+export const allowInlineForRun = (interpreter: string): string => `Permitir código en línea de «${interpreter}» en esta ejecución`;
+
+/** Motivo al tocar la carpeta de datos de la app con «Sin preguntar nunca» [R89.4]. */
+export const APP_DATA_DENY =
+  'Esa es la carpeta de datos de la aplicación (ajustes, clave y secretos cifrados): los agentes no la leen ni la escriben, con ningún permiso.';
+
+/**
+ * ¿Nombra el comando la carpeta `dir` fuera de la carpeta de trabajo `root`? Una rama aislada vive dentro de los datos
+ * de la app y puede nombrar su propia ruta [R89.4].
+ */
+export function namesOutside(command: string, dir: string, root: string, platform: NodeJS.Platform = process.platform): boolean {
+  const n = (s: string) => (platform === 'win32' ? s.toLowerCase().replaceAll('\\', '/') : s);
+  return n(command).split(n(root)).join('').includes(n(dir));
 }
 
 /** Motivo al escribir en `.orquestador` [R50.5]. */
 export const APP_DIR_DENY =
   'En .orquestador están los diagramas y las ejecuciones que la aplicación tiene abiertos: no se escribe ahí. Deja tus archivos en otra carpeta.';
 
-const sameOrInside = (abs: string, dir: string) => {
-  const n = (p: string) => (process.platform === 'win32' ? path.resolve(p).toLowerCase() : path.resolve(p));
-  const a = n(abs);
-  const d = n(dir);
-  return a === d || a.startsWith(d.endsWith(path.sep) ? d : `${d}${path.sep}`);
-};
 
 /** Motivo de la denegación para un agente de solo lectura [R47.9]. */
 export const READONLY_DENY =
@@ -213,7 +227,7 @@ export const ISOLATED_DENY =
 export function withSelfProtection<P extends (tool: string, input: Record<string, unknown>, id?: string) => Promise<PermissionResult>>(note: WritePolicyDeps['note'], inner: P): P {
   return (async (tool: string, input: Record<string, unknown>, id?: string) => {
     const command = tool === 'Bash' && typeof input['command'] === 'string' ? (input['command'] as string) : undefined;
-    if (command !== undefined && killsAppProcess(command)) {
+    if (command !== undefined && killsAppProcess(command, [process.pid])) {
       note?.({ kind: 'denied', path: command, reason: APP_KILL_DENY });
       return deny(APP_KILL_DENY);
     }
@@ -284,8 +298,11 @@ export function createWritePolicy(deps: WritePolicyDeps): (tool: string, input: 
 
   const appDirs = deps.appDirs ?? [path.join(deps.root, '.orquestador')];
 
+  const { decideRead, decideWeb } = createReadPolicy(deps);
+
   return async (tool, input) => {
-    if ((READ_TOOLS as readonly string[]).includes(tool)) return allow(input);
+    if ((READ_TOOLS_LOCAL as readonly string[]).includes(tool)) return decideRead(input);
+    if ((WEB_TOOLS as readonly string[]).includes(tool)) return decideWeb(tool, input);
     // Subagentes, lista de tareas y skills de Claude Code: no escriben por sí mismos; lo que hagan pasa por aquí [R50.2].
     if ((AUTO_TOOLS as readonly string[]).includes(tool)) return allow(input);
 
@@ -318,6 +335,10 @@ export function createWritePolicy(deps: WritePolicyDeps): (tool: string, input: 
           deps.note?.({ kind: 'denied', path: target, reason: APP_DIR_DENY });
           return deny(APP_DIR_DENY);
         }
+        if ((deps.protectedDirs ?? []).some((d) => sameOrInside(abs, d))) {
+          deps.note?.({ kind: 'denied', path: target, reason: APP_DATA_DENY });
+          return deny(APP_DATA_DENY);
+        }
         return allow(input);
       }
       if (!spot) {
@@ -347,10 +368,18 @@ export function createWritePolicy(deps: WritePolicyDeps): (tool: string, input: 
 
     if (tool === 'Bash') {
       const command = typeof input['command'] === 'string' ? (input['command'] as string) : '';
-      if (deps.level === 'full') return allow(input);
+      if (deps.level === 'full') {
+        if ((deps.protectedDirs ?? []).some((d) => namesOutside(command, d, deps.root))) {
+          deps.note?.({ kind: 'denied', path: command, reason: APP_DATA_DENY });
+          return deny(APP_DATA_DENY);
+        }
+        return allow(input);
+      }
       // Solo lectura: solo lo sencillo que no crea nada, y sin preguntar [R47.9].
       if (deps.level === 'readonly') {
-        if ((await classifyCommand(command, deps.root, deps.root, { readOnly: true })).safe) return allow(input);
+        // git sin textconv ni diff externo del repositorio [R90.2].
+        const hardened = hardenReadOnlyGit(command);
+        if ((await classifyCommand(hardened, deps.root, deps.root, { readOnly: true })).safe) return allow(hardened === command ? input : { ...input, command: hardened });
         deps.note?.({ kind: 'denied', path: command, reason: 'agente de solo lectura' });
         return deny(READONLY_DENY);
       }
@@ -359,9 +388,11 @@ export function createWritePolicy(deps: WritePolicyDeps): (tool: string, input: 
       const danger = sensitiveCommand(command, deps.root);
       // En automático solo preguntan los delicados [R47.9].
       if (deps.level === 'auto' && danger === null) return allow(input);
-      const key = danger === null ? grantKey(command) : null;
+      // El código en línea se puede permitir para toda la ejecución, por intérprete [R89.11].
+      const interpreter = danger === DANGER.code ? inlineInterpreter(command) : null;
+      const key = danger === null ? grantKey(command) : interpreter !== null ? `codigo:${interpreter}` : null;
       if (key !== null && deps.commandGrants?.has(key)) return allow(input);
-      const forRun = key !== null && deps.commandGrants ? allowCommandForRun(key) : undefined;
+      const forRun = key !== null && deps.commandGrants ? (interpreter !== null ? allowInlineForRun(interpreter) : allowCommandForRun(key)) : undefined;
       const text = danger === null ? `¿Puedo ejecutar este comando?\n${command}` : `¿Puedo ejecutar este comando? (${danger})\n${command}`;
       const answer = (await deps.ask({ text, options: [ALLOW_ONCE, ...(forRun ? [forRun] : []), DENY], kind: 'permission', fallback: DENY })).trim();
       if (answer === ALLOW_ONCE) return allow(input);
@@ -392,8 +423,11 @@ async function askUser(deps: WritePolicyDeps, input: Record<string, unknown>): P
   return allow({ ...input, answers });
 }
 
-/** Herramientas que el gancho deja a `canUseTool`: lecturas, preguntas (necesitan `updatedInput`) y las automáticas [R50.4]. */
-const HOOK_SKIP = new Set<string>([...READ_TOOLS, 'AskUserQuestion', ...AUTO_TOOLS]);
+/**
+ * Herramientas que el gancho deja a `canUseTool`: preguntas (necesitan `updatedInput`) y las automáticas [R50.4]. Las
+ * lecturas y la web pasan por el gancho, para que una regla `allow` de `.claude` no se salte la política [R87.3].
+ */
+const HOOK_SKIP = new Set<string>(['AskUserQuestion', ...AUTO_TOOLS]);
 
 /**
  * La misma política en `canUseTool` y en un gancho `PreToolUse`, con la decisión guardada por llamada: una regla

@@ -9,7 +9,7 @@ import type { AppModel } from './useApp';
 
 /** El asistente, en el lateral del Diseñador o en el panel acoplado [R29.5][R38.1]. */
 export function AppAssistant({ app }: { app: AppModel }) {
-  return <AssistantPanel api={app.api} host={app.assistantHost} state={app.chat} setState={app.setChat} confirmActions={projectPermission(app.config.settings ?? {}) !== 'full'} where={app.section} onClose={() => app.layout.setAssistOpen(false)} />;
+  return <AssistantPanel api={app.api} host={app.assistantHost} tabs={app.assistant.tabs} setTabs={app.assistant.setTabs} confirmActions={projectPermission(app.config.settings ?? {}) !== 'full'} where={app.section} onClose={() => app.layout.setAssistOpen(false)} />;
 }
 
 function Designer({ app }: { app: AppModel }) {
@@ -66,7 +66,7 @@ export function AppSections({ app }: { app: AppModel }) {
           onAnswerMain={(q, text) => void client.answer(q, text)}
           agentNames={designer.agentNames}
           onExport={(id, jsonl) => downloadText(`${id}.jsonl`, jsonl)}
-          onAskAssistant={(text) => app.askAssistant(text)}
+          onAskAssistant={(text, title) => app.askAssistant(text, false, title)}
         />
       )}
       {(section === 'agents' || section === 'knowledge') && (
@@ -77,7 +77,7 @@ export function AppSections({ app }: { app: AppModel }) {
           drafts={app.drafts}
           onGo={app.openLibrary}
           onChanged={() => void app.lib.reloadAgents()}
-          onAskClaude={(text) => app.askAssistant(text)}
+          onAskClaude={(text, title) => app.askAssistant(text, false, title)}
           version={app.libVersion}
           assistantReady={app.config.engine === 'claude'}
           onOpenTerminal={() => void app.terminals.openTerminal('claude').catch(() => undefined)}

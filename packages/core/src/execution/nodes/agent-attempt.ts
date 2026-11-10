@@ -5,6 +5,7 @@ import type { Slot } from '../run/concurrency-limiter';
 import { LOOP_CUT, StepWatchdog, toolSignature, type TimeoutKind } from '../run/watchdog';
 import { deliverableNotice } from '../text/deliverable-notice';
 import { splitRule, type SplitBranch } from '../text/split';
+import { framesFor, loopContext } from '../text/loop-context';
 import { explainTouchedFiles } from '../text/touched-files';
 import type { Outcome, StepContext } from './handler';
 import { SharedSlot, pauseHold } from './agent-resources';
@@ -86,6 +87,7 @@ async function attemptOnce(step: StepContext, node: DiagramNode, input: Payload,
   const hasExtra = Object.keys(extra).length > 0;
   const deliverable = deliverableNotice(step.deliverable, step.finalIds, node.id, path);
   const split = isCoordinator(node) ? splitRule(await branchesOf(step, node)) : undefined;
+  const loop = loopContext(framesFor(step.loops, path), input.text);
   const origin = {
     ...(step.rootExtra && Object.keys(mergeExtra(step.rootExtra)).length > 0 ? { diagram: mergeExtra(step.rootExtra) } : {}),
     ...(own && Object.keys(own).length > 0 ? { node: own } : {}),
@@ -105,6 +107,7 @@ async function attemptOnce(step: StepContext, node: DiagramNode, input: Payload,
       ...(turn.memory ? { memory: turn.memory } : {}),
       ...(turn.flow ? { flow: turn.flow } : {}),
       ...(turn.memoryStats ? { memoryStats: turn.memoryStats } : {}),
+      ...(loop ? { loop } : {}),
       ...(turn.scope ? { scope: turn.scope } : {}),
       ...(deliverable ? { deliverable } : {}),
       ...(hasExtra ? { extra: origin } : {}),
@@ -170,7 +173,7 @@ async function attemptOnce(step: StepContext, node: DiagramNode, input: Payload,
     );
   // En pausa, el paso queda retenido antes de su siguiente herramienta o al acabar su turno [R77.12][R77.13].
   const hold = pauseHold(step, node.id, path, watchdog);
-  const request = { nodeId: node.id, agentId, runId: step.emitter.runId, input, ...(task ? { task } : {}), ...(node.model ? { model: node.model } : {}), ...(node.confirm ? { confirm: true } : {}), ...(split ? { split } : {}), ...(turn.memory ? { memory: turn.memory } : {}), ...(turn.flow ? { flow: turn.flow } : {}), ...(turn.scope ? { scope: turn.scope } : {}), ...(deliverable ? { deliverable } : {}), ...(hasExtra ? { extra } : {}), ...(missing.length > 0 ? { missing } : {}), attempt, ask, previousAnswers: [...answered], ...(turn.previous ? { previousAttempt: turn.previous } : {}), ...(step.space ? { workspace: { dir: step.space.dir } } : {}), ...(turn.projectMemory ? { projectMemory: turn.projectMemory } : {}), ...(limits.maxCostUsd !== undefined ? { maxCostUsd: limits.maxCostUsd } : {}), whilePaused: (tool: string) => hold(tool) };
+  const request = { nodeId: node.id, agentId, runId: step.emitter.runId, input, ...(task ? { task } : {}), ...(node.model ? { model: node.model } : {}), ...(node.confirm ? { confirm: true } : {}), ...(split ? { split } : {}), ...(turn.memory ? { memory: turn.memory } : {}), ...(loop ? { loop } : {}), ...(turn.flow ? { flow: turn.flow } : {}), ...(turn.scope ? { scope: turn.scope } : {}), ...(deliverable ? { deliverable } : {}), ...(hasExtra ? { extra } : {}), ...(missing.length > 0 ? { missing } : {}), attempt, ask, previousAnswers: [...answered], ...(turn.previous ? { previousAttempt: turn.previous } : {}), ...(step.space ? { workspace: { dir: step.space.dir } } : {}), ...(turn.projectMemory ? { projectMemory: turn.projectMemory } : {}), ...(limits.maxCostUsd !== undefined ? { maxCostUsd: limits.maxCostUsd } : {}), whilePaused: (tool: string) => hold(tool) };
 
   // Misma acción seguida sin cambiar archivos [R70.10][R70.11].
   let lastSig = '';
@@ -229,7 +232,7 @@ async function attemptOnce(step: StepContext, node: DiagramNode, input: Payload,
           step.emitter.emit({ type: 'knowledge.unmet', nodeId: node.id, attempt, kind: ev.kind, id: ev.id }, path);
           break;
         case 'usage':
-          step.emitter.emit({ type: 'agent.usage', nodeId: node.id, inputTokens: ev.inputTokens, outputTokens: ev.outputTokens, ...(ev.costUsd !== undefined ? { costUsd: ev.costUsd } : {}) }, path);
+          step.emitter.emit({ type: 'agent.usage', nodeId: node.id, inputTokens: ev.inputTokens, outputTokens: ev.outputTokens, ...(ev.cachedTokens ? { cachedTokens: ev.cachedTokens } : {}), ...(ev.costUsd !== undefined ? { costUsd: ev.costUsd } : {}) }, path);
           step.budget.add(ev.inputTokens, ev.outputTokens, ev.costUsd);
           break;
         case 'file':

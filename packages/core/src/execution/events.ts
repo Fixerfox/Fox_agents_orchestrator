@@ -43,6 +43,8 @@ export type EventBody =
       split?: string;
       /** Memoria que recibe este paso [R60.25]. */
       memory?: string;
+      /** Bloque «Estás dentro de un bucle» que recibe este paso [R84.4]. */
+      loop?: string;
       /** Su sitio en el flujo [R80.8]. */
       flow?: string;
       /** Tokens estimados de cada bloque de la memoria y cuáles se recortaron [R72.19]. */
@@ -115,6 +117,8 @@ export type EventBody =
       nodeId: Id;
       inputTokens: number;
       outputTokens: number;
+      /** Lo leído de la caché, ya incluido en `inputTokens` [R83.2]. */
+      cachedTokens?: number;
       costUsd?: number;
       /** Gasto de una pieza interna, no del paso [R60.30][R34.28]; `decision`: router y bucles [R63.15]. */
       source?: 'supervisor' | 'judge' | 'decision';

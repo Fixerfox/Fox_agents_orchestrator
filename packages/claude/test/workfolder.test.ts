@@ -86,9 +86,10 @@ describe('SPEC-031 · confinamiento', () => {
 });
 
 describe('SPEC-031 · política de herramientas', () => {
-  it('[R31.11] leer y buscar siempre se permite', async () => {
+  it('[R31.11] leer y buscar dentro de la carpeta se permite sin preguntar', async () => {
     const { canUse, asked } = policy();
-    for (const t of ['Read', 'Glob', 'Grep', 'WebFetch', 'WebSearch']) expect(await canUse(t, { file_path: '/cualquiera' })).toMatchObject({ behavior: 'allow' });
+    for (const t of ['Read', 'Glob', 'Grep']) expect(await canUse(t, { file_path: join(work, 'src', 'a.ts') })).toMatchObject({ behavior: 'allow' });
+    expect(await canUse('Glob', { pattern: '**/*.ts' })).toMatchObject({ behavior: 'allow' });
     expect(asked).toHaveLength(0);
   });
 
@@ -212,7 +213,6 @@ describe('SPEC-031 · el adaptador usa la carpeta de trabajo', () => {
     expect(system).toContain('Un juego de naves.');
     expect(system).toContain('crear archivos y carpetas nuevos');
     expect(system).not.toContain('Solo puedes leer');
-    expect(system).not.toContain(dir);
   });
 
   it('[R31.11] ofrece herramientas de escritura y la política corresponde a la carpeta', async () => {

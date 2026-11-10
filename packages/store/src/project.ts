@@ -31,6 +31,7 @@ import {
 } from '@orquestador/core';
 import { atomicWrite } from './fs-util';
 import * as memory from './project-memory';
+import { ensureProjectGitignore, skillFilePath } from './fs-guards';
 import { StoreError } from './errors';
 import { ProjectPaths } from './paths';
 import * as files from './project-files';
@@ -90,6 +91,7 @@ export class ProjectStore {
       pins: {},
     };
     await writeVersioned(store.paths.projectFile, file as unknown as Record<string, unknown>, projectSpec);
+    await ensureProjectGitignore(store.paths.orq);
     return store;
   }
 
@@ -103,6 +105,7 @@ export class ProjectStore {
       }
       throw err;
     }
+    await ensureProjectGitignore(store.paths.orq);
     return store;
   }
 
@@ -187,8 +190,7 @@ export class ProjectStore {
 
   /** Añade un archivo auxiliar a una skill; la ruta debe ser relativa y quedarse dentro de la carpeta [R25.6]. */
   async writeSkillFile(id: Id, rel: string, data: Uint8Array): Promise<void> {
-    if (!isRelativeInside(rel) || rel === 'SKILL.md') throw new StoreError('outside-root', 'Ruta de archivo no válida en la skill');
-    const file = path.join(this.paths.skillDir(id), ...rel.split(/[\\/]/));
+    const file = await skillFilePath(this.paths.skillDir(id), rel);
     await fs.mkdir(path.dirname(file), { recursive: true });
     await fs.writeFile(file, data);
   }
@@ -217,8 +219,7 @@ export class ProjectStore {
 
   /** Contenido de texto de un archivo de la skill (hasta 200 000 caracteres) [R24.12]. */
   async readSkillFile(id: Id, rel: string): Promise<{ text: string; truncated: boolean }> {
-    if (!isRelativeInside(rel) || rel === 'SKILL.md') throw new StoreError('outside-root', 'Ruta de archivo no válida en la skill');
-    const file = path.join(this.paths.skillDir(id), ...rel.split(/[\\/]/));
+    const file = await skillFilePath(this.paths.skillDir(id), rel);
     let buf: Buffer;
     try {
       buf = await fs.readFile(file);
@@ -237,7 +238,7 @@ export class ProjectStore {
     if (text.length > 200_000) throw new StoreError('invalid', 'El archivo es demasiado largo (máximo 200 000 caracteres)');
     if (containsSecrets([text])) throw new StoreError('secrets', 'El archivo contiene algo que parece una clave o un token; quítalo antes de guardar');
     await this.loadSkill(id);
-    const file = path.join(this.paths.skillDir(id), ...rel.split(/[\\/]/));
+    const file = await skillFilePath(this.paths.skillDir(id), rel);
     try {
       const old = await fs.readFile(file);
       if (old.subarray(0, 8000).includes(0)) throw new StoreError('invalid', 'Ese archivo no es de texto y no se puede editar aquí');

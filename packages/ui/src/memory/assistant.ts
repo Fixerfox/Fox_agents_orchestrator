@@ -1,4 +1,4 @@
-import { ok, fail, type AssistantEvent } from '@orquestador/editor';
+import { ok, fail, type AssistantEvent, type SavedAssistantTabs } from '@orquestador/editor';
 import type { MemoryApi, MemoryApiOptions, MemoryState } from './types';
 
 /** Asistente simulado y redacción con Claude. */
@@ -8,6 +8,8 @@ export function memoryAssistant(s: MemoryState, options: MemoryApiOptions) {
   const assistantResults: MemoryApi['assistantResults'] = [];
   const assistantTurns: MemoryApi['assistantTurns'] = [];
   const callNames = new Map<string, string>();
+  /** Pestañas guardadas del proyecto abierto [R86.11]. */
+  let savedTabs: SavedAssistantTabs | null = null;
 
   return {
     assistantResults,
@@ -68,6 +70,14 @@ export function memoryAssistant(s: MemoryState, options: MemoryApiOptions) {
       turn.cancelled = true;
       for (const r of turn.pending.values()) r({ ok: false, result: 'Detenido.' });
       return ok(true);
+    },
+    async assistantTabsLoad() {
+      return ok(s.open && savedTabs ? structuredClone(savedTabs) : null);
+    },
+    async assistantTabsSave(doc) {
+      if (!s.open) return fail('not-found', 'No hay un proyecto abierto');
+      savedTabs = structuredClone(doc);
+      return ok(null);
     },
     onAssistantEvents(listener) {
       assistantListeners.add(listener);

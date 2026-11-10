@@ -90,7 +90,7 @@ describe('SPEC-036 · conocimiento obligatorio (adaptador de Claude)', () => {
     expect(s).toContain('REGLA DE ESTILO');
     expect(s).toContain('CONTENIDO DE LAS NOTAS');
     // el binario no se puede incluir: se exige y se comprueba (aquí sí lo leyó)
-    expect(s).toContain('Foto: OBLIGATORIO consultarlo antes de responder (docs/foto.bin)');
+    expect(s).toContain(`Foto: OBLIGATORIO consultarlo antes de responder (${path.resolve(root, 'docs/foto.bin')})`);
     // el opcional solo se menciona, sin contenido repetido
     expect(s.split('CONTENIDO DE LAS NOTAS')).toHaveLength(2);
     expect(knowledge(evs).sort()).toEqual(['context:b:read:true', 'context:f:inline:true', 'context:t:inline:true']);
@@ -104,7 +104,7 @@ describe('SPEC-036 · conocimiento obligatorio (adaptador de Claude)', () => {
     const s = promptText(seen.options!.systemPrompt);
     expect(s).toContain(big);
     expect(s).not.toContain('y'.repeat(500));
-    expect(s).toContain('otra: léela en .orquestador/skills/otra/SKILL.md');
+    expect(s).toContain(`otra: léela en ${path.join(path.resolve('/proy'), '.orquestador', 'skills', 'otra', 'SKILL.md')}`);
     expect(err.retriable).toBe(true);
     expect(err.missed).toEqual([{ kind: 'skill', id: 'otra' }]);
   });
@@ -120,9 +120,9 @@ describe('SPEC-036 · conocimiento obligatorio (adaptador de Claude)', () => {
     expect(knowledge(evs)).toEqual(['context:u:tool:true', 'mcp:pixel:tool:true']);
   });
 
-  it('[R36.9] la ruta de la skill es relativa en la raíz del proyecto y absoluta si la carpeta de trabajo es otra', async () => {
-    expect(skillLocation('trazo', '/proy', '/proy')).toBe('.orquestador/skills/trazo/SKILL.md');
-    expect(skillLocation('trazo', '/proy', '/otra')).toBe(path.join('/proy', '.orquestador', 'skills', 'trazo', 'SKILL.md'));
+  it('[R36.9][R92.1] la ruta de la skill es siempre absoluta, trabaje el agente donde trabaje', async () => {
+    expect(skillLocation('trazo', '/proy', '/proy')).toBe(path.join(path.resolve('/proy'), '.orquestador', 'skills', 'trazo', 'SKILL.md'));
+    expect(skillLocation('trazo', '/proy', '/otra')).toBe(path.join(path.resolve('/proy'), '.orquestador', 'skills', 'trazo', 'SKILL.md'));
     const folder = await mkdtemp(path.join(os.tmpdir(), 'orq36-folder-'));
     const { query, seen } = fake([ok()]);
     await run(env({ skills: [skill('trazo')], folder }), query, req({ skillIds: ['trazo'] }));

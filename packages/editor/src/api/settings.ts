@@ -11,9 +11,20 @@ export interface ConnectionResult {
   ms: number;
 }
 
+/** Versión y sistema de la app, para Ajustes [R91.11]. */
+export interface AppInfo {
+  version: string;
+  platform: string;
+  arch: string;
+}
+
 /** Ajustes tal como los ve el renderer: la clave API nunca viaja, solo si existe [R23.3]. */
 export interface SettingsView extends AppSettings {
   apiKeyStored: boolean;
+  /** Los ajustes estaban dañados: se usan los de por defecto con «Preguntar» hasta guardarlos [R89.6]. */
+  recovered?: boolean;
+  /** Solo de lectura: no se guarda [R91.11]. */
+  app?: AppInfo;
 }
 
 /** Ajustes de la app y clave API. */

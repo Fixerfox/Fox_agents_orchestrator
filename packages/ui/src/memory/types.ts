@@ -2,6 +2,10 @@ import type { AgentDefinition, AppSettings, ContextDefinition, Diagram, ImportPl
 import type { ApiResult, AssistantMessage, ConnectionResult, DraftRequest, DraftResult, FilePreview, McpTestResult, ProjectApi, RunSummary, TerminalProgram } from '@orquestador/editor';
 
 export interface MemoryApiOptions {
+  /** Simula unos ajustes que estaban dañados [R89.6]. */
+  settingsRecovered?: boolean;
+  /** Lo que trae la configuración de Claude Code del proyecto, para la pantalla de confianza [R88.6]. */
+  trustItems?: { file: string; key: string; detail: string }[];
   /** Orquestador a usar; por defecto agentes simulados que responden «salida de <agente>». */
   orchestrator?: Orchestrator;
   /** Archivos de salida por ejecución (nombre → texto). */

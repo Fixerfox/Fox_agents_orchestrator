@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { AppSettings, ProjectPermission } from '@orquestador/core';
-import type { ProjectApi, SettingsView } from '@orquestador/editor';
+import { t, type ProjectApi, type SettingsView } from '@orquestador/editor';
 
 /** Solo los campos de ajustes: `apiKeyStored` es del estado de la vista y el contrato lo rechaza. */
 const toSettings = (v: SettingsView): AppSettings => ({
@@ -22,6 +22,11 @@ export function useAppSettings(api: ProjectApi, project: string | undefined, sec
   useEffect(() => {
     void api.getSettings().then((r) => r.ok && setSettings(r.value));
   }, [api]);
+  // Ajustes dañados: se avisa, ya con el proyecto abierto, de que se vuelve a «Preguntar» [R89.6].
+  const recovered = settings?.recovered === true;
+  useEffect(() => {
+    if (recovered && project !== undefined) fail(t('settings.recovered'));
+  }, [recovered, project]);
   const [workFolder, setWorkFolder] = useState<string>();
   useEffect(() => {
     if (project === undefined) return setWorkFolder(undefined);

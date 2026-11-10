@@ -190,16 +190,37 @@ export const ASSISTANT_TOOLS: readonly AssistantToolSpec[] = [
     params: { program: s('«claude» o «shell»'), prompt: s('Petición inicial para Claude Code', true) },
     destructive: true,
   },
-  { name: 'remove_step', description: 'Quita un paso del diagrama abierto.', params: { nodeId: s('Id del paso') }, destructive: true },
+  { name: 'remove_step', description: 'Quita un paso del diagrama abierto. Si estaba en medio de una cadena, une el paso anterior con el siguiente; si no, dice qué pasos quedaron sin conexión.', params: { nodeId: s('Id del paso') }, destructive: true },
   { name: 'delete_agent', description: 'Borra un agente del proyecto.', params: { id: s('Id del agente') }, destructive: true },
   { name: 'delete_skill', description: 'Borra una skill del proyecto.', params: { id: s('Id de la skill') }, destructive: true },
   { name: 'delete_context', description: 'Borra un contexto del proyecto.', params: { id: s('Id del contexto') }, destructive: true },
-  { name: 'run_diagram', description: 'Ejecuta el diagrama abierto con una entrada (gasta tokens).', params: { input: s('Entrada para el diagrama') }, destructive: true },
+  { name: 'run_diagram', description: 'Ejecuta el diagrama abierto con una entrada (gasta tokens). Antes lo valida: si tiene problemas, falla con la lista. Devuelve el id de la ejecución.', params: { input: s('Entrada para el diagrama') }, destructive: true },
 ];
 
 export const ASSISTANT_SERVER = 'orquestador';
 export const ASSISTANT_MAX_MESSAGES = 30;
 export const ASSISTANT_MAX_TEXT = 20_000;
+/** Pestañas del asistente como mucho, y elementos que se guardan de cada una [R86.3][R86.12]. */
+export const ASSISTANT_MAX_TABS = 8;
+export const ASSISTANT_MAX_SAVED_ITEMS = 200;
+export const ASSISTANT_TAB_TITLE_MAX = 80;
+
+/** Estado de una tarjeta de acción del asistente [R29.5]. */
+export type AssistantToolStatus = 'running' | 'ask' | 'secret' | 'choice' | 'done' | 'error' | 'denied' | 'undone';
+
+/** Elemento de una conversación tal como se guarda: sin funciones [R86.13]. */
+export type SavedChatItem =
+  | { kind: 'user'; id: string; text: string }
+  | { kind: 'assistant'; id: string; text: string }
+  | { kind: 'tool'; id: string; turnId: string; name: string; args: Record<string, unknown>; status: AssistantToolStatus; summary?: string; answer?: string }
+  | { kind: 'read'; id: string; tool: string; target: string; ok: boolean }
+  | { kind: 'error'; id: string; text: string };
+
+/** Pestañas del asistente de un proyecto, tal como se guardan [R86.11]. */
+export interface SavedAssistantTabs {
+  activeId: string;
+  tabs: { id: string; title: string; updatedAt: number; items: SavedChatItem[] }[];
+}
 
 export interface AssistantMessage {
   role: 'user' | 'assistant';

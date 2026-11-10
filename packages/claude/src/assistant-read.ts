@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { APP_KILL_DENY, killsAppProcess } from './commands';
 import type { PermissionResult } from './sdk-types';
 
 /** Herramientas de lectura del asistente: archivos y carpetas en cualquier sitio, y la web [R29.7]. */
@@ -19,6 +20,8 @@ const SENSITIVE_FILES: RegExp[] = [
   /^\.(npmrc|pypirc|netrc|git-credentials|pgpass)$/i,
   /^_netrc$/i,
   /^(credentials|secrets?)(\.(json|ya?ml|toml|ini|txt|env|cfg|conf|xml))?$/i,
+  // La sesión de Claude Code [R87.7].
+  /^\.credentials\.json$/i,
 ];
 
 const parts = (p: string) => p.split(/[\\/]+/).filter((s) => s.length > 0);
@@ -81,6 +84,8 @@ export function assistantToolPolicy(opts: { appTools?: readonly string[]; protec
   const stateDirs = opts.appStateDirs ?? (opts.cwd ? [path.join(opts.cwd, '.orquestador')] : []);
   return (tool: string, input: Record<string, unknown>): PermissionResult => {
     const allow: PermissionResult = { behavior: 'allow', updatedInput: input };
+    // El asistente tampoco cierra el orquestador por nombre ni por PID [R90.10].
+    if (tool === 'Bash' && typeof input['command'] === 'string' && killsAppProcess(input['command'] as string, [process.pid])) return { behavior: 'deny', message: APP_KILL_DENY };
     const writes = (ASSISTANT_WRITE_TOOLS as readonly string[]).includes(tool);
     if (!writes && tool !== 'Read' && tool !== 'Glob' && tool !== 'Grep') return allow;
     // En `Grep`, `pattern` es una expresión regular, no una ruta: solo cuentan `path` y `glob`.
@@ -104,7 +109,7 @@ export function assistantGuardHook(policy: (tool: string, input: Record<string, 
 }
 
 /** Herramientas de archivos que comprueba el gancho [R50.8]. */
-export const ASSISTANT_GUARD_MATCHER = ['Read', 'Glob', 'Grep', ...ASSISTANT_WRITE_TOOLS].join('|');
+export const ASSISTANT_GUARD_MATCHER = ['Read', 'Glob', 'Grep', 'Bash', ...ASSISTANT_WRITE_TOOLS].join('|');
 
 const MAX_TARGET = 80;
 const short = (s: string) => (s.length > MAX_TARGET ? `${s.slice(0, MAX_TARGET - 1)}…` : s);

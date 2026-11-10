@@ -1,5 +1,5 @@
 import { finalSteps, forwardEdges, returnEdges, splitBranchIds, validateDiagram, type Diagram, type DiagramNode, type Edge, type ReturnInfo } from '../diagrams';
-import { isCoordinator, mergeLimits, type Id, type KnowledgeExtra, type Payload } from '../shared';
+import { isCoordinator, mergeLimits, redactWith, type Id, type KnowledgeExtra, type Payload } from '../shared';
 import type { FileChange, MemoryProposalRequest, TransformUsage } from './adapter';
 import { MAX_PROPOSALS, ruleProposals, type MemoryProposal } from './memory-proposals';
 import { proposeCorrectionWith } from './corrections';
@@ -50,7 +50,7 @@ export class Orchestrator {
 
   start(diagram: Diagram, order: string | Payload, options: RunOptions = {}): RunHandle {
     const runId = this.deps.newRunId?.() ?? globalThis.crypto.randomUUID();
-    const bus = new EventBus(runId, this.deps.now);
+    const bus = new EventBus(runId, this.deps.now, ...(this.deps.secretValues ? [redactWith(this.deps.secretValues)] : []));
     const stop = new RunAbort();
     const timers = this.deps.timers ?? realTimers;
     // Los tokens seguidos de un paso van juntos al bus [R77.15].
@@ -87,6 +87,7 @@ export class Orchestrator {
       ...(memory ? { memory } : {}),
       ...(this.deps.flow ? { flow: { levels: new Map() } } : {}),
       ...(spaces ? { spaces } : {}),
+      ...(this.deps.loopContext ? { loops: new Map() } : {}),
       ...(this.deps.checks?.runner ? { checkRunner: this.deps.checks.runner } : {}),
       ...(this.deps.projectMemory ? { projectMemory: (agentId: Id) => this.deps.projectMemory!(runId, { diagramId: diagram.id, agentId }).catch(() => undefined) } : {}),
       ...(this.deps.checks?.agentChecks ? { agentChecks: (agentId: Id) => this.deps.checks!.agentChecks!(agentId, runId) } : {}),

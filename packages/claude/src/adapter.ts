@@ -1,5 +1,6 @@
 import { BranchTracker } from './git-branch';
 import { promises as fs } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { AgentError, effectivePermission, loadsClaudeConfig, mergeExtra, type FileChange, type AgentAdapter, type AgentRequest, type AgentStreamEvent, type AgentDefinition, type AppSettings, type ContextDefinition, type SkillDefinition } from '@orquestador/core';
 import { baseOptions } from './connection';
@@ -24,6 +25,10 @@ export interface ClaudeEnvironment {
   loadSkills(ids: string[], runId?: string): Promise<SkillDefinition[]>;
   /** Carpeta de trabajo elegida por el usuario [R31.1]; si falta, se trabaja en la carpeta del proyecto. */
   workFolder?(): Promise<string | undefined>;
+  /** Carpeta de datos de la app (clave, secretos): los agentes no la leen fuera de su carpeta de trabajo [R87.4]. */
+  appDataDir?: string;
+  /** ¿Se carga la configuración de Claude Code del proyecto para un paso que trabaja en `dir`? Sin valor, sí [R88.4]. */
+  projectConfigTrusted?(dir: string): Promise<boolean>;
   /** Copia de seguridad antes de modificar un archivo existente [R31.6]. */
   backup?(runId: string, abs: string, rel: string): Promise<void>;
   /** Servidores MCP del agente con sus secretos (solo en el proceso principal) [R30.4]. */
@@ -127,6 +132,9 @@ export class ClaudeAdapter implements AgentAdapter {
             root,
             level,
             appDirs: [...new Set([path.join(root, '.orquestador'), path.join(this.env.projectRoot, '.orquestador')])],
+            // Se lee sin preguntar en la carpeta del proyecto y en lo de Claude Code del usuario [R87.5].
+            readRoots: [this.env.projectRoot, path.join(os.homedir(), '.claude')],
+            ...(this.env.appDataDir ? { protectedDirs: [this.env.appDataDir] } : {}),
             commandGrants: this.grantsFor(request.runId ?? request.nodeId),
             ask: request.ask,
             backup: async (abs, rel) => this.env.backup?.(request.runId ?? 'sin-ejecucion', abs, rel),
@@ -153,6 +161,7 @@ export class ClaudeAdapter implements AgentAdapter {
           toolList: agentTools(loadsClaudeConfig(settings)),
           canUseTool: guard.canUseTool,
           claudeCode: true,
+          projectTrusted: (await this.env.projectConfigTrusted?.(folder ?? this.env.projectRoot)) ?? true,
         }),
         ...(Object.keys(mcpServers).length > 0 ? { mcpServers } : {}),
         // El prompt de Claude Code, con lo del agente al final [R50.1].
@@ -163,6 +172,7 @@ export class ClaudeAdapter implements AgentAdapter {
             ...(request.deliverable ? { deliverable: request.deliverable } : {}),
             ...(request.projectMemory ? { projectMemory: request.projectMemory.text } : {}),
             level,
+            projectRoot: this.env.projectRoot,
           }),
         ),
         // Sin tope práctico: el gancho puede estar esperando a que el usuario responda un permiso [R50.4].
@@ -170,7 +180,7 @@ export class ClaudeAdapter implements AgentAdapter {
       };
       await branches.start();
       for (const u of tracker.inlined()) yield { type: 'knowledge', kind: u.item.kind, id: u.item.id, via: u.via, required: true };
-      for await (const msg of this.query({ prompt: buildUserPrompt(request.input, request.previousAnswers, request.task, missed.map((i) => `«${i.name}»`), request.previousAttempt, request.memory, request.flow), options })) {
+      for await (const msg of this.query({ prompt: buildUserPrompt(request.input, request.previousAnswers, request.task, missed.map((i) => `«${i.name}»`), request.previousAttempt, request.memory, request.loop, request.flow), options })) {
         if (signal.aborted) return;
         let mapped: AgentStreamEvent[];
         try {
@@ -210,6 +220,8 @@ export class ClaudeAdapter implements AgentAdapter {
             else if (ev.tool === 'Agent' || ev.tool === 'Task') yield* commandFiles(await watch.closing('flush'), touched, sent);
           }
         }
+        // Con el resultado, el paso ha terminado: no se espera a lo que quede en segundo plano [R92.5].
+        if (finished) break;
       }
       if (!finished && !signal.aborted) throw new AgentError('Claude terminó sin devolver un resultado.', true);
     } catch (e) {
@@ -221,6 +233,8 @@ export class ClaudeAdapter implements AgentAdapter {
       throw explainThrown(e, apiKey);
     } finally {
       signal.removeEventListener('abort', abort);
+      // Cierra la sesión del SDK y lo que el agente dejara en marcha [R92.5].
+      if (finished) controller.abort();
     }
   }
 }

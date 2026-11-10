@@ -93,7 +93,10 @@ describe('SPEC-047 · qué comando es sencillo', () => {
     for (const c of ['mkdir ../fuera', `mkdir ${join(dir, 'x')}`, 'mkdir /tmp/x', 'cat ../secreto.txt', 'mkdir salida/x', 'mkdir .git/hooks2', 'touch node_modules/a', 'mkdir .orquestador/x', 'cd .. && mkdir x', 'cd', 'cd noexiste', 'grep x ../otro', 'find .. -name x']) {
       expect(await safe(c), c).toBe(false);
     }
-    expect(await safe(`mkdir ${join(work, 'docs')}`)).toBe(true);
+    // Una ruta absoluta con barras normales, dentro de la carpeta, sí es sencilla. Con barras invertidas no: en bash
+    // escapan, y `C:\x\docs` no es la ruta que parece.
+    expect(await safe(`mkdir ${join(work, 'docs').split('\\').join('/')}`)).toBe(true);
+    if (process.platform === 'win32') expect(await safe(`mkdir ${join(work, 'docs')}`)).toBe(false);
   });
 
   it('[R47.1] programas que cambian o ejecutan cosas, y opciones peligrosas, no son sencillos; con readOnly, tampoco mkdir', async () => {

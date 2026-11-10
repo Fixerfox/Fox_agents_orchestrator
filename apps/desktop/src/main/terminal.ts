@@ -27,6 +27,56 @@ export interface TerminalDeps {
 export const cmdSafe = (s: string) => s.replace(/["%\r\n]+/g, ' ').trim();
 
 /**
+ * El entorno con la carpeta del `claude` del paquete al final del `PATH`: el que tenga instalado el usuario sigue
+ * teniendo preferencia [R91.17]. En Windows la variable puede llamarse `Path`.
+ */
+export function withClaudeOnPath(env: NodeJS.ProcessEnv, claudeDir: string | undefined, platform: NodeJS.Platform): NodeJS.ProcessEnv {
+  if (!claudeDir) return env;
+  const key = Object.keys(env).find((k) => (platform === 'win32' ? k.toUpperCase() === 'PATH' : k === 'PATH')) ?? 'PATH';
+  const sep = platform === 'win32' ? ';' : ':';
+  const parts = (env[key] ?? '').split(sep).filter(Boolean);
+  if (parts.includes(claudeDir)) return env;
+  return { ...env, [key]: [...parts, claudeDir].join(sep) };
+}
+
+/** Terminales de Linux, en el orden en que se prueban, con cómo recibe cada una el programa [R91.12]. */
+export function linuxTerminals(cmd: { file: string; args: string[] }, env: NodeJS.ProcessEnv): { file: string; args: string[] }[] {
+  const run = [cmd.file, ...cmd.args];
+  const custom = env.TERMINAL?.trim();
+  return [
+    ...(custom ? [{ file: custom, args: ['-e', ...run] }] : []),
+    { file: 'x-terminal-emulator', args: ['-e', ...run] },
+    { file: 'gnome-terminal', args: ['--', ...run] },
+    { file: 'konsole', args: ['-e', ...run] },
+    { file: 'xfce4-terminal', args: ['-x', ...run] },
+    { file: 'xterm', args: ['-e', ...run] },
+  ];
+}
+
+/** La primera que arranca; si ninguna, el último error [R91.12]. */
+export async function firstThatStarts<T>(candidates: readonly T[], start: (c: T) => Promise<void>): Promise<void> {
+  let last: unknown = new Error('Sin terminales');
+  for (const c of candidates) {
+    try {
+      return await start(c);
+    } catch (e) {
+      last = e;
+    }
+  }
+  throw last;
+}
+
+/** Texto entre comillas simples para la shell. */
+const shQuote = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`;
+
+/** En macOS, Terminal.app ejecuta la orden en la carpeta del proyecto [R91.12]. */
+export function macTerminal(cmd: { file: string; args: string[] }, cwd: string, env: Record<string, string>) {
+  const line = `cd ${shQuote(cwd)} && ${[cmd.file, ...cmd.args].map(shQuote).join(' ')}`;
+  const script = line.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  return { file: 'osascript', args: ['-e', `tell application "Terminal" to do script "${script}"`, '-e', 'tell application "Terminal" to activate'], cwd, env };
+}
+
+/**
  * Programa y argumentos de cada terminal. Solo `claude` o la consola: la interfaz nunca da comandos ni rutas [R30.13].
  * En Windows `claude` se lanza desde `cmd.exe` (para encontrar `claude.cmd` o `claude.exe`) con la petición en una
  * variable de entorno; en Linux se lanza directamente con la petición como argumento (sin consola de por medio).
@@ -100,8 +150,10 @@ export class TerminalService {
         // `start` abre una ventana nueva de consola con el mismo programa [R30.14]
         const inner = cmd.file === 'cmd.exe' ? `cmd.exe /d /k ${cmd.args[2]}` : `${cmd.file} ${cmd.args.join(' ')}`;
         await this.deps.openExternal({ file: 'cmd.exe', args: [`/d /c start "Orquestador" ${inner}`], cwd, env, verbatim: true });
+      } else if (platform === 'darwin') {
+        await this.deps.openExternal(macTerminal(cmd, cwd, env));
       } else {
-        await this.deps.openExternal({ file: 'x-terminal-emulator', args: ['-e', cmd.file, ...cmd.args], cwd, env });
+        await firstThatStarts(linuxTerminals(cmd, this.deps.env ?? process.env), (c) => this.deps.openExternal({ ...c, cwd, env }));
       }
     } catch {
       throw new TerminalError('unavailable', 'No se pudo abrir ninguna terminal en este equipo');

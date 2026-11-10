@@ -6,6 +6,8 @@ import { t, type ConnectionResult, type MessageKey, type ProjectApi, type Settin
 import { fieldErrors } from '../common';
 import { applyTheme, loadTheme, saveTheme, type Theme } from './theme';
 import { Choice, PermMatrix, RULES, Row, Shell, type Section, type SectionId } from './SettingsParts';
+import { TrustRow } from './TrustDialog';
+import { AboutLine } from './AboutLine';
 
 interface Props {
   api: ProjectApi;
@@ -241,6 +243,7 @@ export function SettingsDialog({ api, onClose, onSaved }: Props) {
             <Row id="set-cc" label={t('settings.claudeConfig')} hint={t('settings.claudeConfig.hint')}>
               <input id="set-cc" type="checkbox" className="orq-toggle" checked={loadsClaudeConfig(draft)} onChange={(e) => set({ claudeConfig: e.target.checked })} />
             </Row>
+            {loadsClaudeConfig(draft) && <TrustRow api={api} />}
           </div>
         </>
       ),
@@ -353,7 +356,7 @@ export function SettingsDialog({ api, onClose, onSaved }: Props) {
               <option value="finish-running">{t('settings.onBudget.finish')}</option>
             </select>
           </Row>
-          <Row id="set-tokens" label={t('settings.tokens')} error={errors['defaultMaxTokens']}>
+          <Row id="set-tokens" label={t('settings.tokens')} hint={t('settings.tokens.hint')} error={errors['defaultMaxTokens']}>
             <input id="set-tokens" type="number" min={1} value={tokens} onChange={(e) => ((touched.current = true), setTokens(e.target.value), setStatus(t('settings.saving')))} />
           </Row>
           <Row id="set-isolate" label={t('settings.isolate')} hint={t('settings.isolate.hint')}>
@@ -425,6 +428,7 @@ export function SettingsDialog({ api, onClose, onSaved }: Props) {
       summary: t(`theme.${theme}` as MessageKey),
       intro: t('settings.look.intro'),
       content: (
+        <>
         <fieldset className="orq-field orq-setseg">
           <legend>{t('settings.theme')}</legend>
           <div className="orq-setseg__opts" role="radiogroup">
@@ -445,6 +449,8 @@ export function SettingsDialog({ api, onClose, onSaved }: Props) {
             ))}
           </div>
         </fieldset>
+        <AboutLine app={view.app} />
+        </>
       ),
     },
   ];

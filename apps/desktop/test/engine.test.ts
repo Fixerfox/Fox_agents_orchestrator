@@ -103,7 +103,7 @@ describe('SPEC-027 · motor de los agentes por IPC', () => {
     expect(calls).toHaveLength(1);
     expect(calls[0]!.system).toContain('Dibuja con cariño');
     expect(calls[0]!.system).toContain('Paleta de 16 colores');
-    expect(calls[0]!.system).toContain('.orquestador/skills/pixel/SKILL.md');
+    expect(calls[0]!.system).toContain(join('.orquestador', 'skills', 'pixel', 'SKILL.md')); // ruta absoluta [R92.1]
     expect(calls[0]!.prompt).toContain('Dibuja un héroe');
     const finished = pushed.find((e) => e.type === 'run.finished');
     expect(finished).toMatchObject({ type: 'run.finished', status: 'succeeded' });
