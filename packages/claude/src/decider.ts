@@ -75,10 +75,12 @@ export class ClaudeDecider implements Decider {
     return { obj, ...(usage ? { usage } : {}) };
   }
 
-  async route(request: { nodeId: string; candidates: RouteCandidate[]; input: Payload }, signal: AbortSignal) {
-    const list = request.candidates.map((c) => `- ${c.edgeId}: ${c.label || c.to}`).join('\n');
+  async route(request: { nodeId: string; candidates: RouteCandidate[]; input: Payload; criteria?: string }, signal: AbortSignal) {
+    // Cada opción con lo que hay en ella y, si lo hay, el criterio de la persona [R81.4].
+    const list = request.candidates.map((c) => `- ${c.edgeId}: ${c.description?.trim() || c.label || c.to}`).join('\n');
+    const criteria = request.criteria?.trim() ? `\nCriterio para elegir: ${request.criteria.trim()}\n` : '';
     const { obj, usage } = await this.json(
-      `Decide por qué conexiones sigue el trabajo.\nOpciones:\n${list}\n\nSalida del paso anterior:\n${datos(clip(request.input))}\n\nResponde {"edges":["id",...],"reason":"motivo breve"} con una o más opciones.`,
+      `Decide por qué conexiones sigue el trabajo.\nOpciones:\n${list}\n${criteria}\nSalida del paso anterior:\n${datos(clip(request.input))}\n\nResponde {"edges":["id",...],"reason":"motivo breve"} con una o más opciones.`,
       signal,
     );
     const valid = new Set(request.candidates.map((c) => c.edgeId));

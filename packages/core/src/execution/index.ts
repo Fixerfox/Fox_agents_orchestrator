@@ -13,6 +13,7 @@ export { REQUIREMENTS_UNMET, UNFINISHED_CONTINUE, UNFINISHED_OPTIONS, UNFINISHED
 export { explainTouchedFiles } from './text/touched-files';
 export { LOOP_HEADING, LOOP_REASON_MAX, LOOP_REFINE, LOOP_REQUEST_MAX, framesFor, loopContext, type LoopFrame } from './text/loop-context';
 export { BURN_MINUTES, BURN_RATE_USD_PER_MIN, applyRules, branchMemoryLine, newBranchMemory, newRuleState, rememberBranch, type BranchMemory, type RuleState, type SupervisorAlert } from './run/supervisor-rules';
+export { FLOW_HEADING, FLOW_MAX_TARGETS, FLOW_ONLY_YOURS, describeTarget, flowContext, type FlowView } from './text/flow-context';
 export { checkSplit, composeSplitFix, declaredFiles, describeSplitProblem, parseSplit, splitInputs, splitRule, withinDeclared, type SplitBranch, type SplitPart, type SplitProblem, type SplitResult } from './text/split';
 export { describePreviousAttempt, PREVIOUS_ATTEMPT_CHARS } from './nodes/agent-retries';
 export { DECISION_TIMEOUT_MS, guardDecider } from './run/guarded-decider';
