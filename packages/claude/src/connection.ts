@@ -28,7 +28,8 @@ export const AUTO_TOOLS = ['Agent', 'TodoWrite', 'Skill'] as const;
 
 /** Fuentes de configuración de Claude Code: todas, como la CLI, o ninguna [R50.3]. */
 export const CLAUDE_SETTING_SOURCES = ['user', 'project', 'local'] as const;
-export const settingSourcesFor = (settings: AppSettings): string[] => (loadsClaudeConfig(settings) ? [...CLAUDE_SETTING_SOURCES] : []);
+/** Sin confianza en el proyecto, solo la del usuario: la del repositorio puede traer hooks o env [R88.2]. */
+export const settingSourcesFor = (settings: AppSettings, projectTrusted = true): string[] => (!loadsClaudeConfig(settings) ? [] : projectTrusted ? [...CLAUDE_SETTING_SOURCES] : ['user']);
 
 export function baseOptions(args: {
   settings: AppSettings;
@@ -43,9 +44,12 @@ export function baseOptions(args: {
   canUseTool?: ClaudeQueryOptions['canUseTool'];
   /** Paso de agente: carga la configuración de Claude Code y solo sus MCP [R50.3]. */
   claudeCode?: boolean;
+  /** ¿Se carga la configuración de Claude Code del proyecto? [R88.4] */
+  projectTrusted?: boolean;
 }): ClaudeQueryOptions {
   const tools = args.tools === false ? [] : [...(args.toolList ?? READ_ONLY_TOOLS)];
-  const auto = [...READ_ONLY_TOOLS, ...AUTO_TOOLS] as readonly string[];
+  // En los pasos de agente las lecturas y la web también pasan por la política [R87.3].
+  const auto = (args.claudeCode ? [...AUTO_TOOLS] : [...READ_ONLY_TOOLS, ...AUTO_TOOLS]) as readonly string[];
   return {
     model: args.model ?? args.settings.defaultModel,
     cwd: args.cwd,
@@ -59,7 +63,7 @@ export function baseOptions(args: {
     canUseTool: args.canUseTool ?? permissionPolicy,
     abortController: args.controller,
     env: buildEnv(args.settings, args.apiKey),
-    settingSources: args.claudeCode ? settingSourcesFor(args.settings) : [],
+    settingSources: args.claudeCode ? settingSourcesFor(args.settings, args.projectTrusted ?? true) : [],
     ...(args.claudeCode ? { strictMcpConfig: true } : {}),
     persistSession: false,
   };

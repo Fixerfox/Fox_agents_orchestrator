@@ -16,6 +16,8 @@ El hito indica cuándo debe estar cubierto por tests. `npm run spec:check` exige
 ## Índice
 | Spec | Título | Hito | Estado |
 |---|---|---|---|
+| [088](088-confianza-en-el-proyecto.md) | Confianza en el proyecto: la configuración de Claude Code de un repositorio con hooks, env o helpers solo se carga si se confía en ella (decisión con huella en los datos de la app), y las aprobaciones de comprobaciones salen del repositorio | M16g | Implementada |
+| [087](087-confinamiento-de-los-agentes.md) | Confinamiento de los agentes: carpetas protegidas como las ve Windows, secretos nunca, lecturas de fuera según el nivel y web por dominio | M16f | Implementada |
 | [086](086-asistente-con-pestanas.md) | El asistente con pestañas: cada petición desde un botón abre su pestaña con su propio historial, los turnos siguen en segundo plano y las pestañas se guardan por proyecto en la carpeta de datos de la app | M16e | Implementada |
 | [085](085-acciones-del-asistente-fiables.md) | Acciones del asistente fiables: quitar un paso reconecta la cadena, mensajes de «after» correctos y run_diagram valida y dice si arrancó | M16d | Implementada |
 | [084](084-bucle-con-contexto.md) | El bucle conserva la petición y el criterio: cada agente del cuerpo recibe vuelta, criterio del evaluador, petición original y último motivo | M16c | Implementada |

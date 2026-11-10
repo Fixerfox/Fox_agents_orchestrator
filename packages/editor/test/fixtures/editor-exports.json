@@ -102,6 +102,7 @@
   "ProblemsView",
   "ProjectApi",
   "ProjectInfo",
+  "ProjectTrustInfo",
   "ProposalView",
   "QueuedRunView",
   "RUN_EVENTS_CHANNEL",

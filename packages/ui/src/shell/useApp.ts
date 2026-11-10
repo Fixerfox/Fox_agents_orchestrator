@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { EditorSession, createDiagram, t, type ProjectApi, type TestBridgeApi } from '@orquestador/editor';
-import { isolatesBranches } from '@orquestador/core';
+import { isolatesBranches, loadsClaudeConfig } from '@orquestador/core';
 import { DraftStore, type LibraryTarget, type OpenLibrary } from '../common';
 import { useAssistantTabs, type AssistantHost } from '../assistant';
 import { useDesigner, useDesignerSelection, useDiagramDocument, useProjectCatalog, useSession, type AgentOption } from '../diagrams';
 import { askingIdsOf, runningIdsOf, useLiveRun, useRunLauncher, useRunsIndex, type RunsNav } from '../runs';
-import { useAppSettings } from '../settings';
+import { useAppSettings, useProjectTrust } from '../settings';
 import type { SectionId } from './NavRail';
 import type { StartPath } from './StartScreen';
 import { useShellLayout } from './useShellLayout';
@@ -87,6 +87,8 @@ export function useApp({ api, agents: builtIn = [], confirm = (m) => window.conf
   const lib = useProjectCatalog(api, project, builtIn);
   const doc = useDiagramDocument({ api, session, snap, project, projectRef, confirm, fail, guard, clearSelection: sel.clearSelection, goDiagrams });
   const config = useAppSettings(api, project, section, fail);
+  // Al abrir un proyecto con configuración de Claude Code que ejecuta cosas, se pide confiar [R88.7].
+  const trust = useProjectTrust(api, project, config.settings !== undefined && loadsClaudeConfig(config.settings));
   // Sin aislar las ramas en paralelo, los abanicos avisan [R73.21].
   useEffect(() => session.setSharedFans(config.settings !== undefined && !isolatesBranches(config.settings)), [session, config.settings]);
   const launcher = useRunLauncher({ api, session, project, client, save: doc.save, fail, setMessage, refreshRuns: runsIndex.refresh, goRuns, setRunsNav });
@@ -175,7 +177,7 @@ export function useApp({ api, agents: builtIn = [], confirm = (m) => window.conf
 
   return {
     api, session, snap, client, run, section, setSection, runModal, setRunModal, runsNav, setRunsNav, goRuns, goDiagrams, goSection,
-    message, setMessage, fail, guard, project, onProject, closeProject, onOpened, terminals, sel, layout, assistant, libVersion,
+    message, setMessage, fail, guard, project, onProject, closeProject, onOpened, terminals, sel, layout, assistant, trust, libVersion,
     askAssistant, runsIndex, askingIds, runningIds, lib, doc, config, launcher, libOpen, drafts, startSettings, setStartSettings, wizard,
     setWizard, openLibrary, designer, assistantHost,
   };

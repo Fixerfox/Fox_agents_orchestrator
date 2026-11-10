@@ -3,7 +3,8 @@ import type { AssistantEvent, ImportKind } from '@orquestador/editor';
 import type { CreateAppServer, QueryFn } from '@orquestador/claude';
 import { createHash } from 'node:crypto';
 import type { Batcher, RunService } from '@orquestador/runtime';
-import { StoreError, type ApiKeyVault, type McpSecretVault, type ProjectStore, type RecentStore, type SettingsStore } from '@orquestador/store';
+import { StoreError, type ApiKeyVault, type McpSecretVault, type ProjectStore, type ProjectTrustStore, type RecentStore, type SettingsStore, type TrustDecision } from '@orquestador/store';
+import { scanClaudeConfig, type ConfigRisk } from '@orquestador/claude';
 import type { OrchestratorContext } from '../composition';
 import type { TerminalService } from '../terminal';
 
@@ -41,6 +42,10 @@ export interface DesktopDeps {
   pushAssistant?(turnId: string, event: AssistantEvent): void;
   /** Tiempo máximo de espera de una herramienta (permiso del usuario incluido). */
   assistantToolTimeoutMs?: number;
+  /** Si se confía en la configuración de Claude Code de cada proyecto, en los datos de la app [R88.3]. */
+  trust?: ProjectTrustStore;
+  /** Carpeta de los datos de la app para las aprobaciones de comprobaciones de cada proyecto [R88.5]. */
+  trustDir?: string;
   /** Carpeta de datos de la app donde se guardan las pestañas del asistente de cada proyecto [R86.11]. */
   assistantTabsDir?: string;
   /** Carpetas que el asistente nunca lee (la de datos de la app, con la clave y los secretos) [R29.8]. */
@@ -117,4 +122,22 @@ export function scrubPaths(message: string, root?: string): string {
 export function mcpVaultKey(root: string, id: string, scope?: 'project' | 'app'): string {
   if (scope === 'app') return `app:${id}`;
   return `${createHash('sha256').update(root).digest('hex').slice(0, 16)}:${id}`;
+}
+
+/**
+ * Lo que trae la configuración de Claude Code del proyecto abierto (su carpeta, la de trabajo y `dir`) y la decisión
+ * vigente para esa huella [R88.4][R88.6].
+ */
+export async function projectTrustState(h: HandlerState, dir?: string): Promise<{ items: ConfigRisk[]; fingerprint: string; decision: TrustDecision | null }> {
+  if (!h.root) return { items: [], fingerprint: '', decision: null };
+  const work = await h.store?.getWorkFolder().catch(() => undefined);
+  const scan = await scanClaudeConfig([h.root, ...(work ? [work] : []), ...(dir ? [dir] : [])]);
+  const decision = scan.items.length > 0 ? ((await h.deps.trust?.decision(h.root, scan.fingerprint)) ?? null) : null;
+  return { ...scan, decision };
+}
+
+/** Se carga la configuración del proyecto si no trae nada arriesgado o si se confía en ella [R88.4]. */
+export async function projectConfigTrusted(h: HandlerState, dir?: string): Promise<boolean> {
+  const s = await projectTrustState(h, dir);
+  return s.items.length === 0 || s.decision === 'trusted';
 }

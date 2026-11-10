@@ -1,5 +1,6 @@
 import { BranchTracker } from './git-branch';
 import { promises as fs } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { AgentError, effectivePermission, loadsClaudeConfig, mergeExtra, type FileChange, type AgentAdapter, type AgentRequest, type AgentStreamEvent, type AgentDefinition, type AppSettings, type ContextDefinition, type SkillDefinition } from '@orquestador/core';
 import { baseOptions } from './connection';
@@ -14,6 +15,9 @@ import { CommandWatch } from './changes';
 import { classifyCommand } from './commands';
 
 /** Lo que el adaptador necesita del proyecto y de Ajustes; se lee al empezar cada ejecución del nodo [R27.10]. */
+/** Carpetas de `~/.claude` que los agentes leen sin preguntar [R87.5]. */
+export const CLAUDE_HOME_DIRS = ['skills', 'agents', 'commands', 'plugins'] as const;
+
 export interface ClaudeEnvironment {
   projectRoot: string;
   settings(): AppSettings;
@@ -24,6 +28,10 @@ export interface ClaudeEnvironment {
   loadSkills(ids: string[], runId?: string): Promise<SkillDefinition[]>;
   /** Carpeta de trabajo elegida por el usuario [R31.1]; si falta, se trabaja en la carpeta del proyecto. */
   workFolder?(): Promise<string | undefined>;
+  /** Carpeta de datos de la app (clave, secretos): los agentes no la leen fuera de su carpeta de trabajo [R87.4]. */
+  appDataDir?: string;
+  /** ¿Se carga la configuración de Claude Code del proyecto para un paso que trabaja en `dir`? Sin valor, sí [R88.4]. */
+  projectConfigTrusted?(dir: string): Promise<boolean>;
   /** Copia de seguridad antes de modificar un archivo existente [R31.6]. */
   backup?(runId: string, abs: string, rel: string): Promise<void>;
   /** Servidores MCP del agente con sus secretos (solo en el proceso principal) [R30.4]. */
@@ -127,6 +135,9 @@ export class ClaudeAdapter implements AgentAdapter {
             root,
             level,
             appDirs: [...new Set([path.join(root, '.orquestador'), path.join(this.env.projectRoot, '.orquestador')])],
+            // Se lee sin preguntar en la carpeta del proyecto y en lo de Claude Code del usuario [R87.5].
+            readRoots: [this.env.projectRoot, ...CLAUDE_HOME_DIRS.map((d) => path.join(os.homedir(), '.claude', d))],
+            ...(this.env.appDataDir ? { protectedDirs: [this.env.appDataDir] } : {}),
             commandGrants: this.grantsFor(request.runId ?? request.nodeId),
             ask: request.ask,
             backup: async (abs, rel) => this.env.backup?.(request.runId ?? 'sin-ejecucion', abs, rel),
@@ -153,6 +164,7 @@ export class ClaudeAdapter implements AgentAdapter {
           toolList: agentTools(loadsClaudeConfig(settings)),
           canUseTool: guard.canUseTool,
           claudeCode: true,
+          projectTrusted: (await this.env.projectConfigTrusted?.(folder ?? this.env.projectRoot)) ?? true,
         }),
         ...(Object.keys(mcpServers).length > 0 ? { mcpServers } : {}),
         // El prompt de Claude Code, con lo del agente al final [R50.1].

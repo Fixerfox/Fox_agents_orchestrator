@@ -94,6 +94,8 @@ export const CHANNELS = {
   testConnection: 'settings:test-connection',
   draftWithClaude: 'ai:draft',
   currentProject: 'project:current',
+  projectTrust: 'project:trust',
+  setProjectTrust: 'project:set-trust',
   getWorkFolder: 'workfolder:get',
   pickWorkFolder: 'workfolder:pick',
   stageAttachment: 'input:stage',

@@ -91,12 +91,12 @@ describe('SPEC-050 · agentes con Claude Code completo', () => {
     expect(promptText(undefined)).toBe('');
   });
 
-  it('[R50.2] los agentes tienen subagentes, lista de tareas y skills, que se aprueban sin preguntar', async () => {
+  it('[R50.2][R87.3] los agentes tienen subagentes, lista de tareas y skills, que se aprueban sin preguntar; leer ya no', async () => {
     const { seen, run } = setup();
     await run();
     expect(seen.options!.tools).toEqual(agentTools(true));
     expect(seen.options!.tools).toEqual(expect.arrayContaining(['Agent', 'TodoWrite', 'Skill', 'Bash', 'Write']));
-    expect(seen.options!.allowedTools).toEqual(expect.arrayContaining(['Agent', 'TodoWrite', 'Skill', 'Read']));
+    expect(seen.options!.allowedTools).toEqual(['Agent', 'TodoWrite', 'Skill']);
     expect(seen.options!.allowedTools).not.toContain('Write');
     expect(seen.options!.allowedTools).not.toContain('Bash');
     for (const t of ['Agent', 'TodoWrite', 'Skill']) expect(await seen.options!.canUseTool!(t, {})).toMatchObject({ behavior: 'allow' });
@@ -139,7 +139,7 @@ describe('SPEC-050 · agentes con Claude Code completo', () => {
     expect(off.seen.options!.tools).toEqual(expect.arrayContaining(['Agent', 'TodoWrite']));
   });
 
-  it('[R50.4] la política corre también en el gancho PreToolUse y decide una sola vez por llamada', async () => {
+  it('[R50.4][R87.3] la política corre también en el gancho PreToolUse y decide una sola vez por llamada', async () => {
     const { seen, run, answers } = setup({
       settings: { permissions: 'ask' },
       script: async (o) => {
@@ -156,8 +156,9 @@ describe('SPEC-050 · agentes con Claude Code completo', () => {
         });
         // un MCP que no es del agente también se deniega en el gancho
         expect(await hook({ tool_name: 'mcp__ajeno__x', tool_input: {} }, 'm1', hookOpts)).toMatchObject({ hookSpecificOutput: { permissionDecision: 'deny' } });
-        // lecturas, preguntas y herramientas automáticas se dejan a canUseTool
-        for (const t of ['Read', 'AskUserQuestion', 'Agent', 'TodoWrite', 'Skill']) expect(await hook({ tool_name: t, tool_input: {} }, `x-${t}`, hookOpts)).toEqual({});
+        // preguntas y herramientas automáticas se dejan a canUseTool; las lecturas pasan por el gancho [R87.3]
+        for (const t of ['AskUserQuestion', 'Agent', 'TodoWrite', 'Skill']) expect(await hook({ tool_name: t, tool_input: {} }, `x-${t}`, hookOpts)).toEqual({});
+        expect(await hook({ tool_name: 'Read', tool_input: { file_path: '.env' } }, 'x-env', hookOpts)).toMatchObject({ hookSpecificOutput: { permissionDecision: 'deny' } });
       },
     });
     await run();

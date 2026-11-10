@@ -48,6 +48,10 @@ function termSize(cols: unknown, rows: unknown, bad: (m: string) => Error): void
 export interface ProjectSessionApi {
   /** Proyecto abierto en el proceso principal, para volver a él al recargarse la interfaz [R19.12]. */
   currentProject(): Promise<ApiResult<ProjectInfo | null>>;
+  /** Lo que trae la configuración de Claude Code del proyecto y si se confía en ella [R88.6]. */
+  projectTrust(): Promise<ApiResult<ProjectTrustInfo>>;
+  /** Confiar en la configuración de Claude Code del proyecto o ignorarla, para lo que trae ahora [R88.6]. */
+  setProjectTrust(decision: 'trusted' | 'ignored'): Promise<ApiResult<null>>;
   /** Diálogo del sistema; `null` si el usuario cancela. */
   createProject(): Promise<ApiResult<ProjectInfo | null>>;
   openProject(): Promise<ApiResult<ProjectInfo | null>>;
@@ -82,9 +86,16 @@ export interface ProjectSessionApi {
   onTerminalEvents(listener: (id: string, event: TerminalEvent) => void): () => void;
 }
 
+/** Lo arriesgado de la configuración de Claude Code del proyecto abierto, sin rutas [R88.6]. */
+export interface ProjectTrustInfo {
+  items: { file: string; key: string; detail: string }[];
+  decision: 'trusted' | 'ignored' | null;
+}
+
 export function parseProjectRequest(channel: string, payload: unknown, { bad, exact, str }: RequestCheck): unknown {
   switch (channel) {
     case CHANNELS.currentProject:
+    case CHANNELS.projectTrust:
     case CHANNELS.createProject:
     case CHANNELS.openProject:
     case CHANNELS.listRecent:
@@ -97,6 +108,9 @@ export function parseProjectRequest(channel: string, payload: unknown, { bad, ex
       return undefined;
     case CHANNELS.forgetRecent:
       if (!safeId(payload)) throw bad('id no válido');
+      return payload;
+    case CHANNELS.setProjectTrust:
+      if (payload !== 'trusted' && payload !== 'ignored') throw bad('decisión no válida');
       return payload;
     case CHANNELS.openRecent: {
       if (!isObject(payload)) throw bad('se esperaba un id');

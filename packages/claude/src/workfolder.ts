@@ -5,10 +5,10 @@ import type { AgentQuestion } from '@orquestador/core';
 import type { PermissionLevel } from '@orquestador/core';
 import { APP_KILL_DENY, ISOLATED_GIT_DENY, allowCommandForRun, killsAppProcess, classifyCommand, grantKey, sensitiveCommand, writesGit } from './commands';
 import { AUTO_TOOLS } from './connection';
+import { ALLOW_ONCE, ALLOW_RUN, DENY, READ_TOOLS_LOCAL, WEB_TOOLS, createReadPolicy } from './read-policy';
+import { protectedName, sameOrInside } from './protected';
 import type { CanUseTool, PermissionResult, PreToolUseHook } from './sdk-types';
 
-/** Carpetas que nunca se resumen ni se pueden escribir [R31.2][R31.5]. */
-const HIDDEN = new Set(['.git', 'node_modules', '.orquestador']);
 const BINARY = /\.(png|jpe?g|gif|webp|bmp|ico|psd|zip|7z|rar|gz|tar|exe|dll|so|dylib|bin|pdf|mp3|wav|ogg|flac|mp4|mov|avi|webm|ttf|otf|woff2?|pyc)$/i;
 const MANIFESTS = ['README.md', 'CLAUDE.md', 'package.json', 'pyproject.toml', 'Cargo.toml'];
 const MAX_ENTRIES = 5000;
@@ -23,7 +23,8 @@ export interface FolderSummary {
   text: string;
 }
 
-const isHidden = (name: string) => HIDDEN.has(name);
+/** Carpetas que nunca se resumen ni se pueden escribir, como las ve el sistema [R31.2][R31.5][R87.1]. */
+const isHidden = (name: string) => protectedName(name);
 
 /** Cuenta los archivos de una carpeta sin entrar en las ocultas ni pasar de un tope. */
 async function walk(dir: string, depth: number, rel: string, tree: string[], count: { n: number }): Promise<void> {
@@ -109,9 +110,7 @@ export const WORK_TOOLS = [...READ_TOOLS, ...WRITE_TOOLS, 'Bash', 'AskUserQuesti
 /** Las de Claude Code que además tiene cada paso de agente; `Skill` solo si se carga su configuración [R50.2]. */
 export const agentTools = (claudeConfig: boolean): string[] => [...WORK_TOOLS, 'Agent', 'TodoWrite', ...(claudeConfig ? ['Skill'] : [])];
 
-export const ALLOW_ONCE = 'Permitir';
-export const ALLOW_RUN = 'Permitir en esta ejecución';
-export const DENY = 'Denegar';
+export { ALLOW_ONCE, ALLOW_RUN, DENY, READ_OUTSIDE_GRANT, READ_TOOLS_LOCAL, SENSITIVE_DENY, WEB_SEARCH_GRANT, WEB_TOOLS, webGrant } from './read-policy';
 
 export interface WritePolicyDeps {
   root: string;
@@ -135,18 +134,17 @@ export interface WritePolicyDeps {
    * Carpetas `.orquestador` que nunca se escriben, tampoco con «Sin preguntar nunca» [R50.5]. Sin valor, la de `root`.
    */
   appDirs?: readonly string[];
+  /** Carpetas, además de `root`, donde se lee sin preguntar: la del proyecto y `~/.claude` [R87.5]. */
+  readRoots?: readonly string[];
+  /** Carpeta de datos de la app: nunca se lee fuera de la carpeta de trabajo del paso [R87.4]. */
+  protectedDirs?: readonly string[];
 }
+
 
 /** Motivo al escribir en `.orquestador` [R50.5]. */
 export const APP_DIR_DENY =
   'En .orquestador están los diagramas y las ejecuciones que la aplicación tiene abiertos: no se escribe ahí. Deja tus archivos en otra carpeta.';
 
-const sameOrInside = (abs: string, dir: string) => {
-  const n = (p: string) => (process.platform === 'win32' ? path.resolve(p).toLowerCase() : path.resolve(p));
-  const a = n(abs);
-  const d = n(dir);
-  return a === d || a.startsWith(d.endsWith(path.sep) ? d : `${d}${path.sep}`);
-};
 
 /** Motivo de la denegación para un agente de solo lectura [R47.9]. */
 export const READONLY_DENY =
@@ -284,8 +282,11 @@ export function createWritePolicy(deps: WritePolicyDeps): (tool: string, input: 
 
   const appDirs = deps.appDirs ?? [path.join(deps.root, '.orquestador')];
 
+  const { decideRead, decideWeb } = createReadPolicy(deps);
+
   return async (tool, input) => {
-    if ((READ_TOOLS as readonly string[]).includes(tool)) return allow(input);
+    if ((READ_TOOLS_LOCAL as readonly string[]).includes(tool)) return decideRead(input);
+    if ((WEB_TOOLS as readonly string[]).includes(tool)) return decideWeb(tool, input);
     // Subagentes, lista de tareas y skills de Claude Code: no escriben por sí mismos; lo que hagan pasa por aquí [R50.2].
     if ((AUTO_TOOLS as readonly string[]).includes(tool)) return allow(input);
 
@@ -392,8 +393,11 @@ async function askUser(deps: WritePolicyDeps, input: Record<string, unknown>): P
   return allow({ ...input, answers });
 }
 
-/** Herramientas que el gancho deja a `canUseTool`: lecturas, preguntas (necesitan `updatedInput`) y las automáticas [R50.4]. */
-const HOOK_SKIP = new Set<string>([...READ_TOOLS, 'AskUserQuestion', ...AUTO_TOOLS]);
+/**
+ * Herramientas que el gancho deja a `canUseTool`: preguntas (necesitan `updatedInput`) y las automáticas [R50.4]. Las
+ * lecturas y la web pasan por el gancho, para que una regla `allow` de `.claude` no se salte la política [R87.3].
+ */
+const HOOK_SKIP = new Set<string>(['AskUserQuestion', ...AUTO_TOOLS]);
 
 /**
  * La misma política en `canUseTool` y en un gancho `PreToolUse`, con la decisión guardada por llamada: una regla

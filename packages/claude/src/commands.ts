@@ -1,3 +1,4 @@
+import { protectedName } from './protected';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 
@@ -5,7 +6,6 @@ import path from 'node:path';
 const SPECIAL = /[;|&><`$~%\\\n\r]/;
 
 /** Carpetas internas que `mkdir` y `touch` no pueden tocar sin preguntar [R47.1]. */
-const PROTECTED = new Set(['.git', 'node_modules', '.orquestador']);
 
 /** Programas que solo leen: sus argumentos que no son opciones son rutas [R47.1]. */
 const READ_PATHS = new Set(['ls', 'dir', 'cat', 'head', 'tail', 'wc', 'tree', 'stat', 'file']);
@@ -92,7 +92,8 @@ async function inside(root: string, cwd: string, arg: string): Promise<string | 
   }
 }
 
-const isProtected = (root: string, abs: string): boolean => path.relative(path.resolve(root), abs).split(path.sep).some((p) => PROTECTED.has(p));
+/** Carpetas internas, como las ve el sistema (mayúsculas, puntos finales, flujos de NTFS) [R87.1]. */
+export const isProtected = (root: string, abs: string): boolean => path.relative(path.resolve(root), abs).split(path.sep).some((p) => protectedName(p));
 
 /** Comprueba un comando simple (sin `&&`) y devuelve la carpeta en la que queda, o `null` si no es sencillo. */
 async function simple(words: string[], root: string, cwd: string, readOnly = false): Promise<string | null> {
@@ -318,7 +319,7 @@ export function sensitiveCommand(command: string, root: string, cwd: string = ro
   for (const seg of segmentsOf(text)) {
     for (const target of redirectTargets(seg.text)) {
       if (escapes(root, at, target)) return DANGER.outside;
-      if (target.replace(/\\/g, '/').split('/').some((p) => PROTECTED.has(p))) return DANGER.outside;
+      if (target.replace(/\\/g, '/').split('/').some((p) => protectedName(p))) return DANGER.outside;
     }
     const plain = seg.text.replace(/\d?>>?\s*&?("[^"]*"|'[^']*'|[^\s]+)/g, ' ').replace(/</g, ' ');
     const words = tokenize(plain) ?? plain.split(/\s+/).filter(Boolean);

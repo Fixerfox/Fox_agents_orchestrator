@@ -25,6 +25,12 @@ export interface OrchestratorContext {
   spacesRoot?: string;
   /** Crea servidores MCP en proceso (el de la memoria del proyecto) [R76.15]. */
   createAppServer?: CreateAppServer;
+  /** Carpeta de datos de la app: los agentes no la leen [R87.4]. */
+  appDataDir?: string;
+  /** ¿Se carga la configuración de Claude Code del proyecto para un paso en `dir`? [R88.4] */
+  projectConfigTrusted?(dir: string): Promise<boolean>;
+  /** Archivo de las aprobaciones de comandos de comprobación, en los datos de la app [R88.5]. */
+  checksApprovalsFile?: string;
 }
 
 /** Espacios abiertos de cada ejecución en marcha, para la vista previa [R73.19]. */
@@ -64,6 +70,8 @@ export function claudeEnvironment(ctx: OrchestratorContext): ClaudeEnvironment {
     settings: ctx.settings,
     apiKey: ctx.apiKey,
     workFolder: () => ctx.store.getWorkFolder(),
+    ...(ctx.appDataDir ? { appDataDir: ctx.appDataDir } : {}),
+    ...(ctx.projectConfigTrusted ? { projectConfigTrusted: ctx.projectConfigTrusted } : {}),
     backup: (runId, abs, rel) => ctx.store.backupFile(runId, abs, rel),
     async loadAgent(id, runId) {
       return (await library.agents(runId)).find((a) => a.id === id);
@@ -126,7 +134,7 @@ export const appResources = new AppResources({ maxAgents: () => agentsTotal(appS
 export function composeOrchestrator(ctx: OrchestratorContext, query: QueryFn): Orchestrator {
   appSettings = ctx.settings;
   return createEngineOrchestrator(
-    { library: libraryOf(ctx), settings: ctx.settings, resources: appResources, restoreFiles: restoreAttemptFiles(ctx.store, ctx.projectRoot), spaces: branchSpacesFor(ctx), checkRunner: checkRunnerFor(ctx.store, ctx.projectRoot), evidence: evidenceFor(ctx.store, ctx.projectRoot) },
+    { library: libraryOf(ctx), settings: ctx.settings, resources: appResources, restoreFiles: restoreAttemptFiles(ctx.store, ctx.projectRoot), spaces: branchSpacesFor(ctx), checkRunner: checkRunnerFor(ctx.store, ctx.projectRoot, ctx.checksApprovalsFile), evidence: evidenceFor(ctx.store, ctx.projectRoot) },
     [createClaudeEngine(claudeEnvironment(ctx), query)],
   );
 }

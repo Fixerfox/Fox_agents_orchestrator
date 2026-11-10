@@ -5,7 +5,7 @@ import { pathToFileURL } from 'node:url';
 import { execFile, spawn } from 'node:child_process';
 import { ASSISTANT_EVENTS_CHANNEL, CHANNELS, OPEN_RUN_CHANNEL, RUN_EVENTS_CHANNEL, TERMINAL_EVENTS_CHANNEL, TEST_ARG, TEST_CALL_CHANNEL, TEST_READY_CHANNEL, TEST_REPLY_CHANNEL } from '@orquestador/editor';
 import { sdkCreateAppServer, sdkQuery } from '@orquestador/claude';
-import { ApiKeyVault, McpSecretVault, RecentStore, SettingsStore } from '@orquestador/store';
+import { ApiKeyVault, McpSecretVault, ProjectTrustStore, RecentStore, SettingsStore } from '@orquestador/store';
 import { crashLine } from './crash';
 import { Background } from './background';
 import { cleanupSpaces, composeOrchestrator } from './composition';
@@ -85,7 +85,7 @@ const handlers = new DesktopHandlers({
   },
   claudeQuery: sdkQuery,
   // Los espacios de las ramas en paralelo, en los datos de la app [R73.6].
-  createOrchestrator: (ctx) => composeOrchestrator({ ...ctx, spacesRoot: join(dataDir(), 'spaces'), createAppServer: sdkCreateAppServer }, sdkQuery),
+  createOrchestrator: (ctx) => composeOrchestrator({ ...ctx, spacesRoot: join(dataDir(), 'spaces'), appDataDir: dataDir(), createAppServer: sdkCreateAppServer }, sdkQuery),
   preinstallSpecKit: true,
   settings: new SettingsStore(join(dataDir(), 'config')),
   recents: new RecentStore(join(dataDir(), 'config')),
@@ -95,6 +95,8 @@ const handlers = new DesktopHandlers({
   createAppServer: sdkCreateAppServer,
   assistantProtectedDirs: [dataDir()],
   assistantTabsDir: join(dataDir(), 'assistant'),
+  trust: new ProjectTrustStore(join(dataDir(), 'trust.json')),
+  trustDir: join(dataDir(), 'trust'),
   pushAssistant: (turnId, event) => {
     if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(ASSISTANT_EVENTS_CHANNEL, { turnId, event });
   },

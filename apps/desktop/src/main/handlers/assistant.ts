@@ -5,7 +5,7 @@ import { draftWithClaude, runAssistantTurn } from '@orquestador/claude';
 import { AgentError } from '@orquestador/core';
 import { ASSISTANT_TOOLS, CHANNELS, type AssistantEvent, type AssistantMessage, type DraftRequest } from '@orquestador/editor';
 import { StoreError, atomicWrite } from '@orquestador/store';
-import { UNHANDLED, requireStore, scrubPaths, type HandlerState } from './state';
+import { UNHANDLED, projectConfigTrusted, requireStore, scrubPaths, type HandlerState } from './state';
 
 /** Archivo de las pestañas del proyecto abierto en la carpeta de datos de la app; nunca sale hacia la interfaz [R86.11]. */
 export function assistantTabsFile(dir: string, root: string, platform: NodeJS.Platform = process.platform): string {
@@ -56,6 +56,7 @@ export async function handleAssistant(h: HandlerState, channel: string, arg: unk
         apiKey: await h.deps.vault?.read(),
         cwd: root,
         protectedDirs: h.deps.assistantProtectedDirs ?? [],
+        projectTrusted: await projectConfigTrusted(h),
         signal: turn.controller.signal,
         emit: (e) => push(e.type === 'error' ? { ...e, message: scrubPaths(e.message, root) } : e.type === 'read' ? { ...e, target: scrubPaths(e.target, root) } : e),
         newId: () => randomUUID(),

@@ -19,6 +19,8 @@ const SENSITIVE_FILES: RegExp[] = [
   /^\.(npmrc|pypirc|netrc|git-credentials|pgpass)$/i,
   /^_netrc$/i,
   /^(credentials|secrets?)(\.(json|ya?ml|toml|ini|txt|env|cfg|conf|xml))?$/i,
+  // La sesión de Claude Code [R87.7].
+  /^\.credentials\.json$/i,
 ];
 
 const parts = (p: string) => p.split(/[\\/]+/).filter((s) => s.length > 0);

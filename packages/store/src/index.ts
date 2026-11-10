@@ -11,3 +11,4 @@ export * from './recent';
 export * from './previews';
 export * from './ports';
 export * from './project-memory';
+export * from './trust';
