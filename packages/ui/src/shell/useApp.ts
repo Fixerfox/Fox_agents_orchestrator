@@ -90,7 +90,9 @@ export function useApp({ api, agents: builtIn = [], confirm = (m) => window.conf
   // Al abrir un proyecto con configuración de Claude Code que ejecuta cosas, se pide confiar [R88.7].
   const trust = useProjectTrust(api, project, config.settings !== undefined && loadsClaudeConfig(config.settings));
   // Sin aislar las ramas en paralelo, los abanicos avisan [R73.21].
-  useEffect(() => session.setSharedFans(config.settings !== undefined && !isolatesBranches(config.settings)), [session, config.settings]);
+  useEffect(() => {
+    session.setSharedFans(config.settings !== undefined && !isolatesBranches(config.settings));
+  }, [session, config.settings]);
   const launcher = useRunLauncher({ api, session, project, client, save: doc.save, fail, setMessage, refreshRuns: runsIndex.refresh, goRuns, setRunsNav });
 
   const [libOpen, setLibOpen] = useState<LibraryTarget>();

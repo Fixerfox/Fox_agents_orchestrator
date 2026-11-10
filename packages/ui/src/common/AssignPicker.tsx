@@ -25,7 +25,9 @@ export function AssignPicker({ title, icon: Icon, items, selected, emptyText, cr
   const [chosen, setChosen] = useState<string[]>(selected);
   const [q, setQ] = useState('');
   const search = useRef<HTMLInputElement>(null);
-  useEffect(() => search.current?.focus(), []);
+  useEffect(() => {
+    search.current?.focus();
+  }, []);
   const shown = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return needle === '' ? items : items.filter((i) => `${i.name} ${i.description ?? ''}`.toLowerCase().includes(needle));

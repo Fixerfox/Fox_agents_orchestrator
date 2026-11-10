@@ -16,6 +16,7 @@ El hito indica cuándo debe estar cubierto por tests. `npm run spec:check` exige
 ## Índice
 | Spec | Título | Hito | Estado |
 |---|---|---|---|
+| [095](095-efectos-sin-retorno.md) | Los efectos de React no devuelven nada por accidente: el panel del Supervisor caía al cerrarse porque scrollIntoView devuelve una promesa en Chromium; efectos con cuerpo de bloque y un test que lo vigila | M17d | Implementada |
 | [091](091-empaquetado.md) | Empaquetado y releases: instalador de Windows, AppImage de Linux y dmg de macOS con el binario de Claude dentro, datos migrados, avisos de terceros, prueba de humo y releases de GitHub con nombres fijos | M17a | Implementada |
 | [094](094-seguridad-del-repositorio.md) | Seguridad del repositorio: solo el dueño aprueba los PR, a develop desde cualquier rama y a main solo desde develop, main y develop no se borran, y licencia MIT | M17b | Implementada |
 | [093](093-paleta-por-carpetas.md) | La paleta del Diseñador por carpetas: skills, contextos y MCP agrupados como en Conocimiento, con carpetas que se pliegan y se recuerdan | M17c | Implementada |

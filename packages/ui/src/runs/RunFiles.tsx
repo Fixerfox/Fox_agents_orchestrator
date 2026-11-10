@@ -91,7 +91,9 @@ export function FileViewer({ api, runId, events, path: initial, labelOf, onClose
   const [tab, setTab] = useState<'changes' | 'content'>('changes');
   const [file, setFile] = useState<RunFileContent | { error: string } | undefined>();
   const [restored, setRestored] = useState<Set<string>>(new Set());
-  useEffect(() => ref.current?.focus(), []);
+  useEffect(() => {
+    ref.current?.focus();
+  }, []);
   useEffect(() => {
     let alive = true;
     void api.listBackups(runId).then((r) => alive && setBackups(r.ok ? r.value : []));
