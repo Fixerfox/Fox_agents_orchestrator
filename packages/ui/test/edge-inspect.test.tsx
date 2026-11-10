@@ -175,3 +175,15 @@ describe('SPEC-042 · en el lienzo', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 });
+
+describe('SPEC-080 · su sitio en el flujo en el inspector', () => {
+  it('[R80.11] la pestaña «Contexto» enseña su sitio en el flujo cuando lo recibió', async () => {
+    const agents = new MockAgent(scripts);
+    const orch = new Orchestrator({ getAdapter: () => agents, decider: new MockDecider(), flow: true });
+    const { dialog } = card((await orch.start(chain, 'Haz la landing').result).events);
+    await userEvent.click(dialog.getAllByRole('button', { name: 'Ampliar' })[0]!);
+    await userEvent.click(dialog.getByRole('tab', { name: 'Contexto de «dis»' }));
+    expect(dialog.getByText('Su sitio en el flujo')).toBeTruthy();
+    expect(dialog.getByTestId('einsp-flow').textContent).toContain('La salida final de la ejecución.');
+  });
+});

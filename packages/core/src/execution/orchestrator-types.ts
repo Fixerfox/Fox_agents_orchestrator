@@ -33,6 +33,8 @@ export interface OrchestratorDeps {
    * con IA. Sin él se usan `getAdapter` y `decider` tal cual [R63.13].
    */
   forRun?(): { getAdapter(agentId: Id): AgentAdapter; decider: Decider; review?(): boolean };
+  /** Cuenta a cada paso de agente su sitio en el flujo [R80.10]. */
+  flow?: boolean;
   /** Memoria de la ejecución; va con el Supervisor, o sola con esto; `tokens`, su tope [R72.3][R72.15]. */
   memory?: { tokens?(): number | undefined };
   /** Temporizadores y reloj; por defecto, los del sistema [R70.9]. */
