@@ -141,6 +141,19 @@ export interface WritePolicyDeps {
 }
 
 
+/** Motivo al tocar la carpeta de datos de la app con «Sin preguntar nunca» [R89.4]. */
+export const APP_DATA_DENY =
+  'Esa es la carpeta de datos de la aplicación (ajustes, clave y secretos cifrados): los agentes no la leen ni la escriben, con ningún permiso.';
+
+/**
+ * ¿Nombra el comando la carpeta `dir` fuera de la carpeta de trabajo `root`? Una rama aislada vive dentro de los datos
+ * de la app y puede nombrar su propia ruta [R89.4].
+ */
+export function namesOutside(command: string, dir: string, root: string, platform: NodeJS.Platform = process.platform): boolean {
+  const n = (s: string) => (platform === 'win32' ? s.toLowerCase().replaceAll('\\', '/') : s);
+  return n(command).split(n(root)).join('').includes(n(dir));
+}
+
 /** Motivo al escribir en `.orquestador` [R50.5]. */
 export const APP_DIR_DENY =
   'En .orquestador están los diagramas y las ejecuciones que la aplicación tiene abiertos: no se escribe ahí. Deja tus archivos en otra carpeta.';
@@ -319,6 +332,10 @@ export function createWritePolicy(deps: WritePolicyDeps): (tool: string, input: 
           deps.note?.({ kind: 'denied', path: target, reason: APP_DIR_DENY });
           return deny(APP_DIR_DENY);
         }
+        if ((deps.protectedDirs ?? []).some((d) => sameOrInside(abs, d))) {
+          deps.note?.({ kind: 'denied', path: target, reason: APP_DATA_DENY });
+          return deny(APP_DATA_DENY);
+        }
         return allow(input);
       }
       if (!spot) {
@@ -348,7 +365,13 @@ export function createWritePolicy(deps: WritePolicyDeps): (tool: string, input: 
 
     if (tool === 'Bash') {
       const command = typeof input['command'] === 'string' ? (input['command'] as string) : '';
-      if (deps.level === 'full') return allow(input);
+      if (deps.level === 'full') {
+        if ((deps.protectedDirs ?? []).some((d) => namesOutside(command, d, deps.root))) {
+          deps.note?.({ kind: 'denied', path: command, reason: APP_DATA_DENY });
+          return deny(APP_DATA_DENY);
+        }
+        return allow(input);
+      }
       // Solo lectura: solo lo sencillo que no crea nada, y sin preguntar [R47.9].
       if (deps.level === 'readonly') {
         if ((await classifyCommand(command, deps.root, deps.root, { readOnly: true })).safe) return allow(input);

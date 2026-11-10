@@ -14,6 +14,8 @@ export interface ConnectionResult {
 /** Ajustes tal como los ve el renderer: la clave API nunca viaja, solo si existe [R23.3]. */
 export interface SettingsView extends AppSettings {
   apiKeyStored: boolean;
+  /** Los ajustes estaban dañados: se usan los de por defecto con «Preguntar» hasta guardarlos [R89.6]. */
+  recovered?: boolean;
 }
 
 /** Ajustes de la app y clave API. */

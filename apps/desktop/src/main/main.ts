@@ -9,6 +9,7 @@ import { ApiKeyVault, McpSecretVault, ProjectTrustStore, RecentStore, SettingsSt
 import { crashLine } from './crash';
 import { Background } from './background';
 import { cleanupSpaces, composeOrchestrator } from './composition';
+import { openOutside, previewResponse } from './preview-protocol';
 import { DesktopHandlers } from './handlers';
 import { TerminalService, type SpawnPty } from './terminal';
 import { parseWindowTone, secureWebContents, titleBarOverlay, windowOptions, TITLEBAR, WINDOW_TONE_CHANNEL } from './window';
@@ -79,10 +80,8 @@ protocol.registerSchemesAsPrivileged([{ scheme: 'orq-preview', privileges: { sta
 
 const handlers = new DesktopHandlers({
   terminals,
-  openFile: async (abs) => {
-    const err = await shell.openPath(abs);
-    if (err) throw new Error(err);
-  },
+  // Solo documentos e imágenes con su programa; lo demás, en su carpeta [R89.10].
+  openFile: (abs) => openOutside(abs, shell),
   claudeQuery: sdkQuery,
   // Los espacios de las ramas en paralelo, en los datos de la app [R73.6].
   createOrchestrator: (ctx) => composeOrchestrator({ ...ctx, spacesRoot: join(dataDir(), 'spaces'), appDataDir: dataDir(), createAppServer: sdkCreateAppServer }, sdkQuery),
@@ -270,10 +269,8 @@ app.whenReady().then(() => {
     ipcMain.handle(channel, (_event, payload: unknown) => handlers.invoke(channel, payload));
   }
   void session; // la política de contenido se fija por ventana en secureWebContents
-  protocol.handle('orq-preview', async (req) => {
-    const abs = await handlers.previewAsset(req.url);
-    return abs ? net.fetch(pathToFileURL(abs).toString()) : new Response('No encontrado', { status: 404 });
-  });
+  // La CSP va en la propia respuesta [R89.9].
+  protocol.handle('orq-preview', async (req) => previewResponse(await handlers.previewAsset(req.url), (url) => net.fetch(url)));
   createWindow();
   if (test) void startTestMcp(test.port);
   // Espacios de ramas que quedaron de un cierre inesperado [R73.18].
