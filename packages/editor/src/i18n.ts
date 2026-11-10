@@ -350,6 +350,8 @@ export const es = {
   'settings.sup.intro': 'Vigila cada ejecución y comprueba que cada paso hizo lo pedido.',
   'settings.budget.intro': 'Cuántos agentes trabajan a la vez y cuánto pueden gastar.',
   'settings.look.intro': 'Cómo se ve la aplicación en este equipo.',
+  'settings.about': 'Orquestador {version}',
+  'settings.about.license': 'Licencia MIT · © Nicolas Corta Avila',
   'settings.work.intro': 'La carpeta en la que trabajan los agentes de este proyecto.',
   'settings.status.idle': 'Sin probar todavía',
   'settings.status.running': 'Probando la conexión…',

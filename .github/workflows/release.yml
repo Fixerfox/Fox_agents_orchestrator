@@ -1,0 +1,103 @@
+# Instaladores de Windows, Linux y macOS [R91.15]. Con una etiqueta vX.Y.Z publica una release de GitHub con nombres
+# fijos, para que la web enlace a …/releases/latest/download/<nombre>. A mano, solo deja los instaladores como artefactos.
+name: release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            exe: release/dist/win-unpacked/Orquestador.exe
+            files: release/dist/Orquestador-Windows-x64.exe
+          - os: ubuntu-latest
+            exe: release/dist/Orquestador-Linux-x86_64.AppImage
+            # El AppImage, sin FUSE en la CI y sin el sandbox SUID que Ubuntu 24.04 restringe.
+            smoke: xvfb-run -a node scripts/smoke.mjs release/dist/Orquestador-Linux-x86_64.AppImage --no-sandbox
+            files: release/dist/Orquestador-Linux-x86_64.AppImage
+          - os: macos-latest
+            exe: release/dist/mac-arm64/Orquestador.app/Contents/MacOS/Orquestador
+            files: release/dist/Orquestador-macOS-arm64.dmg
+          - os: macos-15-intel
+            exe: release/dist/mac/Orquestador.app/Contents/MacOS/Orquestador
+            files: release/dist/Orquestador-macOS-x64.dmg
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    env:
+      # La firma y la notarización se activan solas si existen los secretos [R91.16].
+      CSC_LINK: ${{ secrets.CSC_LINK }}
+      CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      # Sin scripts de instalación: electron-builder descarga su propio Electron.
+      - run: npm ci --ignore-scripts
+      # Los tests corren en los sistemas de la CI de siempre; en macOS basta con los tipos y la prueba de humo.
+      - run: npm run check
+        if: runner.os != 'macOS'
+      - run: npm run typecheck
+        if: runner.os == 'macOS'
+      - run: npm run dist
+      - name: Prueba de humo [R91.14]
+        shell: bash
+        run: ${{ matrix.smoke || format('node scripts/smoke.mjs {0}', matrix.exe) }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: orquestador-${{ matrix.os }}
+          path: |
+            ${{ matrix.files }}
+            release/dist/THIRD_PARTY_NOTICES.txt
+          if-no-files-found: error
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+      - name: Crear la release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+          WIN_SIGNED: ${{ secrets.CSC_LINK != '' }}
+          MAC_NOTARIZED: ${{ secrets.APPLE_ID != '' }}
+        run: |
+          {
+            echo "Orquestador ${TAG#v}"
+            echo
+            echo "Descargas:"
+            echo "- Windows: Orquestador-Windows-x64.exe"
+            echo "- Linux: Orquestador-Linux-x86_64.AppImage (chmod +x y ejecutar)"
+            echo "- macOS: Orquestador-macOS-arm64.dmg (Apple Silicon) y Orquestador-macOS-x64.dmg (Intel)"
+            echo
+            if [ "$WIN_SIGNED" != "true" ]; then echo "> Windows: sin firma. SmartScreen avisará; «Más información» → «Ejecutar de todas formas»."; fi
+            if [ "$MAC_NOTARIZED" != "true" ]; then echo "> macOS: sin firma de Apple. Tras copiarla a Aplicaciones: \`xattr -cr /Applications/Orquestador.app\`."; fi
+            echo
+            echo "Licencia MIT © Nicolas Corta Avila. Avisos de terceros en THIRD_PARTY_NOTICES.txt."
+          } > notes.md
+          # Con guion (v0.9.0-rc.1) es una pre-release: no pasa a ser la «latest» de los enlaces de la web.
+          PRE=""; case "$TAG" in *-*) PRE="--prerelease";; esac
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --title "Orquestador ${TAG#v}" --notes-file notes.md $PRE \
+            out/Orquestador-Windows-x64.exe out/Orquestador-Linux-x86_64.AppImage \
+            out/Orquestador-macOS-arm64.dmg out/Orquestador-macOS-x64.dmg out/THIRD_PARTY_NOTICES.txt
