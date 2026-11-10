@@ -1,7 +1,7 @@
-import { useState, type ComponentProps, type ReactNode } from 'react';
+import { useEffect, useState, type ComponentProps, type ReactNode } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { Maximize2, SlidersHorizontal, X } from 'lucide-react';
-import type { RunEvent } from '@orquestador/core';
+import type { LibraryFolders, RunEvent } from '@orquestador/core';
 import { eventsOfDiagram, t, type EditorSession, type EditorSnapshot, type ProjectApi } from '@orquestador/editor';
 import { SideResizeHandle, type OpenLibrary } from '../common';
 import { Breadcrumbs } from './Breadcrumbs';
@@ -53,6 +53,16 @@ export function DesignerScreen(p: Props) {
   const { agents, catalog } = p.lib;
   /** Ventana «Configurar» abierta [R64.1]. */
   const [config, setConfig] = useState<ConfigTarget>();
+  // Las carpetas de Conocimiento, para agrupar la paleta; se releen cuando cambia el catálogo [R93.1][R93.4].
+  const [folders, setFolders] = useState<LibraryFolders>();
+  useEffect(() => {
+    let live = true;
+    void p.api.getLibraryFolders().then((r) => live && r.ok && setFolders(r.value));
+    return () => {
+      live = false;
+    };
+  }, [p.api, catalog]);
+  const folderOf = (kind: 'skills' | 'contexts' | 'mcp', id: string) => folders?.kinds[kind].items[id] ?? '';
   return (
     <div className="orq-body">
       <Palette
@@ -64,9 +74,9 @@ export function DesignerScreen(p: Props) {
         onPickAgent={() => designer.setPicker({})}
         onAddAgent={(agentId) => designer.onAdd({ kind: 'agent', agentId })}
         resources={[
-          ...catalog.skills.map((k) => ({ kind: 'skillIds' as const, id: k.id, name: k.name })),
-          ...catalog.contexts.map((c) => ({ kind: 'contextIds' as const, id: c.id, name: c.name })),
-          ...(catalog.mcp ?? []).map((m) => ({ kind: 'mcpIds' as const, id: m.id, name: m.name })),
+          ...catalog.skills.map((k) => ({ kind: 'skillIds' as const, id: k.id, name: k.name, folder: folderOf('skills', k.id) })),
+          ...catalog.contexts.map((c) => ({ kind: 'contextIds' as const, id: c.id, name: c.name, folder: folderOf('contexts', c.id) })),
+          ...(catalog.mcp ?? []).map((m) => ({ kind: 'mcpIds' as const, id: m.id, name: m.name, folder: folderOf('mcp', m.id) })),
         ]}
         diagrams={doc.diagramList}
         currentDiagramId={snap.diagram.id}
