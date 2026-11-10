@@ -96,6 +96,8 @@ jobs:
             echo
             echo "Licencia MIT © Nicolas Corta Avila. Avisos de terceros en THIRD_PARTY_NOTICES.txt."
           } > notes.md
-          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --title "Orquestador ${TAG#v}" --notes-file notes.md \
+          # Con guion (v0.9.0-rc.1) es una pre-release: no pasa a ser la «latest» de los enlaces de la web.
+          PRE=""; case "$TAG" in *-*) PRE="--prerelease";; esac
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --title "Orquestador ${TAG#v}" --notes-file notes.md $PRE \
             out/Orquestador-Windows-x64.exe out/Orquestador-Linux-x86_64.AppImage \
             out/Orquestador-macOS-arm64.dmg out/Orquestador-macOS-x64.dmg out/THIRD_PARTY_NOTICES.txt
