@@ -2207,6 +2207,11 @@ button.orq-node__alerts:hover { text-decoration: underline; }
 .orq-accept { width: min(520px, calc(100vw - 48px)); display: flex; flex-direction: column; gap: 12px; }
 .orq-accept textarea { width: 100%; resize: vertical; }
 .orq-accept__actions { display: flex; justify-content: flex-end; gap: 8px; }
+/* Confianza en la configuración de Claude Code del proyecto [R88.7] */
+.orq-trust { max-width: 560px; display: grid; gap: 12px; }
+.orq-trust h2 { display: flex; align-items: center; gap: 8px; }
+.orq-trust__list { margin: 0; padding-left: 20px; display: grid; gap: 6px; font-size: 13px; }
+.orq-trust__list code { font-family: var(--mono, monospace); }
 .orq-done.is-attention { border-color: color-mix(in srgb, var(--accent) 60%, var(--line)); }
 .orq-done.is-attention .orq-done__icon { color: var(--accent-text); }
 .orq-supfinal.is-warn { color: var(--accent-text); }

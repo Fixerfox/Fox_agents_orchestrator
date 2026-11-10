@@ -17,7 +17,7 @@ Al revisar una ejecución real (Spec Kit, 05/11) no quedaba claro qué había he
 ## Requisitos
 
 ### Motor
-- **R45.1** [M8f] Los agentes de trabajo se lanzan con `allowedTools` solo con las herramientas de lectura (`Read`, `Glob`, `Grep`, `WebFetch`, `WebSearch`). `Write`, `Edit`, `MultiEdit`, `NotebookEdit`, `Bash`, `AskUserQuestion` y las de MCP pasan siempre por `canUseTool` (copia, permiso, registro y preguntas por chat). Un fichero que el agente ha creado en ese mismo intento se puede retocar sin preguntar ni hacer copia, y sigue contando como nuevo.
+- **R45.1** [M8f] Los agentes de trabajo se lanzan con `allowedTools` solo con las herramientas que no escriben ni leen por sí mismas (`Agent`, `TodoWrite`, `Skill`); desde SPEC-087, las de lectura y la web también pasan por la política. `Write`, `Edit`, `MultiEdit`, `NotebookEdit`, `Bash`, `AskUserQuestion` y las de MCP pasan siempre por `canUseTool` (copia, permiso, registro y preguntas por chat). Un fichero que el agente ha creado en ese mismo intento se puede retocar sin preguntar ni hacer copia, y sigue contando como nuevo.
 - **R45.2** [M8f] El adaptador de Claude emite el evento `file` de cada fichero creado o modificado en cuanto termina la herramienta que lo escribió (una sola vez por fichero y paso; un fichero nuevo que aún no existe espera a la siguiente vez y se descarta al final si no llegó a crearse), y también cuando el intento falla. `file.produced` lleva `change: 'created' | 'modified'` cuando se sabe.
 - **R45.3** [M8f] `agent.question` lleva `kind`: `permission` para modificar un fichero, ejecutar un comando o usar una herramienta MCP; `gate` para la pregunta de un agente supervisado (R39.4); `question` para las del agente. La confirmación sigue con `confirm` (R43.5).
 

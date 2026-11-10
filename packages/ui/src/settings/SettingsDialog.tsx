@@ -6,6 +6,7 @@ import { t, type ConnectionResult, type MessageKey, type ProjectApi, type Settin
 import { fieldErrors } from '../common';
 import { applyTheme, loadTheme, saveTheme, type Theme } from './theme';
 import { Choice, PermMatrix, RULES, Row, Shell, type Section, type SectionId } from './SettingsParts';
+import { TrustRow } from './TrustDialog';
 
 interface Props {
   api: ProjectApi;
@@ -241,6 +242,7 @@ export function SettingsDialog({ api, onClose, onSaved }: Props) {
             <Row id="set-cc" label={t('settings.claudeConfig')} hint={t('settings.claudeConfig.hint')}>
               <input id="set-cc" type="checkbox" className="orq-toggle" checked={loadsClaudeConfig(draft)} onChange={(e) => set({ claudeConfig: e.target.checked })} />
             </Row>
+            {loadsClaudeConfig(draft) && <TrustRow api={api} />}
           </div>
         </>
       ),

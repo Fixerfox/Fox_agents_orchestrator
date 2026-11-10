@@ -31,6 +31,17 @@ export const DELIVERABLE_RULE =
 
 /** Lo que el agente puede hacer en la carpeta según su nivel de permisos [R50.6]. */
 export function folderRule(level: PermissionLevel): string {
+  return `${folderWrites(level)} ${readRule(level)}`;
+}
+
+/** Lo que el agente puede leer según su nivel [R87.10]. */
+export function readRule(level: PermissionLevel): string {
+  const secrets = 'Los archivos de secretos (claves, .env, credenciales) nunca se leen: si necesitas un valor, pídeselo al usuario.';
+  if (level === 'readonly' || level === 'ask') return `Fuera de la carpeta de trabajo y del proyecto, leer pide permiso al usuario, y abrir una web nueva o buscar en la web también. ${secrets}`;
+  return `Puedes leer fuera de la carpeta y usar la web sin preguntar. ${secrets}`;
+}
+
+function folderWrites(level: PermissionLevel): string {
   if (level === 'readonly')
     return 'Puedes leer toda la carpeta, pero eres de solo lectura: no crees, modifiques ni borres archivos ni ejecutes comandos que cambien algo; propón los cambios en tu respuesta.';
   const create = 'Puedes leer toda la carpeta y crear archivos y carpetas nuevos sin pedir permiso: hazlo cuando la tarea produzca ficheros, no pegues el código en tu respuesta.';

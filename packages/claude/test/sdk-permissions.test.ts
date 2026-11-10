@@ -78,7 +78,7 @@ async function collect(adapter: ClaudeAdapter, ask: (q: { text: string }) => Pro
 }
 
 describe('SPEC-045 · el motor real pasa por la política de escritura', () => {
-  it('[R45.1] solo las lecturas se aprueban solas: Write, Edit, Bash y AskUserQuestion se deciden en la política', async () => {
+  it('[R45.1][R87.3] nada que lea o escriba se aprueba solo: Read, Write, Edit, Bash y AskUserQuestion se deciden en la política', async () => {
     const log = { asked: [] as string[], ran: [] as string[] };
     let seen: ClaudeQueryOptions | undefined;
     const steps: Step[] = [
@@ -96,11 +96,10 @@ describe('SPEC-045 · el motor real pasa por la política de escritura', () => {
       asked.push(q.text);
       return 'Denegar';
     });
-    expect(seen!.allowedTools).toEqual(expect.arrayContaining(['Read', 'Glob', 'Grep']));
-    for (const t of ['Write', 'Edit', 'MultiEdit', 'Bash', 'AskUserQuestion']) expect(seen!.allowedTools).not.toContain(t);
+    for (const t of ['Read', 'Glob', 'Grep', 'WebFetch', 'WebSearch', 'Write', 'Edit', 'MultiEdit', 'Bash', 'AskUserQuestion']) expect(seen!.allowedTools).not.toContain(t);
     expect(seen!.tools).toEqual(expect.arrayContaining(['Write', 'Edit', 'Bash', 'AskUserQuestion']));
-    // La lectura no pregunta; escribir y ejecutar pasan por la política, y el comando denegado no se ejecuta.
-    expect(log.asked).toEqual(['Write', 'Bash']);
+    // Todo pasa por la política; la lectura de dentro no pregunta al usuario y el comando denegado no se ejecuta.
+    expect(log.asked).toEqual(['Read', 'Write', 'Bash']);
     expect(log.ran).toEqual(['Read', 'Write']);
     expect(asked).toEqual([expect.stringMatching(/^¿Puedo ejecutar este comando\?\nnpm test/)]);
     // El documento que escribe queda en los archivos del paso.

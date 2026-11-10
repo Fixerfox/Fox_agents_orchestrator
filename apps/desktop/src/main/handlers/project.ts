@@ -5,9 +5,9 @@ import { summarizeFolder } from '@orquestador/claude';
 import { analyzeImport, defaultSettings, folderLabel, type RecentView } from '@orquestador/core';
 import { CHANNELS, installSpecKitInto, type ProjectInfo, type SpecKitTarget, type TerminalStartRequest } from '@orquestador/editor';
 import { RunService, RunSnapshots, runDefaultsFrom } from '@orquestador/runtime';
-import { StoreError, readFolder, type ProjectStore } from '@orquestador/store';
+import { StoreError, projectKey, readFolder, type ProjectStore } from '@orquestador/store';
 import { composeRunPorts, createProject, openProject } from '../composition';
-import { UNHANDLED, disposeHandlers, mcpVaultKey, requireStore, type HandlerState } from './state';
+import { UNHANDLED, disposeHandlers, mcpVaultKey, projectConfigTrusted, projectTrustState, requireStore, type HandlerState } from './state';
 
 /** Documentos guía de la raíz de la carpeta del proyecto que se ofrecen como contexto común [R32.16]. */
 const GUIDE_DOCS = ['CLAUDE.md', 'TRABAJO.md', 'AGENTS.md'] as const;
@@ -38,6 +38,8 @@ async function setProject(h: HandlerState, root: string, store: ProjectStore): P
       settings: () => h.settings,
       apiKey: async () => (await h.deps.vault?.read()),
       mcpSecrets: async (id, scope) => (await h.deps.mcpVault?.read(mcpVaultKey(root, id, scope))) ?? {},
+      projectConfigTrusted: (dir) => projectConfigTrusted(h, dir),
+      ...(h.deps.trustDir ? { checksApprovalsFile: join(h.deps.trustDir, `${projectKey(root)}-checks.json`) } : {}),
     }), () => runDefaultsFrom(h.settings), snapshots);
   h.runs.watch((event, diagram) => h.deps.watchRun?.(event, diagram));
   h.runs.onMemoryProposals((n) => h.deps.memoryProposals?.(n));
@@ -72,6 +74,16 @@ export async function handleProject(h: HandlerState, channel: string, arg: unkno
   switch (channel) {
     case CHANNELS.currentProject:
       return h.store ? { name: (await h.store.info()).name } : null;
+    case CHANNELS.projectTrust: {
+      const s = await projectTrustState(h);
+      return { items: s.items, decision: s.decision };
+    }
+    case CHANNELS.setProjectTrust: {
+      requireStore(h);
+      const s = await projectTrustState(h);
+      if (s.items.length > 0) await h.deps.trust?.set(h.root!, s.fingerprint, arg as 'trusted' | 'ignored');
+      return null;
+    }
     case CHANNELS.createProject: {
       const root = await h.deps.pickFolder('create');
       if (!root) return null;

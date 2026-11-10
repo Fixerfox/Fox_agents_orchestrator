@@ -66,6 +66,8 @@ export async function runAssistantTurn(args: {
   cwd: string;
   /** Carpetas que el asistente nunca lee, como la de datos de la app [R29.8]. */
   protectedDirs?: readonly string[];
+  /** ¿Se carga la configuración de Claude Code del proyecto? Sin valor, sí [R88.4]. */
+  projectTrusted?: boolean;
   signal: AbortSignal;
   emit: (e: AssistantTurnEvent) => void;
   /** Ejecuta la herramienta en la interfaz y devuelve su resultado. */
@@ -109,7 +111,7 @@ export async function runAssistantTurn(args: {
       hooks: { PreToolUse: [{ matcher: ASSISTANT_GUARD_MATCHER, hooks: [assistantGuardHook(policy)] }] },
       abortController: controller,
       env: buildEnv(args.settings, args.apiKey),
-      settingSources: settingSourcesFor(args.settings),
+      settingSources: settingSourcesFor(args.settings, args.projectTrusted ?? true),
       persistSession: false,
       systemPrompt: { type: 'preset' as const, preset: 'claude_code' as const, append: ASSISTANT_SYSTEM_PROMPT },
       mcpServers: { [server]: instance as never },
