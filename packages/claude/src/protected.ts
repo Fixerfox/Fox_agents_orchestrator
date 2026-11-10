@@ -9,6 +9,8 @@ const NAMES = new Set<string>(PROTECTED_DIRS);
  * y lo que va desde `:` es un flujo alternativo de NTFS (`.git::$INDEX_ALLOCATION` es la carpeta `.git`) [R87.1].
  */
 export function systemName(segment: string, platform: NodeJS.Platform = process.platform): string {
+  // El disco de macOS no distingue mayúsculas por defecto [R87.2].
+  if (platform === 'darwin') return segment.toLowerCase();
   if (platform !== 'win32') return segment;
   const colon = segment.indexOf(':');
   // «C:» al principio de una ruta absoluta es la unidad, no un flujo.
@@ -22,6 +24,7 @@ export const protectedName = (segment: string, platform: NodeJS.Platform = proce
 /** Ruta normalizada como la vería el sistema, para comparar carpetas [R87.2]. */
 export function systemPath(p: string, platform: NodeJS.Platform = process.platform): string {
   const abs = path.resolve(p);
+  if (platform === 'darwin') return abs.toLowerCase();
   if (platform !== 'win32') return abs;
   return abs
     .split(/[\\/]+/)

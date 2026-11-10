@@ -70,7 +70,7 @@ Además, la web (fixerfoxgames.com) necesita enlaces de descarga que no cambien 
   - ejecuta la prueba de humo con lo empaquetado (en Linux con `xvfb-run`);
   - con una etiqueta, crea la release de GitHub con los instaladores de nombre fijo; a mano, solo los guarda como artefactos;
   - una etiqueta con guion (`v0.9.0-rc.1`) se publica como *pre-release*, para probar sin cambiar los enlaces de `latest`.
-- **R91.16** [M17a] La firma y la notarización se activan solas si existen sus secretos (`CSC_LINK`/`CSC_KEY_PASSWORD`, `APPLE_ID`/`APPLE_APP_SPECIFIC_PASSWORD`/`APPLE_TEAM_ID`). Si faltan, la release dice que va sin firmar.
+- **R91.16** [M17a] La firma y la notarización se activan solas si existen sus secretos (`CSC_LINK`/`CSC_KEY_PASSWORD`, `APPLE_ID`/`APPLE_APP_SPECIFIC_PASSWORD`/`APPLE_TEAM_ID`). Si faltan, la release dice que va sin firmar. Las que llegan vacías (la CI pone `''` cuando no existe el secreto) se quitan antes de construir.
 
 ## Casos
 - **E91.a** *Dado* un usuario con datos en `%APPDATA%\@orquestador\desktop`, *cuando* arranca la versión empaquetada, *entonces* sus ajustes, su clave cifrada y sus recientes siguen ahí.

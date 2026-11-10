@@ -69,7 +69,10 @@ describe('SPEC-087 · A2: carpetas protegidas como las ve Windows', () => {
 
   it('[R87.2] con «Sin preguntar nunca», .orquestador en otras mayúsculas o con punto final también queda protegido', async () => {
     const { canUse } = policy('full');
-    expect(await canUse('Write', { file_path: join(work, '.ORQUESTADOR', 'x.json'), content: 'x' })).toMatchObject({ behavior: 'deny' });
+    // Linux distingue mayúsculas: ahí `.ORQUESTADOR` es otra carpeta.
+    expect(await canUse('Write', { file_path: join(work, '.ORQUESTADOR', 'x.json'), content: 'x' })).toMatchObject({ behavior: process.platform === 'linux' ? 'allow' : 'deny' });
+    expect(sameOrInside('/Users/u/p/.ORQUESTADOR/x', '/Users/u/p/.orquestador', 'darwin')).toBe(true);
+    expect(sameOrInside('/home/u/p/.ORQUESTADOR/x', '/home/u/p/.orquestador', 'linux')).toBe(false);
     expect(sameOrInside(win('C:', 'p', '.orquestador.', 'x'), win('C:', 'p', '.orquestador'), 'win32')).toBe(true);
     expect(sameOrInside(win('C:', 'P', '.Orquestador::$DATA', 'x'), win('c:', 'p', '.orquestador'), 'win32')).toBe(true);
     expect(sameOrInside(win('C:', 'p', '.orquestadorx'), win('C:', 'p', '.orquestador'), 'win32')).toBe(false);

@@ -244,7 +244,9 @@ describe('SPEC-091 · prueba de humo y releases', () => {
     const wf = read('.github/workflows/release.yml');
     for (const s of ['CSC_LINK', 'CSC_KEY_PASSWORD', 'APPLE_ID', 'APPLE_APP_SPECIFIC_PASSWORD', 'APPLE_TEAM_ID']) expect(wf).toContain(`${s}: \${{ secrets.${s} }}`);
     expect(wf).toContain('sin firma');
-    const { macIdentity } = await script<{ macIdentity(e: Record<string, string>): string | undefined }>('scripts/dist.mjs');
+    const { macIdentity, dropEmptySigning } = await script<{ macIdentity(e: Record<string, string>): string | undefined; dropEmptySigning(e: Record<string, string>): Record<string, string> }>('scripts/dist.mjs');
+    // La CI pasa '' si no existe el secreto: se quita para que electron-builder no lo tome por una ruta.
+    expect(dropEmptySigning({ CSC_LINK: '', CSC_KEY_PASSWORD: ' ', APPLE_ID: 'yo@x', PATH: '' })).toEqual({ APPLE_ID: 'yo@x', PATH: '' });
     expect(macIdentity({})).toBe('-');
     expect(macIdentity({ CSC_LINK: 'base64' })).toBeUndefined();
   });
