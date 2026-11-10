@@ -210,6 +210,8 @@ export interface AgentRequest {
   memory?: string;
   /** Bloque «Estás dentro de un bucle», si el paso está en uno [R84.4]. */
   loop?: string;
+  /** Su sitio en el flujo: quién recibe su salida, revisión y vuelta [R80.8]. */
+  flow?: string;
   /** Archivos y carpetas a los que se limita este paso [R60.16]. */
   scope?: string[];
   /** Qué se entregará al final: contrato completo (pasos finales) o una línea de objetivo [R46.4]. */
@@ -288,6 +290,8 @@ export interface RouteCandidate {
   edgeId: Id;
   to: Id;
   label: string;
+  /** Qué hay en ese destino: agente y tarea, revisión, salida… [R81.2] */
+  description?: string;
 }
 
 /** Lo que juzga el Juez de una revisión [R34.26]. */
@@ -310,7 +314,7 @@ export interface JudgeVerdict {
 export interface Decider {
   /** `usage`: lo que gastó la decisión, que cuenta en el presupuesto [R63.15]. */
   route(
-    request: { nodeId: Id; candidates: RouteCandidate[]; input: Payload },
+    request: { nodeId: Id; candidates: RouteCandidate[]; input: Payload; /** Criterio del router [R81.3]. */ criteria?: string },
     signal: AbortSignal,
   ): Promise<{ edgeIds: Id[]; reason: string; usage?: TransformUsage }>;
   judge(

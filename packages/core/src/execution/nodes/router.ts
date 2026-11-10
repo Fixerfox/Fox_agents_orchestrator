@@ -1,6 +1,7 @@
 import type { Edge } from '../../diagrams';
 import type { Id } from '../../shared';
 import { replayedIn } from '../run/replay-decider';
+import { targetDescriber } from './flow';
 import { chargeDecision, failStep, nodeStarted, type NodeHandler } from './handler';
 
 /** Router: elige por las condiciones de las aristas o con la IA. */
@@ -31,9 +32,12 @@ export const routerHandler: NodeHandler = {
       emitter.emit({ type: 'decision', nodeId: node.id, kind: 'condition', request: { input }, response: results, ...(replayedIn(decider, 'condition') ? { reused: true } : {}) }, path);
       reason = 'reglas de las aristas';
     } else {
-      const candidates = outEdges.map((e) => ({ edgeId: e.id, to: e.to, label: nodeById.get(e.to)?.label ?? e.to }));
-      const { usage, ...res } = await decider.route({ nodeId: node.id, candidates, input }, signal);
-      emitter.emit({ type: 'decision', nodeId: node.id, kind: 'route', request: { candidates, input }, response: res, ...(replayedIn(decider, 'route') ? { reused: true } : {}) }, path);
+      // Con la app, cada opción lleva qué hay en ella; el criterio, siempre que lo haya [R81.2][R81.3].
+      const describe = targetDescriber(step, path);
+      const candidates = outEdges.map((e) => ({ edgeId: e.id, to: e.to, label: nodeById.get(e.to)?.label ?? e.to, ...(describe ? { description: describe(e.to) } : {}) }));
+      const criteria = node.router?.criteria?.trim() || undefined;
+      const { usage, ...res } = await decider.route({ nodeId: node.id, candidates, input, ...(criteria ? { criteria } : {}) }, signal);
+      emitter.emit({ type: 'decision', nodeId: node.id, kind: 'route', request: { candidates, input, ...(criteria ? { criteria } : {}) }, response: res, ...(replayedIn(decider, 'route') ? { reused: true } : {}) }, path);
       chargeDecision(step, node, path, usage);
       const wanted = new Set(res.edgeIds);
       chosen = outEdges.filter((e) => wanted.has(e.id));

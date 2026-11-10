@@ -99,7 +99,11 @@ export function LibraryScreen({ api, section, onChanged, open, onGo, drafts: sha
     setLoaded(true);
   }, [api]);
   useEffect(() => void reload(), [reload, version]);
-  useEffect(() => (setManual(false), setCtxPick(false), setSeed(undefined)), [sel, tab]);
+  useEffect(() => {
+    setManual(false);
+    setCtxPick(false);
+    setSeed(undefined);
+  }, [sel, tab]);
   /** Cambia las carpetas y las guarda; devuelve el error, si lo hay [R38.14]. */
   const changeFolders = async (fn: (f: LibraryFolders) => LibraryFolders): Promise<string | undefined> => {
     let next: LibraryFolders;

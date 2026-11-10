@@ -16,6 +16,7 @@ El hito indica cuándo debe estar cubierto por tests. `npm run spec:check` exige
 ## Índice
 | Spec | Título | Hito | Estado |
 |---|---|---|---|
+| [095](095-efectos-sin-retorno.md) | Los efectos de React no devuelven nada por accidente: el panel del Supervisor caía al cerrarse porque scrollIntoView devuelve una promesa en Chromium; efectos con cuerpo de bloque y un test que lo vigila | M17d | Implementada |
 | [091](091-empaquetado.md) | Empaquetado y releases: instalador de Windows, AppImage de Linux y dmg de macOS con el binario de Claude dentro, datos migrados, avisos de terceros, prueba de humo y releases de GitHub con nombres fijos | M17a | Implementada |
 | [094](094-seguridad-del-repositorio.md) | Seguridad del repositorio: solo el dueño aprueba los PR, a develop desde cualquier rama y a main solo desde develop, main y develop no se borran, y licencia MIT | M17b | Implementada |
 | [093](093-paleta-por-carpetas.md) | La paleta del Diseñador por carpetas: skills, contextos y MCP agrupados como en Conocimiento, con carpetas que se pliegan y se recuerdan | M17c | Implementada |
@@ -29,6 +30,8 @@ El hito indica cuándo debe estar cubierto por tests. `npm run spec:check` exige
 | [084](084-bucle-con-contexto.md) | El bucle conserva la petición y el criterio: cada agente del cuerpo recibe vuelta, criterio del evaluador, petición original y último motivo | M16c | Implementada |
 | [083](083-tokens-de-cache.md) | Los tokens de caché cuentan: la entrada incluye lo leído y escrito en caché, y el límite de tokens lo mide | M16b | Implementada |
 | [082](082-modo-prueba-mcp.md) | Modo prueba: la app arrancada con --test-mcp abre un MCP local (token, solo 127.0.0.1, datos aparte) con las acciones del asistente y herramientas para manejar la interfaz, abrir proyectos, responder diálogos, llamar a la API y esperar ejecuciones | M16a | Implementada |
+| [081](081-decidir-con-contexto.md) | Decidir con contexto: el router con IA ve qué hay en cada opción y un criterio propio; quien revisa sin ser el destino del retorno escribe el VEREDICTO | M15l | Implementada |
+| [080](080-sitio-en-el-flujo.md) | Su sitio en el flujo: cada paso sabe quién recibe su salida (agente, router, revisión, salida), si su tramo pasa por una revisión y en qué vuelta del bucle va, en el mensaje del usuario | M15k | Implementada |
 | [079](079-no-matar-el-orquestador.md) | Un agente no puede cerrar el orquestador: matar por nombre electron, node, claude u orquestador se deniega con cualquier permiso | M15j | Implementada |
 | [078](078-aprobaciones-en-modal.md) | Aprobaciones largas en un modal: confirmaciones y revisiones con quién pregunta siempre a la vista y «Aprobar» fijo abajo | M15i | Implementada |
 | [077](077-gobierno-de-recursos.md) | Gobierno de recursos: límite global de agentes, enfriamiento compartido ante límites de uso, presupuesto con aviso y freno, pausa en la siguiente herramienta, tokens agrupados y métricas | M15h | Implementada |

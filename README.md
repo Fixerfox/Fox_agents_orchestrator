@@ -117,7 +117,7 @@ En Windows también vale con doble clic en `iniciar.bat`.
 2. Fusiona en `main` y crea la etiqueta: `git tag v0.9.0 && git push origin v0.9.0`.
 3. El flujo [`release`](.github/workflows/release.yml) construye Windows, Linux y macOS, los prueba y publica la release. Los enlaces de arriba apuntan siempre a la última.
 
-Una etiqueta con guion (`v0.9.0-rc.1`) se publica como *pre-release* y no cambia esos enlaces.
+Las versiones definitivas solo salen de `main`. Para probar desde develop, usa una etiqueta con guion (`v0.9.0-rc.1`): se publica como *pre-release* y no cambia esos enlaces.
 
 ---
 

@@ -8,7 +8,9 @@ export function AcceptDialog({ api, runId, onClose, onAccepted }: { api: Project
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
   const ref = useRef<HTMLTextAreaElement>(null);
-  useEffect(() => ref.current?.focus(), []);
+  useEffect(() => {
+    ref.current?.focus();
+  }, []);
   const confirm = async () => {
     if (!reason.trim()) return setError(t('accept.need'));
     setBusy(true);

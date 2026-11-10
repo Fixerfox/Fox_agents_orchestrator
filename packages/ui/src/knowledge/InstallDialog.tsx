@@ -21,7 +21,9 @@ export function InstallDialog({ api, onClose }: Props) {
   const [empty, setEmpty] = useState(false);
   const [busy, setBusy] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => ref.current?.focus(), []);
+  useEffect(() => {
+    ref.current?.focus();
+  }, []);
 
   const choose = async (kind: ImportKind) => {
     setBusy(true);

@@ -50,6 +50,8 @@ export interface RunServices {
   resources?: SharedResources;
   /** Vigila la ejecución, si la app lo activa [R60.1]. */
   supervisor?: Supervisor;
+  /** Diagramas de cada nivel por ruta, si se cuenta a los pasos su sitio en el flujo [R80.10]. */
+  flow?: { levels: Map<string, Diagram> };
   /** La memoria de la ejecución, con el Supervisor o si se pide [R72.3]. */
   memory?: RunMemoryService;
   questions: QuestionBroker;

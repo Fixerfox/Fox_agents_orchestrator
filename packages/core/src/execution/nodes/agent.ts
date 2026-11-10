@@ -7,6 +7,7 @@ import { newTrace } from './agent-attempt';
 import { attemptsOf, type AgentTurn } from './agent-retries';
 import { verifyStep } from './agent-checks';
 import { BUDGET_SPENT } from '../run/budget-tracker';
+import { flowOf } from './flow';
 import { errorMessage, failStep, type NodeHandler, type StepContext } from './handler';
 
 /** Veces que se repite un paso que no reparte bien, antes de fallar [R59.8]. */
@@ -62,6 +63,9 @@ export const agentHandler: NodeHandler = {
         turn.memory = memory.text;
         turn.memoryStats = memory.stats;
       }
+      // Su sitio en el flujo, también fijo durante el paso [R80.8].
+      const flow = flowOf(step, node, path);
+      if (flow) turn.flow = flow;
       // Y la del proyecto, tal como estaba al lanzar la ejecución [R76.13][R76.14].
       const known = node.agentId && step.projectMemory ? await step.projectMemory(node.agentId) : undefined;
       if (known) turn.projectMemory = known;

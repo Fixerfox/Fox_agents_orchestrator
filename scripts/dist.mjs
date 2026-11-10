@@ -20,6 +20,18 @@ export function stagedManifest(app) {
   return { name: 'orquestador', ...rest, dependencies };
 }
 
+/** Variables de firma y notarización que lee electron-builder [R91.16]. */
+export const SIGNING_VARS = ['CSC_LINK', 'CSC_KEY_PASSWORD', 'CSC_NAME', 'WIN_CSC_LINK', 'WIN_CSC_KEY_PASSWORD', 'APPLE_ID', 'APPLE_APP_SPECIFIC_PASSWORD', 'APPLE_TEAM_ID', 'APPLE_API_KEY', 'APPLE_API_KEY_ID', 'APPLE_API_ISSUER'];
+
+/**
+ * Quita las que llegan vacías: la CI pone `''` si no existe el secreto, y electron-builder toma un `CSC_LINK` vacío
+ * por una ruta (la carpeta del proyecto) e intenta importarla como certificado [R91.16].
+ */
+export function dropEmptySigning(env) {
+  for (const k of SIGNING_VARS) if (env[k] !== undefined && env[k].trim() === '') delete env[k];
+  return env;
+}
+
 /** ¿Hay con qué firmar en macOS? Si no, firma *ad hoc* (Apple Silicon no abre nada sin firma) [R91.16]. */
 export const macIdentity = (env) => (env.CSC_LINK || env.CSC_NAME ? undefined : '-');
 
@@ -37,6 +49,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const config = readJson(join(root, 'apps', 'desktop', 'electron-builder.json'));
   delete config.$comment;
   const electronVersion = readJson(join(root, 'node_modules', 'electron', 'package.json')).version;
+  dropEmptySigning(process.env);
   const identity = macIdentity(process.env);
   const { build, Platform, Arch } = await import('electron-builder');
   const targets = process.platform === 'win32' ? Platform.WINDOWS : process.platform === 'darwin' ? Platform.MAC : Platform.LINUX;

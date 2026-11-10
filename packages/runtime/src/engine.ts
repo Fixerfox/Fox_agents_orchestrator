@@ -115,6 +115,8 @@ export function createEngineOrchestrator(ctx: EngineContext, engines: readonly A
     memory: { tokens: () => ctx.settings().memoryTokens },
     loopContext: true,
     ...(ctx.secretValues ? { secretValues: ctx.secretValues } : {}),
+    // Cada paso sabe quién recibe su salida, qué revisión le espera y en qué vuelta va [R80.10].
+    flow: true,
     agentProfile: (id, extra, runId) => profileOf(ctx.library, id, extra, runId),
     ...(ctx.restoreFiles ? { restoreFiles: (runId: Id, files: { path: string; change?: 'created' | 'modified' }[], dir?: string) => ctx.restoreFiles!(runId, files, dir) } : {}),
     // Las ramas en paralelo, aisladas si Ajustes lo dice (activo por defecto) [R73.2].

@@ -171,6 +171,9 @@ export function Inspector({ session, snap, selection, agents, onError, onEditAge
                 <option value="rules">{t('inspector.router.rules')}</option>
               </select>
             </label>
+            {(node.router?.mode ?? 'ai') === 'ai' && (
+              <TextField label={t('insp.router.criteria')} multiline value={node.router?.criteria ?? ''} placeholder={t('insp.router.criteria.ph')} onCommit={(v) => patch(node.id, { router: { criteria: v } })} />
+            )}
             <p className="orq-hint orq-sees">{t((node.router?.mode ?? 'ai') === 'ai' ? 'insp.sees.router.ai' : 'insp.sees.router.rules')}</p>
             </div>
           )}

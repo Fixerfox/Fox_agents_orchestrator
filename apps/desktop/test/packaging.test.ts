@@ -237,6 +237,13 @@ describe('SPEC-091 · prueba de humo y releases', () => {
     expect(wf).toContain('scripts/smoke.mjs');
     expect(wf).toContain("if: startsWith(github.ref, 'refs/tags/v')");
     expect(wf).toContain('case "$TAG" in *-*) PRE="--prerelease"');
+  });
+
+  it('[R91.18] la versión definitiva solo sale de main; las de prueba, de cualquier rama', () => {
+    const wf = read('.github/workflows/release.yml');
+    expect(wf).toContain("if: startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-')");
+    expect(wf).toContain('git merge-base --is-ancestor "$GITHUB_SHA" origin/main');
+    expect(wf).toMatch(/build:\n {4}needs: origin/);
     for (const f of ['Orquestador-Windows-x64.exe', 'Orquestador-Linux-x86_64.AppImage', 'Orquestador-macOS-arm64.dmg', 'Orquestador-macOS-x64.dmg']) expect(wf).toContain(`out/${f}`);
   });
 
@@ -244,7 +251,9 @@ describe('SPEC-091 · prueba de humo y releases', () => {
     const wf = read('.github/workflows/release.yml');
     for (const s of ['CSC_LINK', 'CSC_KEY_PASSWORD', 'APPLE_ID', 'APPLE_APP_SPECIFIC_PASSWORD', 'APPLE_TEAM_ID']) expect(wf).toContain(`${s}: \${{ secrets.${s} }}`);
     expect(wf).toContain('sin firma');
-    const { macIdentity } = await script<{ macIdentity(e: Record<string, string>): string | undefined }>('scripts/dist.mjs');
+    const { macIdentity, dropEmptySigning } = await script<{ macIdentity(e: Record<string, string>): string | undefined; dropEmptySigning(e: Record<string, string>): Record<string, string> }>('scripts/dist.mjs');
+    // La CI pasa '' si no existe el secreto: se quita para que electron-builder no lo tome por una ruta.
+    expect(dropEmptySigning({ CSC_LINK: '', CSC_KEY_PASSWORD: ' ', APPLE_ID: 'yo@x', PATH: '' })).toEqual({ APPLE_ID: 'yo@x', PATH: '' });
     expect(macIdentity({})).toBe('-');
     expect(macIdentity({ CSC_LINK: 'base64' })).toBeUndefined();
   });

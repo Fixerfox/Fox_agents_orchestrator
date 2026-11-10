@@ -338,3 +338,24 @@ describe('panel derecho en ventanas estrechas [R21.16]', () => {
     await vi.waitFor(() => expect(screen.queryByRole('complementary', { name: 'Propiedades' })).toBeNull());
   });
 });
+
+describe('SPEC-081 · criterio del router', () => {
+  it('[R81.1][R81.5] en modo IA se escribe el criterio, en blanco no se guarda, y en reglas no aparece', async () => {
+    const s = new EditorSession(createDiagram('d', 'D'));
+    const r = s.addNode({ kind: 'router', position: P });
+    const m = mountInspector(s, { nodes: [r], edges: [] });
+    const routerOf = () => s.getSnapshot().level.nodes.find((n) => n.id === r)!.router;
+    expect(screen.getByText(/cada paso siguiente con su agente y su tarea/)).toBeTruthy();
+    await userEvent.type(screen.getByLabelText('Criterio para elegir'), 'si hay errores, a Arreglar');
+    await userEvent.tab();
+    expect(routerOf()).toEqual({ mode: 'ai', criteria: 'si hay errores, a Arreglar' });
+    m.rerender({ nodes: [r], edges: [] });
+    await userEvent.clear(screen.getByLabelText('Criterio para elegir'));
+    await userEvent.type(screen.getByLabelText('Criterio para elegir'), '   ');
+    await userEvent.tab();
+    expect(routerOf()).toEqual({ mode: 'ai' });
+    await userEvent.selectOptions(screen.getByLabelText('Modo de enrutado'), 'rules');
+    m.rerender({ nodes: [r], edges: [] });
+    expect(screen.queryByLabelText('Criterio para elegir')).toBeNull();
+  });
+});

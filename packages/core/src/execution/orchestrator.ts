@@ -85,6 +85,7 @@ export class Orchestrator {
       ...(this.deps.resources ? { resources: this.deps.resources } : {}),
       ...(supervisor ? { supervisor } : {}),
       ...(memory ? { memory } : {}),
+      ...(this.deps.flow ? { flow: { levels: new Map() } } : {}),
       ...(spaces ? { spaces } : {}),
       ...(this.deps.loopContext ? { loops: new Map() } : {}),
       ...(this.deps.checks?.runner ? { checkRunner: this.deps.checks.runner } : {}),
@@ -235,6 +236,7 @@ async function executeDiagram(run: RunServices, nodes: NodeRegistry, diagram: Di
 
   const nodeById = new Map(diagram.nodes.map((n) => [n.id, n]));
   run.memory?.levels.set(path.join('/'), diagram);
+  run.flow?.levels.set(path.join('/'), diagram);
   for (const n of diagram.nodes) run.labels.set(pathKey(path, n.id), n.label ?? n.id);
   const returns = returnEdges(diagram);
   const incoming = new Map<Id, Edge[]>();
