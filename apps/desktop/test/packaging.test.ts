@@ -237,6 +237,13 @@ describe('SPEC-091 · prueba de humo y releases', () => {
     expect(wf).toContain('scripts/smoke.mjs');
     expect(wf).toContain("if: startsWith(github.ref, 'refs/tags/v')");
     expect(wf).toContain('case "$TAG" in *-*) PRE="--prerelease"');
+  });
+
+  it('[R91.18] la versión definitiva solo sale de main; las de prueba, de cualquier rama', () => {
+    const wf = read('.github/workflows/release.yml');
+    expect(wf).toContain("if: startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-')");
+    expect(wf).toContain('git merge-base --is-ancestor "$GITHUB_SHA" origin/main');
+    expect(wf).toMatch(/build:\n {4}needs: origin/);
     for (const f of ['Orquestador-Windows-x64.exe', 'Orquestador-Linux-x86_64.AppImage', 'Orquestador-macOS-arm64.dmg', 'Orquestador-macOS-x64.dmg']) expect(wf).toContain(`out/${f}`);
   });
 
