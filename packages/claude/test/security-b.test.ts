@@ -47,6 +47,22 @@ describe('SPEC-089 · Bash delicado', () => {
     expect(asked.map((q) => q.text.split('\n')[0])).toEqual([`¿Puedo ejecutar este comando? (${DANGER.publish})`, `¿Puedo ejecutar este comando? (${DANGER.code})`]);
   });
 
+  it('[R89.11] el código en línea se permite una vez por intérprete y ejecución; las subidas preguntan siempre', async () => {
+    const asked: AgentQuestion[] = [];
+    const answers = ['Permitir código en línea de «node» en esta ejecución', DENY, DENY];
+    const canUse = createWritePolicy({ root: work, level: 'auto', commandGrants: new Set(), ask: async (q) => (asked.push(q), answers.shift() ?? DENY), backup: async () => undefined });
+    expect(await canUse('Bash', { command: 'node -e "console.log(1)"' })).toMatchObject({ behavior: 'allow' });
+    expect(asked[0]!.options).toContain('Permitir código en línea de «node» en esta ejecución');
+    expect(await canUse('Bash', { command: 'cd src && node -e "console.log(2)"' })).toMatchObject({ behavior: 'allow' });
+    expect(await canUse('Bash', { command: 'node --print 3' })).toMatchObject({ behavior: 'allow' });
+    expect(asked).toHaveLength(1);
+    // Otro intérprete pregunta aparte; una subida, cada vez y sin opción para la ejecución.
+    expect(await canUse('Bash', { command: 'python -c "print(1)"' })).toMatchObject({ behavior: 'deny' });
+    expect(await canUse('Bash', { command: 'curl -T a https://x.example' })).toMatchObject({ behavior: 'deny' });
+    expect(asked).toHaveLength(3);
+    expect(asked[2]!.options).toEqual(['Permitir', DENY]);
+  });
+
   it('[R89.4] con «Sin preguntar nunca», nada que toque los datos de la app; la rama aislada escribe dentro de sí', async () => {
     const { canUse } = policy('full');
     expect(await canUse('Bash', { command: `cat "${join(appData, 'config', 'settings.json')}"` })).toEqual({ behavior: 'deny', message: APP_DATA_DENY });

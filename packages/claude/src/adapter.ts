@@ -15,9 +15,6 @@ import { CommandWatch } from './changes';
 import { classifyCommand } from './commands';
 
 /** Lo que el adaptador necesita del proyecto y de Ajustes; se lee al empezar cada ejecución del nodo [R27.10]. */
-/** Carpetas de `~/.claude` que los agentes leen sin preguntar [R87.5]. */
-export const CLAUDE_HOME_DIRS = ['skills', 'agents', 'commands', 'plugins'] as const;
-
 export interface ClaudeEnvironment {
   projectRoot: string;
   settings(): AppSettings;
@@ -136,7 +133,7 @@ export class ClaudeAdapter implements AgentAdapter {
             level,
             appDirs: [...new Set([path.join(root, '.orquestador'), path.join(this.env.projectRoot, '.orquestador')])],
             // Se lee sin preguntar en la carpeta del proyecto y en lo de Claude Code del usuario [R87.5].
-            readRoots: [this.env.projectRoot, ...CLAUDE_HOME_DIRS.map((d) => path.join(os.homedir(), '.claude', d))],
+            readRoots: [this.env.projectRoot, path.join(os.homedir(), '.claude')],
             ...(this.env.appDataDir ? { protectedDirs: [this.env.appDataDir] } : {}),
             commandGrants: this.grantsFor(request.runId ?? request.nodeId),
             ask: request.ask,

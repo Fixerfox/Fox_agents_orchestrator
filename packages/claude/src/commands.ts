@@ -223,6 +223,22 @@ const INLINE_CODE: Record<string, readonly string[]> = {
   ruby: ['-e'],
   php: ['-r'],
 };
+/**
+ * Intérprete al que el comando pasa código en línea, para «Permitir código en línea de «node» en esta ejecución»:
+ * así no se pregunta cada comprobación rápida [R89.11].
+ */
+export function inlineInterpreter(command: string): string | null {
+  for (const seg of segmentsOf(command.trim())) {
+    const words = tokenize(seg.text) ?? seg.text.split(/\s+/).filter(Boolean);
+    while (words.length > 0 && /^[A-Za-z_][A-Za-z0-9_]*=/.test(words[0]!)) words.shift();
+    if (words.length === 0) continue;
+    const prog = programOf(words[0]!);
+    const args = words.slice(1);
+    if ((INLINE_CODE[prog] ?? []).some((flag) => args.some((a) => a === flag || a.startsWith(`${flag}=`))) || (prog === 'deno' && args[0] === 'eval')) return prog;
+  }
+  return null;
+}
+
 /** Programas que mandan datos a otro equipo [R89.2]. */
 const UPLOADERS = new Set(['scp', 'sftp', 'ftp', 'nc', 'ncat', 'netcat']);
 const CURL_UPLOAD = /^(-T|--upload-file|-d|--data(-[a-z]+)?|-F|--form(-string)?)(=|$)/;

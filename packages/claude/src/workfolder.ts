@@ -3,7 +3,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import type { AgentQuestion } from '@orquestador/core';
 import type { PermissionLevel } from '@orquestador/core';
-import { APP_KILL_DENY, ISOLATED_GIT_DENY, allowCommandForRun, killsAppProcess, classifyCommand, grantKey, sensitiveCommand, writesGit } from './commands';
+import { APP_KILL_DENY, DANGER, ISOLATED_GIT_DENY, allowCommandForRun, inlineInterpreter, killsAppProcess, classifyCommand, grantKey, sensitiveCommand, writesGit } from './commands';
 import { AUTO_TOOLS } from './connection';
 import { ALLOW_ONCE, ALLOW_RUN, DENY, READ_TOOLS_LOCAL, WEB_TOOLS, createReadPolicy } from './read-policy';
 import { protectedName, sameOrInside } from './protected';
@@ -140,6 +140,9 @@ export interface WritePolicyDeps {
   protectedDirs?: readonly string[];
 }
 
+
+/** Texto de «Permitir código en línea de «node» en esta ejecución» [R89.11]. */
+export const allowInlineForRun = (interpreter: string): string => `Permitir código en línea de «${interpreter}» en esta ejecución`;
 
 /** Motivo al tocar la carpeta de datos de la app con «Sin preguntar nunca» [R89.4]. */
 export const APP_DATA_DENY =
@@ -383,9 +386,11 @@ export function createWritePolicy(deps: WritePolicyDeps): (tool: string, input: 
       const danger = sensitiveCommand(command, deps.root);
       // En automático solo preguntan los delicados [R47.9].
       if (deps.level === 'auto' && danger === null) return allow(input);
-      const key = danger === null ? grantKey(command) : null;
+      // El código en línea se puede permitir para toda la ejecución, por intérprete [R89.11].
+      const interpreter = danger === DANGER.code ? inlineInterpreter(command) : null;
+      const key = danger === null ? grantKey(command) : interpreter !== null ? `codigo:${interpreter}` : null;
       if (key !== null && deps.commandGrants?.has(key)) return allow(input);
-      const forRun = key !== null && deps.commandGrants ? allowCommandForRun(key) : undefined;
+      const forRun = key !== null && deps.commandGrants ? (interpreter !== null ? allowInlineForRun(interpreter) : allowCommandForRun(key)) : undefined;
       const text = danger === null ? `¿Puedo ejecutar este comando?\n${command}` : `¿Puedo ejecutar este comando? (${danger})\n${command}`;
       const answer = (await deps.ask({ text, options: [ALLOW_ONCE, ...(forRun ? [forRun] : []), DENY], kind: 'permission', fallback: DENY })).trim();
       if (answer === ALLOW_ONCE) return allow(input);

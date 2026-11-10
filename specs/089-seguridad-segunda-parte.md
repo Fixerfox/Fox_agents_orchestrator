@@ -23,6 +23,7 @@ Hallazgos medios de la auditoría para la 1.0 (09/11/2026) que quedaban tras SPE
 
 ### M1 · Bash
 - **R89.1** [M16h] `sensitiveCommand` marca como «ejecuta código que no se puede revisar» el código en línea de intérpretes: `node`/`bun` con `-e`, `--eval`, `-p` o `--print`; `python`/`python3`/`py` con `-c`; `perl` con `-e`/`-E`; `ruby` con `-e`; `php` con `-r`; `deno eval`. Así preguntan también en «Automático».
+- **R89.11** [M16h] Para no preguntar cada comprobación rápida, el código en línea ofrece «Permitir código en línea de «<intérprete>» en esta ejecución», que vale para todo el código en línea de ese intérprete en la ejecución. Las subidas (R89.2) y nombrar `.orquestador` (R89.3) siguen preguntando cada vez.
 - **R89.2** [M16h] `sensitiveCommand` marca como «publica fuera del equipo»: `curl` con `-T`/`--upload-file`, `-d`/`--data*`, `-F`/`--form` o `-X`/`--request` con un método distinto de `GET` y `HEAD`; `wget` con `--post-data`, `--post-file`, `--body-data`, `--body-file` o `--method`; `scp`, `sftp`, `ftp`, `nc`/`ncat`; y `rsync` con un destino remoto (`host:ruta`).
 - **R89.3** [M16h] Un argumento o una redirección que nombra `.orquestador` (como la ve el sistema, R87.1) hace el comando delicado.
 - **R89.4** [M16h] Con «Sin preguntar nunca», un comando que nombra la carpeta de datos de la app se deniega con `APP_DATA_DENY`, y `Write`/`Edit` en ella también. La copia aislada de una rama, que vive dentro de esa carpeta, sigue pudiendo escribir dentro de sí misma.
