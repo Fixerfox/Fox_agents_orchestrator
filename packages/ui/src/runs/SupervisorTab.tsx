@@ -101,7 +101,9 @@ export function SupervisorMemoryList({ watch }: { watch: Watch }) {
 export function SupervisorPanel({ watch, alerts, focus, onPick, onFeedback, stats }: { watch: Watch; alerts: readonly SupervisorAlertItem[]; focus?: string | undefined; onPick: (key: string) => void; /** «No era un problema» / «Sí lo era» [R75.21]. */ onFeedback?: ((seq: number, verdict: 'false-alarm' | 'confirmed') => void) | undefined; stats?: { run: readonly RuleStats[]; recent: readonly RuleStats[] } | undefined }) {
   const focused = useRef<HTMLDetailsElement>(null);
   // Al llegar desde un paso, directo a su aviso [R60.40].
-  useEffect(() => focused.current?.scrollIntoView?.({ block: 'nearest' }), [focus]);
+  useEffect(() => {
+    focused.current?.scrollIntoView?.({ block: 'nearest' });
+  }, [focus]);
   const first = focus === undefined ? -1 : alerts.findIndex((a) => a.key === focus);
   return (
     <div className="orq-rsum__sec orq-suptab">

@@ -21,7 +21,9 @@ export function RunModalView({ data: d, api, runId, initialTab = 'summary', onCl
   /** «Abrir entregable»: pasa a Resultados con ese archivo abierto [R46.15]. */
   const [openPath, setOpenPath] = useState<string>();
   const [copied, setCopied] = useState(false);
-  useEffect(() => ref.current?.focus(), []);
+  useEffect(() => {
+    ref.current?.focus();
+  }, []);
   const summary = d.ready ? summarizeRun(d.events, d.label, 600, Date.now(), d.status === 'interrupted') : undefined;
   const name = t('rsum.modal', { name: d.title });
   return (

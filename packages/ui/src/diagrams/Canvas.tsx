@@ -350,11 +350,9 @@ export function Canvas({ session, onSelection, onReject, live, overlay, events, 
   const derived = useMemo<CanvasNode[]>(() => buildFlowNodes(snap.level, snap.path, snap.problems.byNode, live, agentNames, snap.problems.warningOnly, extras, ports), [snap.level, snap.problems, snap.path, live, agentNames, extras, ports]);
   const [nodes, setNodes] = useState<CanvasNode[]>(derived);
   // Al cambiar los datos (p. ej. el estado en vivo) se conserva la selección y la posición que se está arrastrando.
-  useEffect(
-    () =>
-      setNodes((prev) => keepNodes(prev, derived, live !== undefined)),
-    [derived],
-  );
+  useEffect(() => {
+    setNodes((prev) => keepNodes(prev, derived, live !== undefined));
+  }, [derived]);
 
   // Los recuadros de las ramas van detrás de los pasos y los siguen al moverlos [R58.8].
   const shown = useMemo<CanvasNode[]>(() => {

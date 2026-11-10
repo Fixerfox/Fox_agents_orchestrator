@@ -8,7 +8,9 @@ const ICON = { auto: Monitor, light: Sun, dark: Moon } as const;
 /** Selector de tema de la barra superior; recuerda la elección [R21.1]. */
 export function ThemeToggle() {
   const [theme, setTheme] = useState<Theme>(() => loadTheme());
-  useEffect(() => applyTheme(theme), [theme]);
+  useEffect(() => {
+    applyTheme(theme);
+  }, [theme]);
   const Icon = ICON[theme];
   const label = t('theme.switch', { name: t(`theme.${theme}` as MessageKey) });
   return (

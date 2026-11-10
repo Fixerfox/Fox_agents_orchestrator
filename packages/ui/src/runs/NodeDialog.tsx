@@ -23,7 +23,9 @@ const lines = (s: string) => s.split('\n').length;
 export function NodeDialog({ events, live, nodeId, nodePath, label, onAnswer, onClose, labelOf }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const [copied, setCopied] = useState(false);
-  useEffect(() => ref.current?.focus(), []);
+  useEffect(() => {
+    ref.current?.focus();
+  }, []);
   const items = transcriptItems(events, nodeId, nodePath);
   const status = live.nodeStatus[[...nodePath, nodeId].join('/')];
   const input = [...items].reverse().find((i): i is Extract<TranscriptItem, { kind: 'input' }> => i.kind === 'input');

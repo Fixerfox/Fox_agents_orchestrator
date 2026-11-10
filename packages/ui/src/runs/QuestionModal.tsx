@@ -72,7 +72,9 @@ export function QuestionModal({ item, from, agent, context, facts, onOpenFile, o
   const [text, setText] = useState('');
   const box = useRef<HTMLDivElement>(null);
   const area = useRef<HTMLTextAreaElement>(null);
-  useEffect(() => box.current?.focus(), []);
+  useEffect(() => {
+    box.current?.focus();
+  }, []);
   useEffect(() => {
     if (changing && decision) area.current?.focus();
   }, [changing, decision]);

@@ -40,7 +40,9 @@ export function StepConfigDialog({ api, session, snap, nodeId, initialTab = 'ste
   const editable = agent?.editable === true && agentEditor !== undefined;
   const [view, setView] = useState<StepConfigTab>(initialTab === 'agent' && editable ? 'agent' : 'step');
   const [section, setSection] = useState<StepSectionId>(initialSection);
-  useEffect(() => ref.current?.focus(), []);
+  useEffect(() => {
+    ref.current?.focus();
+  }, []);
   useEffect(() => {
     if (!editable && view === 'agent') setView('step');
   }, [editable, view]);

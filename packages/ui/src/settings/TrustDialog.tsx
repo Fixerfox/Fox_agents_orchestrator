@@ -8,7 +8,9 @@ import { t, type ProjectApi, type ProjectTrustInfo } from '@orquestador/editor';
  */
 export function TrustDialog({ info, onDecide, onClose }: { info: ProjectTrustInfo; onDecide: (d: 'trusted' | 'ignored') => void; onClose: () => void }) {
   const ignore = useRef<HTMLButtonElement>(null);
-  useEffect(() => ignore.current?.focus(), []);
+  useEffect(() => {
+    ignore.current?.focus();
+  }, []);
   return (
     <div
       className="orq-modal orq-modal--center"
