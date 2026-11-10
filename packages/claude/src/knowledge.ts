@@ -34,10 +34,10 @@ export interface KnowledgePlan {
 
 export const skillFolder = (id: string) => `.orquestador/skills/${id}`;
 
-/** Ruta de `SKILL.md` legible desde el directorio actual del agente: absoluta si no es la raíz del proyecto [R36.9]. */
-export function skillLocation(id: string, projectRoot: string, cwd: string): string {
-  const rel = `${skillFolder(id)}/SKILL.md`;
-  return path.resolve(cwd) === path.resolve(projectRoot) ? rel : path.join(projectRoot, '.orquestador', 'skills', id, 'SKILL.md');
+/** Ruta de `SKILL.md`, siempre absoluta: se lee desde cualquier carpeta de trabajo [R36.9][R92.1]. */
+export function skillLocation(id: string, projectRoot: string, cwd?: string): string {
+  void cwd;
+  return path.join(path.resolve(projectRoot), '.orquestador', 'skills', id, 'SKILL.md');
 }
 
 const norm = (p: string) => p.replace(/\\/g, '/').replace(/^\.\//, '').toLowerCase();
@@ -130,10 +130,12 @@ export async function planKnowledge(a: PlanArgs): Promise<KnowledgePlan> {
       items.push({ kind: 'context', id: c.id, name: c.name, required, mode: required ? 'verify' : 'offer', where: c.value, detect: detectUrl(c.value) });
       continue;
     }
-    const text = required ? await readInside(a.cwd, c.value) : undefined;
+    // Respecto a la carpeta del proyecto, con la ruta entera [R92.3].
+    const text = required ? await readInside(a.projectRoot, c.value) : undefined;
     const fits = text !== undefined && text.length <= left;
     if (fits) left -= text.length;
-    items.push({ kind: 'context', id: c.id, name: c.name, required, mode: !required ? 'offer' : fits ? 'inline' : 'verify', ...(fits ? { content: text } : {}), where: c.value, detect: detectFile(c.value) });
+    const where = path.resolve(a.projectRoot, c.value);
+    items.push({ kind: 'context', id: c.id, name: c.name, required, mode: !required ? 'offer' : fits ? 'inline' : 'verify', ...(fits ? { content: text } : {}), where, detect: detectFile(c.value) });
   }
   for (const m of a.mcp) {
     const required = isReq('mcpIds', m.def.id);

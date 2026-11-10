@@ -172,6 +172,7 @@ export class ClaudeAdapter implements AgentAdapter {
             ...(request.deliverable ? { deliverable: request.deliverable } : {}),
             ...(request.projectMemory ? { projectMemory: request.projectMemory.text } : {}),
             level,
+            projectRoot: this.env.projectRoot,
           }),
         ),
         // Sin tope práctico: el gancho puede estar esperando a que el usuario responda un permiso [R50.4].
@@ -219,6 +220,8 @@ export class ClaudeAdapter implements AgentAdapter {
             else if (ev.tool === 'Agent' || ev.tool === 'Task') yield* commandFiles(await watch.closing('flush'), touched, sent);
           }
         }
+        // Con el resultado, el paso ha terminado: no se espera a lo que quede en segundo plano [R92.5].
+        if (finished) break;
       }
       if (!finished && !signal.aborted) throw new AgentError('Claude terminó sin devolver un resultado.', true);
     } catch (e) {
@@ -230,6 +233,8 @@ export class ClaudeAdapter implements AgentAdapter {
       throw explainThrown(e, apiKey);
     } finally {
       signal.removeEventListener('abort', abort);
+      // Cierra la sesión del SDK y lo que el agente dejara en marcha [R92.5].
+      if (finished) controller.abort();
     }
   }
 }

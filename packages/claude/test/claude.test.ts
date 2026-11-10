@@ -1,3 +1,4 @@
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { AgentError, defaultSettings, newAgent, newContext, type AgentDefinition, type AgentStreamEvent, type AppSettings, type ContextDefinition, type SkillDefinition } from '@orquestador/core';
 import { ClaudeAdapter, ClaudeDecider, QUESTION_RULE, buildEnv, buildSystemPrompt, permissionPolicy, testConnection, extractJson, type ClaudeEnvironment, type ClaudeQueryOptions, type QueryFn, type SdkMessage, promptText } from '../src';
@@ -82,7 +83,7 @@ describe('SPEC-027 · adaptador de Claude', () => {
     expect(buildSystemPrompt(newAgent('x', 'X'), [], [])).toContain(QUESTION_RULE);
   });
 
-  it('[R27.3][R22.10] los contextos van por referencia: texto incluido, URL y archivo solo mencionados', async () => {
+  it('[R27.3][R22.10][R92.3] los contextos van por referencia: texto incluido, URL y archivo solo mencionados (con su ruta entera)', async () => {
     const ctxs: ContextDefinition[] = [
       { ...newContext('t', 'Guía de estilo'), value: 'Paleta de 16 colores' },
       { ...newContext('u', 'Referencia', 'url'), value: 'https://ejemplo.com/ref' },
@@ -93,18 +94,18 @@ describe('SPEC-027 · adaptador de Claude', () => {
     const s = promptText(seen.options!.systemPrompt);
     expect(s).toContain('Paleta de 16 colores');
     expect(s).toContain('https://ejemplo.com/ref');
-    expect(s).toContain('docs/notas.md');
+    expect(s).toContain(path.resolve('/proy', 'docs/notas.md'));
     expect(s).not.toContain('contenido leído');
   });
 
-  it('[R27.4][R24.8] las skills asignadas se listan con descripción y ruta de su SKILL.md', async () => {
+  it('[R27.4][R24.8][R92.1] las skills asignadas se listan con descripción y ruta entera de su SKILL.md', async () => {
     const skills: SkillDefinition[] = [{ id: 'pixel-art', name: 'Pixel art', description: 'Para dibujar sprites', body: 'NO DEBE IR' }];
     const { query, seen } = fake([ok()]);
     await run(env({}, {}, {}, [], skills), query);
     const s = promptText(seen.options!.systemPrompt);
     expect(s).toContain('Pixel art');
     expect(s).toContain('Para dibujar sprites');
-    expect(s).toContain('.orquestador/skills/pixel-art/SKILL.md');
+    expect(s).toContain(path.join(path.resolve('/proy'), '.orquestador', 'skills', 'pixel-art', 'SKILL.md'));
     expect(s).toContain('referencias/');
     expect(s).not.toContain('NO DEBE IR');
   });
