@@ -1,3 +1,4 @@
+import { runsInlineCode, uploads } from './command-risks';
 import { protectedName } from './protected';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
@@ -212,17 +213,6 @@ export const DANGER = {
   code: 'ejecuta código que no se puede revisar',
 } as const;
 
-/** Intérpretes y la opción que les pasa código en línea [R89.1]. */
-const INLINE_CODE: Record<string, readonly string[]> = {
-  node: ['-e', '--eval', '-p', '--print'],
-  bun: ['-e', '--eval', '-p', '--print'],
-  python: ['-c'],
-  python3: ['-c'],
-  py: ['-c'],
-  perl: ['-e', '-E'],
-  ruby: ['-e'],
-  php: ['-r'],
-};
 /**
  * Intérprete al que el comando pasa código en línea, para «Permitir código en línea de «node» en esta ejecución»:
  * así no se pregunta cada comprobación rápida [R89.11].
@@ -234,33 +224,11 @@ export function inlineInterpreter(command: string): string | null {
     if (words.length === 0) continue;
     const prog = programOf(words[0]!);
     const args = words.slice(1);
-    if ((INLINE_CODE[prog] ?? []).some((flag) => args.some((a) => a === flag || a.startsWith(`${flag}=`))) || (prog === 'deno' && args[0] === 'eval')) return prog;
+    if (runsInlineCode(prog, args)) return prog;
   }
   return null;
 }
 
-/** Programas que mandan datos a otro equipo [R89.2]. */
-const UPLOADERS = new Set(['scp', 'sftp', 'ftp', 'nc', 'ncat', 'netcat']);
-const CURL_UPLOAD = /^(-T|--upload-file|-d|--data(-[a-z]+)?|-F|--form(-string)?)(=|$)/;
-const WGET_UPLOAD = /^--(post-data|post-file|body-data|body-file|method)(=|$)/;
-
-/** ¿Sube datos fuera del equipo? [R89.2] */
-function uploads(prog: string, args: readonly string[]): boolean {
-  if (UPLOADERS.has(prog)) return true;
-  if (prog === 'curl') {
-    if (args.some((a) => CURL_UPLOAD.test(a) || /^-[a-zA-Z]*[TdF]$/.test(a))) return true;
-    const i = args.findIndex((a) => a === '-X' || a === '--request' || a.startsWith('--request=') || /^-X./.test(a));
-    if (i >= 0) {
-      const a = args[i]!;
-      const method = (a.startsWith('--request=') ? a.slice(10) : a.length > 2 && a.startsWith('-X') ? a.slice(2) : (args[i + 1] ?? '')).toUpperCase();
-      if (method !== 'GET' && method !== 'HEAD') return true;
-    }
-  }
-  if (prog === 'wget' && args.some((a) => WGET_UPLOAD.test(a))) return true;
-  // rsync a otro equipo: `host:ruta` o `usuario@host:ruta` (no `C:\…`).
-  if (prog === 'rsync' && args.some((a) => !a.startsWith('-') && /^[^/\\\s]{2,}:/.test(a))) return true;
-  return false;
-}
 export type Danger = (typeof DANGER)[keyof typeof DANGER];
 
 const SENSITIVE_PROGRAMS: Record<string, Danger> = {
@@ -382,8 +350,7 @@ export function sensitiveCommand(command: string, root: string, cwd: string = ro
     const reason = SENSITIVE_PROGRAMS[prog];
     if (reason) return reason;
     // Código en línea y subidas: también en automático [R89.1][R89.2].
-    if ((INLINE_CODE[prog] ?? []).some((flag) => args.some((a) => a === flag || a.startsWith(`${flag}=`)))) return DANGER.code;
-    if (prog === 'deno' && args[0] === 'eval') return DANGER.code;
+    if (runsInlineCode(prog, args)) return DANGER.code;
     if (uploads(prog, args)) return DANGER.publish;
     // Nada que nombre .orquestador, el estado de la app [R89.3].
     if (args.some((a) => a.replace(/\\/g, '/').split('/').some((s) => protectedName(s) && s.toLowerCase().startsWith('.orq')))) return DANGER.outside;
