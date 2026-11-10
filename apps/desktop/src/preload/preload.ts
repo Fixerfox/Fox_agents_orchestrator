@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import { ASSISTANT_EVENTS_CHANNEL, OPEN_RUN_CHANNEL, RUN_EVENTS_CHANNEL, TERMINAL_EVENTS_CHANNEL, type OpenRunTarget } from '@orquestador/editor';
-import { buildApi, watchWindowTone } from './api';
+import { ASSISTANT_EVENTS_CHANNEL, OPEN_RUN_CHANNEL, RUN_EVENTS_CHANNEL, TERMINAL_EVENTS_CHANNEL, TEST_ARG, type OpenRunTarget } from '@orquestador/editor';
+import { buildApi, buildTestBridge, watchWindowTone } from './api';
 
 // Solo se expone la API tipada: nunca `ipcRenderer` ni módulos de Node [R19.2].
 contextBridge.exposeInMainWorld(
@@ -29,6 +29,20 @@ contextBridge.exposeInMainWorld(
     },
   ),
 );
+
+// El puente del modo prueba solo existe si el principal lo pide al crear la ventana [R82.7].
+if (process.argv.includes(TEST_ARG))
+  contextBridge.exposeInMainWorld(
+    'orquestadorTest',
+    buildTestBridge(
+      (channel, payload) => ipcRenderer.send(channel, payload),
+      (channel, listener) => {
+        const handler = (_e: unknown, payload: unknown) => listener(payload);
+        ipcRenderer.on(channel, handler);
+        return () => void ipcRenderer.removeListener(channel, handler);
+      },
+    ),
+  );
 
 // Los botones de ventana siguen el tema de la app [R19.8]. Canal de una sola dirección; el principal valida el valor.
 window.addEventListener('DOMContentLoaded', () => {

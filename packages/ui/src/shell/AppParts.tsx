@@ -3,7 +3,7 @@ import { t } from '@orquestador/editor';
 import { SideResizeHandle, downloadText } from '../common';
 import { DesignerDialogs } from '../diagrams';
 import { LaunchDialog, RunModal } from '../runs';
-import { SettingsDialog } from '../settings';
+import { SettingsDialog, TrustDialog } from '../settings';
 import { AppAssistant } from './AppSections';
 import { NavRail } from './NavRail';
 import { StartScreen } from './StartScreen';
@@ -79,6 +79,7 @@ export function AppDialogs({ app }: { app: AppModel }) {
     <>
       <LaunchDialog api={api} launcher={launcher} runsIndex={runsIndex} engine={conf.engine} currentDiagramId={snap.diagram.id} defaultMaxTokens={conf.settings?.defaultMaxTokens} defaultUnanswered={conf.settings?.unanswered} onEngine={(e) => void conf.setEngine(e)} />
       <DesignerDialogs session={session} snap={snap} sel={sel} lib={lib} designer={designer} projectOpen={project !== undefined} guard={guard} openLibrary={openLibrary} />
+      {app.trust.open && app.trust.info && <TrustDialog info={app.trust.info} onDecide={(d) => void app.trust.decide(d)} onClose={() => app.trust.setOpen(false)} />}
     </>
   );
 }

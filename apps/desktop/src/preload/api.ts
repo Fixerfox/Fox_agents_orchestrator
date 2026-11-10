@@ -1,4 +1,4 @@
-import { CHANNELS, type AssistantEvent, type OpenRunTarget, type TerminalEvent, type InvokeMethod, type ProjectApi } from '@orquestador/editor';
+import { CHANNELS, TEST_CALL_CHANNEL, TEST_READY_CHANNEL, TEST_REPLY_CHANNEL, type AssistantEvent, type OpenRunTarget, type TerminalEvent, type InvokeMethod, type ProjectApi, type TestBridgeApi, type TestCall } from '@orquestador/editor';
 import type { RunEvent } from '@orquestador/core';
 
 /**
@@ -23,6 +23,15 @@ export function buildApi(
   api.onTerminalEvents = subscribeTerminal;
   api.onOpenRun = subscribeOpenRun;
   return api as unknown as ProjectApi;
+}
+
+/** Puente del modo prueba: recibe llamadas y responde por canales fijos, sin `ipcRenderer` [R82.7]. */
+export function buildTestBridge(send: (channel: string, payload?: unknown) => void, on: (channel: string, listener: (payload: unknown) => void) => () => void): TestBridgeApi {
+  return {
+    onCall: (listener) => on(TEST_CALL_CHANNEL, (payload) => listener(payload as TestCall)),
+    reply: (reply) => send(TEST_REPLY_CHANNEL, reply),
+    ready: () => send(TEST_READY_CHANNEL),
+  };
 }
 
 /**

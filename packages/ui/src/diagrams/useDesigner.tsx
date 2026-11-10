@@ -24,7 +24,7 @@ interface Options {
   fail: (message: string) => void;
   guard: (fn: () => void) => void;
   openLibrary: OpenLibrary;
-  askAssistant: (text: string, toDiagrams?: boolean) => void;
+  askAssistant: (text: string, toDiagrams?: boolean, title?: string) => void;
   showRight: () => void;
 }
 
@@ -141,7 +141,7 @@ export function useDesigner({ api, session, snap, doc, sel, catalog: lib, projec
       here: [
         { id: 'here-know', group: here, label: t('menu.agent.here.know'), icon: <BookOpen size={16} />, onSelect: () => setPortPick({ nodeId, port: 'know' }) },
         { id: 'here-mcp', group: here, label: t('menu.agent.here.mcp'), icon: <Plug size={16} />, onSelect: () => setPortPick({ nodeId, port: 'mcp' }) },
-        { id: 'here-claude', group: here, label: t('menu.agent.here.claude'), icon: <Sparkles size={16} />, onSelect: () => askAssistant(t('as.prompt.mcpFor', { name, id: agentId, step: stepName, node: nodeId }), true) },
+        { id: 'here-claude', group: here, label: t('menu.agent.here.claude'), icon: <Sparkles size={16} />, onSelect: () => askAssistant(t('as.prompt.mcpFor', { name, id: agentId, step: stepName, node: nodeId }), true, t('as.tabTitle.mcpStep', { step: stepName })) },
       ],
     };
   };

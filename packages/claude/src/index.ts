@@ -4,6 +4,8 @@ export * from './mapper';
 export * from './prompt';
 export * from './knowledge';
 export * from './workfolder';
+export * from './protected';
+export * from './trust';
 export * from './changes';
 export * from './commands';
 export * from './connection';

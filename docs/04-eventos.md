@@ -19,7 +19,7 @@ interface EventBase { runId: Id; seq: number; ts: string; type: string; nodePath
 | `token.stream` | `nodeId, text` | Salida en streaming (por lotes) (la app junta los seguidos de un paso cada 250 ms o 2.000 caracteres, SPEC-077) |
 | `tool.called` | `nodeId, tool, input` | El agente invoca una herramienta |
 | `tool.result` | `nodeId, tool, ok, output?` | Resultado de la herramienta |
-| `agent.usage` | `nodeId, inputTokens, outputTokens, costUsd?` | Consumo |
+| `agent.usage` | `nodeId, inputTokens, outputTokens, cachedTokens?, costUsd?` | Consumo. `inputTokens` incluye lo escrito y leído de la caché; `cachedTokens`, lo leído de la caché (SPEC-083) |
 | `route.decided` | `fromNodeId, chosen: nodeId[], mode: 'ai'\|'rules', reason` | Un nodo de enrutado elige destinos |
 | `edge.traversed` | `edgeId, fromNodeId, toNodeId, input?` | Se recorre una conexión (para resaltar la ruta); `input` es la parte enviada si el origen reparte (SPEC-059) |
 | `split.rejected` | `nodeId, attempt, problems` | El paso no repartió bien su trabajo y se repite (SPEC-059) |
@@ -60,7 +60,7 @@ interface EventBase { runId: Id; seq: number; ts: string; type: string; nodePath
 | `subdiagram.finished` | `nodeId, status` | Se sale del nodo compuesto con su resultado |
 | `knowledge.used` | `nodeId, attempt, kind, id, via, required` | Una skill, contexto o MCP se incluyó en el prompt (`inline`), se leyó (`read`) o se usó con una herramienta (`tool`); solo ids, nunca contenido (SPEC-036) |
 | `knowledge.unmet` | `nodeId, attempt, kind, id` | Un obligatorio no se usó en ese intento; el intento falla y se reintenta con aviso (SPEC-036) |
-| `agent.request` | `nodeId, agentId, attempt, input, task?, model?, confirm?, deliverable?, extra?, snapshot?, previousAnswers?, previousAttempt?, memory?, memoryStats?, projectMemory?` | Lo que recibe exactamente el agente en cada intento y la configuración usada; `previousAttempt`, lo que se le contó del intento anterior (SPEC-071); `memory` y `memoryStats`, la memoria que recibió y sus tokens por bloque y lo recortado (SPEC-072); `projectMemory`, los ids de las entradas de la memoria del proyecto que recibió (SPEC-076) |
+| `agent.request` | `nodeId, agentId, attempt, input, task?, model?, confirm?, deliverable?, extra?, snapshot?, previousAnswers?, previousAttempt?, memory?, memoryStats?, loop?, projectMemory?` | Lo que recibe exactamente el agente en cada intento y la configuración usada; `previousAttempt`, lo que se le contó del intento anterior (SPEC-071); `memory` y `memoryStats`, la memoria que recibió y sus tokens por bloque y lo recortado (SPEC-072); `projectMemory`, los ids de las entradas de la memoria del proyecto que recibió (SPEC-076); `loop`, el bloque «Estás dentro de un bucle» (SPEC-084) |
 | `node.reused` | `nodeId, fromRunId, costUsd?` | El paso no se ejecuta: se reutiliza su salida de la ejecución anterior; `costUsd`, lo que costó allí (SPEC-041, SPEC-074) |
 | `decision` | `nodeId, kind: route\|condition\|judge, request, response, reused?` | Decisión de IA fuera de los agentes de trabajo; `reused`, tomada de la ejecución que se reanuda (SPEC-074) |
 | `transform.done` | `nodeId, mode: rules\|ai, format: json\|markdown\|text, attempts, ok, errors?, warnings?` | Resultado del nodo «Transformar» (SPEC-037), antes de su `node.finished` |

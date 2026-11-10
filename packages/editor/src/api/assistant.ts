@@ -1,4 +1,4 @@
-import { ASSISTANT_MAX_MESSAGES, ASSISTANT_MAX_TEXT, type AssistantEvent, type AssistantMessage } from '../assistant';
+import { ASSISTANT_MAX_MESSAGES, ASSISTANT_MAX_SAVED_ITEMS, ASSISTANT_MAX_TABS, ASSISTANT_MAX_TEXT, ASSISTANT_TAB_TITLE_MAX, type AssistantEvent, type AssistantMessage, type SavedAssistantTabs } from '../assistant';
 import { UNHANDLED, isObject, safeId, type RequestCheck } from './check';
 import { CHANNELS } from './contract';
 import type { ApiResult } from './result';
@@ -26,6 +26,10 @@ export interface AssistantApi {
   /** Resultado de una herramienta que ejecutó la interfaz [R29.2]. */
   assistantToolResult(req: { turnId: string; callId: string; ok: boolean; result: unknown }): Promise<ApiResult<boolean>>;
   assistantCancel(turnId: string): Promise<ApiResult<boolean>>;
+  /** Pestañas guardadas del proyecto abierto; `null` sin proyecto o sin nada guardado [R86.11]. */
+  assistantTabsLoad(): Promise<ApiResult<SavedAssistantTabs | null>>;
+  /** Guarda las pestañas del proyecto abierto en la carpeta de datos de la app [R86.11]. */
+  assistantTabsSave(doc: SavedAssistantTabs): Promise<ApiResult<null>>;
   onAssistantEvents(listener: (turnId: string, event: AssistantEvent) => void): () => void;
 }
 
@@ -71,7 +75,45 @@ export function parseAssistantRequest(channel: string, payload: unknown, { bad, 
     case CHANNELS.assistantCancel:
       if (!safeId(payload)) throw bad('turnId no válido');
       return payload;
+    case CHANNELS.assistantTabsLoad:
+      if (payload !== undefined && payload !== null) throw bad('no admite argumentos');
+      return undefined;
+    case CHANNELS.assistantTabsSave:
+      checkSavedTabs(payload, { bad, exact, str });
+      return payload;
     default:
       return UNHANDLED;
+  }
+}
+
+const ITEM_KINDS = new Set(['user', 'assistant', 'tool', 'read', 'error']);
+const TOOL_STATUSES = new Set(['running', 'ask', 'secret', 'choice', 'done', 'error', 'denied', 'undone']);
+const SAVED_MAX_BYTES = 4_000_000;
+
+/** Pestañas que se guardan: límites, ids seguros y elementos conocidos [R86.12]. */
+function checkSavedTabs(payload: unknown, { bad, exact, str }: Pick<RequestCheck, 'bad' | 'exact' | 'str'>): void {
+  if (!isObject(payload)) throw bad('se esperaba un objeto');
+  exact(payload, ['activeId', 'tabs']);
+  if (!safeId(payload.activeId)) throw bad('activeId no válido');
+  if (JSON.stringify(payload).length > SAVED_MAX_BYTES) throw bad('pestañas demasiado grandes');
+  const tabs = payload.tabs;
+  if (!Array.isArray(tabs) || tabs.length > ASSISTANT_MAX_TABS) throw bad('pestañas no válidas');
+  for (const tab of tabs) {
+    if (!isObject(tab)) throw bad('pestaña no válida');
+    exact(tab, ['id', 'title', 'updatedAt', 'items']);
+    if (!safeId(tab.id)) throw bad('id de pestaña no válido');
+    str(tab.title, 'title', ASSISTANT_TAB_TITLE_MAX, 0);
+    if (typeof tab.updatedAt !== 'number' || !Number.isFinite(tab.updatedAt)) throw bad('updatedAt no válido');
+    if (!Array.isArray(tab.items) || tab.items.length > ASSISTANT_MAX_SAVED_ITEMS) throw bad('elementos no válidos');
+    for (const it of tab.items) {
+      if (!isObject(it) || typeof it.kind !== 'string' || !ITEM_KINDS.has(it.kind)) throw bad('elemento no válido');
+      if (!safeId(it.id)) throw bad('id de elemento no válido');
+      if (it.kind === 'tool') {
+        if (typeof it.status !== 'string' || !TOOL_STATUSES.has(it.status) || typeof it.name !== 'string' || !isObject(it.args)) throw bad('acción no válida');
+      } else if (it.kind === 'read') {
+        str(it.tool, 'tool', 200, 0);
+        str(it.target, 'target', 2000, 0);
+      } else str(it.text, 'text', ASSISTANT_MAX_TEXT, 0);
+    }
   }
 }

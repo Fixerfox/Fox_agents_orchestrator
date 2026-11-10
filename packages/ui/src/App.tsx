@@ -1,4 +1,4 @@
-import { AppAlert, ErrorBoundary, AppDialogs, AppNav, AppRunModal, AppSections, AppToolbar, AssistantDock, StartView, TerminalDock, useApp, type AppProps } from './shell';
+import { AppAlert, ErrorBoundary, AppDialogs, AppNav, AppRunModal, AppSections, AppTestBridge, AppToolbar, AssistantDock, StartView, TerminalDock, useApp, type AppProps } from './shell';
 
 export type { AppProps };
 
@@ -13,9 +13,16 @@ export function App(props: AppProps) {
 
 function Shell(props: AppProps) {
   const app = useApp(props);
-  if (app.project === undefined) return <StartView app={app} />;
+  if (app.project === undefined)
+    return (
+      <>
+        <AppTestBridge app={app} test={props.test} />
+        <StartView app={app} />
+      </>
+    );
   return (
     <div className="orq-app orq-shell">
+      <AppTestBridge app={app} test={props.test} />
       <AppNav app={app} />
       <div className="orq-shell__main">
         <AppToolbar app={app} />

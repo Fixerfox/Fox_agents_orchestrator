@@ -92,11 +92,11 @@ describe('SPEC-050 · el asistente tiene Claude Code completo', () => {
     expect(policy('Read', { file_path: 'c:/users/nico/appdata/roaming/orquestador/config/api-key.bin' })).toMatchObject({ behavior: 'deny' });
   });
 
-  it('[R50.8] el gancho PreToolUse bloquea antes que cualquier regla de .claude', async () => {
+  it('[R50.8][R90.10] el gancho PreToolUse bloquea antes que cualquier regla de .claude', async () => {
     const { box, query } = capture();
     await turn({ query, protectedDirs: ['/datos/app'] });
     const entry = box.options!.hooks!.PreToolUse![0]!;
-    expect(entry.matcher).toBe('Read|Glob|Grep|Write|Edit|MultiEdit|NotebookEdit');
+    expect(entry.matcher).toBe('Read|Glob|Grep|Bash|Write|Edit|MultiEdit|NotebookEdit');
     const hook = entry.hooks[0]!;
     const opts = { signal: new AbortController().signal };
     expect(await hook({ hook_event_name: 'PreToolUse', tool_name: 'Write', tool_input: { file_path: '/proy/.orquestador/x.json' } }, 'u1', opts)).toEqual({

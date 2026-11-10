@@ -42,8 +42,9 @@ async function listFiles(root: string, max = 20_000): Promise<string[]> {
 }
 
 /** Comprobaciones del proyecto: comandos aprobados en su carpeta y archivos que existen [R75.4][R75.6]. */
-export function checkRunnerFor(store: Pick<ProjectStore, 'paths' | 'getWorkFolder'>, projectRoot: string): CheckRunner {
-  const file = store.paths.approvedChecksFile;
+export function checkRunnerFor(store: Pick<ProjectStore, 'paths' | 'getWorkFolder'>, projectRoot: string, approvalsFile?: string): CheckRunner {
+  // Las aprobaciones viven en los datos de la app: las de un repositorio no cuentan [R88.5].
+  const file = approvalsFile ?? store.paths.approvedChecksFile;
   const read = async (): Promise<string[]> => {
     try {
       const raw = JSON.parse(await fs.readFile(file, 'utf8')) as { approved?: unknown };

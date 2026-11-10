@@ -16,6 +16,15 @@ El hito indica cuándo debe estar cubierto por tests. `npm run spec:check` exige
 ## Índice
 | Spec | Título | Hito | Estado |
 |---|---|---|---|
+| [090](090-seguridad-tercera-parte.md) | Seguridad para la 1.0, tercera parte: «Solo lectura» sin rg --pre ni textconv de git, secretos conocidos ocultos en los registros y .gitignore de .orquestador, llavero de Linux, más protección contra cerrar el orquestador, IPC solo del marco principal, modo prueba sin terminales, blame con <datos> y skills sin enlaces que salen | M16i | Implementada |
+| [089](089-seguridad-segunda-parte.md) | Seguridad para la 1.0, segunda parte: Bash con código en línea o subidas pregunta, nada toca los datos de la app, ajustes dañados vuelven a «Preguntar», secretos MCP sin pérdidas, CSP en las vistas previas y «Abrir fuera» sin ejecutables | M16h | Implementada |
+| [088](088-confianza-en-el-proyecto.md) | Confianza en el proyecto: la configuración de Claude Code de un repositorio con hooks, env o helpers solo se carga si se confía en ella (decisión con huella en los datos de la app), y las aprobaciones de comprobaciones salen del repositorio | M16g | Implementada |
+| [087](087-confinamiento-de-los-agentes.md) | Confinamiento de los agentes: carpetas protegidas como las ve Windows, secretos nunca, lecturas de fuera según el nivel y web por dominio | M16f | Implementada |
+| [086](086-asistente-con-pestanas.md) | El asistente con pestañas: cada petición desde un botón abre su pestaña con su propio historial, los turnos siguen en segundo plano y las pestañas se guardan por proyecto en la carpeta de datos de la app | M16e | Implementada |
+| [085](085-acciones-del-asistente-fiables.md) | Acciones del asistente fiables: quitar un paso reconecta la cadena, mensajes de «after» correctos y run_diagram valida y dice si arrancó | M16d | Implementada |
+| [084](084-bucle-con-contexto.md) | El bucle conserva la petición y el criterio: cada agente del cuerpo recibe vuelta, criterio del evaluador, petición original y último motivo | M16c | Implementada |
+| [083](083-tokens-de-cache.md) | Los tokens de caché cuentan: la entrada incluye lo leído y escrito en caché, y el límite de tokens lo mide | M16b | Implementada |
+| [082](082-modo-prueba-mcp.md) | Modo prueba: la app arrancada con --test-mcp abre un MCP local (token, solo 127.0.0.1, datos aparte) con las acciones del asistente y herramientas para manejar la interfaz, abrir proyectos, responder diálogos, llamar a la API y esperar ejecuciones | M16a | Implementada |
 | [079](079-no-matar-el-orquestador.md) | Un agente no puede cerrar el orquestador: matar por nombre electron, node, claude u orquestador se deniega con cualquier permiso | M15j | Implementada |
 | [078](078-aprobaciones-en-modal.md) | Aprobaciones largas en un modal: confirmaciones y revisiones con quién pregunta siempre a la vista y «Aprobar» fijo abajo | M15i | Implementada |
 | [077](077-gobierno-de-recursos.md) | Gobierno de recursos: límite global de agentes, enfriamiento compartido ante límites de uso, presupuesto con aviso y freno, pausa en la siguiente herramienta, tokens agrupados y métricas | M15h | Implementada |

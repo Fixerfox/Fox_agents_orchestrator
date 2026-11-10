@@ -42,7 +42,7 @@ interface Props {
   changed: (nextSel?: string) => Promise<void>;
   createOther: (to: 'contexts' | 'skills' | 'mcp', id?: string) => void;
   busy: { agents: Set<string>; skills: Set<string>; contexts: Set<string>; mcp?: Set<string> } | undefined;
-  onAskClaude: ((text: string) => void) | undefined;
+  onAskClaude: ((text: string, title?: string) => void) | undefined;
   onOpenTerminal: (() => void) | undefined;
 }
 

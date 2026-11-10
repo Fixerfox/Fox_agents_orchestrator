@@ -1,4 +1,5 @@
 import type { DeliverableSpec, Diagram, DiagramNode, Edge, ReturnInfo } from '../../diagrams';
+import type { LoopFrame } from '../text/loop-context';
 import type { SharedResources } from '../resources-port';
 import type { Id, KnowledgeExtra, Payload, StepCheck, StepLimits } from '../../shared';
 import type { CheckRunner } from '../checks-port';
@@ -90,6 +91,8 @@ export interface RunServices {
   halt(reason: string): void;
   /** Reloj de la ejecución, inyectable [R70.9]. */
   timers: Timers;
+  /** Marco de cada bucle en marcha, por la ruta de su cuerpo, si la app lo pide [R84.3]. */
+  loops?: Map<string, LoopFrame>;
   /** Límites efectivos de un paso: los suyos, los de su agente y los de la ejecución [R70.7]. */
   limitsFor(node: DiagramNode): Promise<StepLimits>;
   /** Siguiente pasada de un nodo en una ruta (1, 2…) [R74.1]. */

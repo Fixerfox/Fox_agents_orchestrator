@@ -68,12 +68,12 @@ describe('SPEC-065 · en la interfaz', () => {
     expect(list.ok && list.value.find((r) => r.runId === 'old')).toMatchObject({ status: 'succeeded', accepted: { by: 'user', reason: 'La medición la hago yo', previousReason: REASON } });
   });
 
-  it('[R65.10] «Hablar con el asistente» abre el asistente con el id de la ejecución', async () => {
+  it('[R65.10][R86.15] «Hablar con el asistente» abre el asistente con el id de la ejecución y una pestaña con su nombre', async () => {
     const past = failedRun();
     const api = createMemoryApi([D], { pastRuns: [past] });
     const { onAskAssistant } = runsScreen(api, [past.summary]);
     await userEvent.click(await screen.findByRole('button', { name: 'Hablar con el asistente' }, { timeout: 4000 }));
-    expect(onAskAssistant).toHaveBeenCalledWith('Quiero hablar de la ejecución old (Quickstart, Fallida).');
+    expect(onAskAssistant).toHaveBeenCalledWith('Quiero hablar de la ejecución old (Quickstart, Fallida).', 'Ejecución «Quickstart»');
   });
 
   it('[R65.10] en la app, el botón abre el panel del asistente con la petición ya enviada', async () => {
