@@ -122,7 +122,8 @@ export class ClaudeDecider implements Decider {
   /** Qué paso tiene que rehacer el trabajo según las correcciones del usuario; JSON validado [R53.17]. */
   async blame(request: { feedback: string; candidates: BlameCandidate[] }, signal: AbortSignal) {
     const list = request.candidates
-      .map((c, i) => [`${i + 1}. id «${c.nodeId}» · ${c.label}`, ...(c.task ? [`   Tarea: ${c.task.slice(0, 400)}`] : []), ...(c.output ? [`   Entregó: ${clip(c.output).slice(0, 1500)}`] : [])].join('\n'))
+      // Tarea y entrega de cada paso, como datos [R90.13].
+      .map((c, i) => [`${i + 1}. id «${c.nodeId}» · ${c.label}`, ...(c.task ? [`   Tarea:\n${datos(c.task.slice(0, 400))}`] : []), ...(c.output ? [`   Entregó:\n${datos(clip(c.output).slice(0, 1500))}`] : [])].join('\n'))
       .join('\n');
     const { obj } = await this.json(
       `El usuario revisó el trabajo de un diagrama de agentes y pide cambios. Elige el paso que tiene que rehacer su parte para que el resto se repita a partir de él: el primero, en orden, cuya entrega causa el problema.\nPasos, en orden:\n${list}\n\nLo que pide el usuario:\n${request.feedback.slice(0, 4000)}\n\nResponde {"nodeId":"id","reason":"motivo breve en español para el usuario"}.`,

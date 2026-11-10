@@ -31,6 +31,8 @@ export interface OrchestratorContext {
   projectConfigTrusted?(dir: string): Promise<boolean>;
   /** Archivo de las aprobaciones de comandos de comprobación, en los datos de la app [R88.5]. */
   checksApprovalsFile?: string;
+  /** Secretos que se han cargado para los agentes, para ocultarlos en los eventos [R90.6]. */
+  secretValues?(): readonly string[];
 }
 
 /** Espacios abiertos de cada ejecución en marcha, para la vista previa [R73.19]. */
@@ -134,7 +136,7 @@ export const appResources = new AppResources({ maxAgents: () => agentsTotal(appS
 export function composeOrchestrator(ctx: OrchestratorContext, query: QueryFn): Orchestrator {
   appSettings = ctx.settings;
   return createEngineOrchestrator(
-    { library: libraryOf(ctx), settings: ctx.settings, resources: appResources, restoreFiles: restoreAttemptFiles(ctx.store, ctx.projectRoot), spaces: branchSpacesFor(ctx), checkRunner: checkRunnerFor(ctx.store, ctx.projectRoot, ctx.checksApprovalsFile), evidence: evidenceFor(ctx.store, ctx.projectRoot) },
+    { ...(ctx.secretValues ? { secretValues: ctx.secretValues } : {}), library: libraryOf(ctx), settings: ctx.settings, resources: appResources, restoreFiles: restoreAttemptFiles(ctx.store, ctx.projectRoot), spaces: branchSpacesFor(ctx), checkRunner: checkRunnerFor(ctx.store, ctx.projectRoot, ctx.checksApprovalsFile), evidence: evidenceFor(ctx.store, ctx.projectRoot) },
     [createClaudeEngine(claudeEnvironment(ctx), query)],
   );
 }

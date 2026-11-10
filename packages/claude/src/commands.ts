@@ -1,4 +1,7 @@
 import { runsInlineCode, uploads } from './command-risks';
+import { programOf, segmentsOf, tokenize } from './shell-words';
+export { tokenize } from './shell-words';
+export { hardenReadOnlyGit, inlineInterpreter } from './command-risks';
 import { protectedName } from './protected';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
@@ -25,36 +28,7 @@ const WITH_SUBCOMMAND = new Set(['npm', 'npx', 'pnpm', 'yarn', 'git', 'pip', 'ca
 const NEVER_GRANT = new Set(['rm', 'rmdir', 'del', 'rd', 'erase', 'mv', 'move', 'dd', 'chmod', 'chown', 'sudo', 'su', 'shred', 'format']);
 const GIT_NEVER_GRANT = new Set(['push', 'reset', 'clean', 'checkout', 'restore', 'rebase', 'rm']);
 
-/** Separa un comando en palabras respetando comillas simples y dobles; `null` si quedan comillas abiertas. */
-export function tokenize(segment: string): string[] | null {
-  const out: string[] = [];
-  let cur = '';
-  let has = false;
-  let quote: '"' | "'" | null = null;
-  for (const ch of segment) {
-    if (quote) {
-      if (ch === quote) quote = null;
-      else cur += ch;
-      continue;
-    }
-    if (ch === '"' || ch === "'") {
-      quote = ch;
-      has = true;
-    } else if (/\s/.test(ch)) {
-      if (has || cur) out.push(cur);
-      cur = '';
-      has = false;
-    } else {
-      cur += ch;
-      has = true;
-    }
-  }
-  if (quote) return null;
-  if (has || cur) out.push(cur);
-  return out;
-}
 
-const programOf = (word: string): string => path.basename(word).toLowerCase().replace(/\.(exe|cmd|bat)$/, '');
 
 /**
  * En Windows la `Bash` de Claude Code es Git Bash, que escribe `D:\x` como `/d/x` (o `/cygdrive/d/x`): se pasa a la
@@ -108,6 +82,8 @@ async function simple(words: string[], root: string, cwd: string, readOnly = fal
   };
 
   if (NO_PATHS.has(prog)) return cwd;
+  // `tree -o` escribe un archivo [R90.1].
+  if (prog === 'tree' && args.some((a) => /^(-o|--output)/.test(a))) return null;
   if (READ_PATHS.has(prog)) return (await allInside(positional)) ? cwd : null;
 
   if (prog === 'mkdir' || prog === 'touch') {
@@ -135,6 +111,8 @@ async function simple(words: string[], root: string, cwd: string, readOnly = fal
   }
 
   if (prog === 'grep' || prog === 'rg') {
+    // `rg --pre` ejecuta un programa por cada archivo [R90.1].
+    if (prog === 'rg' && args.some((a) => /^--pre(-glob)?(=|$)/.test(a))) return null;
     const paths = args.some((a) => GREP_PATTERN_FLAGS.has(a) || a.startsWith('--regexp=') || a.startsWith('--file=')) ? positional : positional.slice(1);
     return (await allInside(paths)) ? cwd : null;
   }
@@ -213,21 +191,6 @@ export const DANGER = {
   code: 'ejecuta código que no se puede revisar',
 } as const;
 
-/**
- * Intérprete al que el comando pasa código en línea, para «Permitir código en línea de «node» en esta ejecución»:
- * así no se pregunta cada comprobación rápida [R89.11].
- */
-export function inlineInterpreter(command: string): string | null {
-  for (const seg of segmentsOf(command.trim())) {
-    const words = tokenize(seg.text) ?? seg.text.split(/\s+/).filter(Boolean);
-    while (words.length > 0 && /^[A-Za-z_][A-Za-z0-9_]*=/.test(words[0]!)) words.shift();
-    if (words.length === 0) continue;
-    const prog = programOf(words[0]!);
-    const args = words.slice(1);
-    if (runsInlineCode(prog, args)) return prog;
-  }
-  return null;
-}
 
 export type Danger = (typeof DANGER)[keyof typeof DANGER];
 
@@ -272,49 +235,6 @@ function escapes(root: string, cwd: string, arg: string): boolean {
   return rel === '..' || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel);
 }
 
-/** Separa un comando en tramos: `&&`, `||`, `;`, `|`, `&`, saltos de línea y sustituciones `$(…)` y `` `…` ``. */
-function segmentsOf(command: string): { text: string; piped: boolean }[] {
-  const out: { text: string; piped: boolean }[] = [];
-  let cur = '';
-  let quote: '"' | "'" | null = null;
-  let piped = false;
-  const flush = (nextPiped: boolean) => {
-    if (cur.trim()) out.push({ text: cur.trim(), piped });
-    cur = '';
-    piped = nextPiped;
-  };
-  for (let i = 0; i < command.length; i++) {
-    const ch = command[i]!;
-    const two = command.slice(i, i + 2);
-    if (quote === "'") {
-      if (ch === "'") quote = null;
-      cur += ch;
-      continue;
-    }
-    // Dentro de comillas dobles las sustituciones siguen ejecutándose.
-    if (two === '$(' || ch === '`') {
-      flush(false);
-      if (two === '$(') i++;
-      continue;
-    }
-    if (quote === '"') {
-      if (ch === '"') quote = null;
-      cur += ch;
-      continue;
-    }
-    if (ch === '"' || ch === "'") {
-      quote = ch;
-      cur += ch;
-    } else if (two === '&&' || two === '||') {
-      flush(false);
-      i++;
-    } else if (ch === '|') flush(true);
-    else if (ch === ';' || ch === '&' || ch === '\n' || ch === '\r' || ch === ')') flush(false);
-    else cur += ch;
-  }
-  flush(false);
-  return out;
-}
 
 /** Destinos de `>` y `>>` en un tramo (sin `2>&1`). */
 function redirectTargets(text: string): string[] {
@@ -441,14 +361,43 @@ export const ISOLATED_GIT_DENY = 'En una rama en paralelo no se cambia git: el c
 
 /** Procesos de los que depende la app: matarlos por nombre la cierra [R79.1]. */
 const APP_PROCESS = /^(electron|node|claude|orquestador)(\.exe)?$/i;
+const APP_NAMES = ['electron', 'electron.exe', 'node', 'node.exe', 'claude', 'claude.exe', 'orquestador', 'orquestador.exe'];
 
 /**
  * ¿Mata por nombre un proceso de la app? `taskkill /IM`, `killall`, `pkill`, `Stop-Process -Name`,
  * `Get-Process <nombre> | Stop-Process` y `wmic … delete`, en cualquier tramo del comando [R79.1].
  */
-export function killsAppProcess(command: string): boolean {
+export function killsAppProcess(command: string, protectedPids: readonly number[] = []): boolean {
   const unquote = (s: string) => s.replace(/^['"]|['"]$/g, '');
-  const names = (s: string) => unquote(s).split(',').some((n) => APP_PROCESS.test(n.trim()));
+  // Un comodín (`electron*`, `elec%`) que casaría con algún proceso de la app cuenta igual [R90.9].
+  const glob = (n: string) => new RegExp(`^${n.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/[*%]/g, '.*').replace(/[?_]/g, '.')}$`, 'i');
+  const names = (s: string) =>
+    unquote(s)
+      .split(',')
+      .some((n) => {
+        const t = n.trim();
+        if (APP_PROCESS.test(t)) return true;
+        if (!/[*?%]/.test(t)) return false;
+        const re = glob(t);
+        return APP_NAMES.some((a) => re.test(a));
+      });
+  const pid = (s: string) => protectedPids.includes(Number(unquote(s)));
+  // Where-Object / ? con el nombre, seguido de Stop-Process [R90.9].
+  if (/stop-process|\bkill\b/i.test(command)) {
+    const where = /\b(?:process)?name['"]?\s*-(?:i|c)?(eq|like|match)\s*['"]?([\w.*?%-]+)/i.exec(command);
+    const matches = (re: string) => {
+      try {
+        return APP_NAMES.some((a) => new RegExp(re, 'i').test(a));
+      } catch {
+        return names(re);
+      }
+    };
+    if (where && (where[1]!.toLowerCase() === 'match' ? matches(where[2]!) : names(where[2]!))) return true;
+  }
+  if (/wmic\b[^;&|]*\bname\s+like\s+['"]?([^'"\s]+)/i.test(command) && /\b(delete|terminate)\b/i.test(command)) {
+    const m = /\bname\s+like\s+['"]?([^'"\s]+)/i.exec(command);
+    if (m && names(m[1]!)) return true;
+  }
   // Get-Process electron | Stop-Process: el nombre va en el tramo de antes.
   if (/stop-process/i.test(command)) {
     const get = /get-process\s+(?:-name\s+)?(['"]?[\w.,-]+['"]?)/i.exec(command);
@@ -468,12 +417,16 @@ export function killsAppProcess(command: string): boolean {
     const args = words.slice(i + 1);
     if (prog === 'taskkill' || prog === 'taskkill.exe') {
       for (let j = 0; j < args.length - 1; j++) if (/^(\/\/?|-)im$/i.test(args[j]!) && names(args[j + 1]!)) return true;
+      for (let j = 0; j < args.length - 1; j++) if (/^(\/\/?|-)pid$/i.test(args[j]!) && pid(args[j + 1]!)) return true;
     }
+    // Matar por PID el propio orquestador [R90.9].
+    if (prog === 'kill' && args.some((a) => !a.startsWith('-') && pid(a))) return true;
     if (prog === 'killall' || prog === 'pkill') {
       if (args.filter((a) => !a.startsWith('-')).some((a) => names(a) || (prog === 'pkill' && /(^|[/\s])(electron|claude|orquestador)/i.test(unquote(a))))) return true;
     }
     if (prog === 'stop-process' || prog === 'spps') {
       for (let j = 0; j < args.length - 1; j++) if (/^-(name|processname)$/i.test(args[j]!) && names(args[j + 1]!)) return true;
+      for (let j = 0; j < args.length - 1; j++) if (/^-id$/i.test(args[j]!) && args[j + 1]!.split(',').some((x) => pid(x))) return true;
     }
   }
   return false;

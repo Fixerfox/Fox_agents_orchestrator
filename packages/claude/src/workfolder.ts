@@ -3,7 +3,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import type { AgentQuestion } from '@orquestador/core';
 import type { PermissionLevel } from '@orquestador/core';
-import { APP_KILL_DENY, DANGER, ISOLATED_GIT_DENY, allowCommandForRun, inlineInterpreter, killsAppProcess, classifyCommand, grantKey, sensitiveCommand, writesGit } from './commands';
+import { APP_KILL_DENY, DANGER, ISOLATED_GIT_DENY, allowCommandForRun, hardenReadOnlyGit, inlineInterpreter, killsAppProcess, classifyCommand, grantKey, sensitiveCommand, writesGit } from './commands';
 import { AUTO_TOOLS } from './connection';
 import { ALLOW_ONCE, ALLOW_RUN, DENY, READ_TOOLS_LOCAL, WEB_TOOLS, createReadPolicy } from './read-policy';
 import { protectedName, sameOrInside } from './protected';
@@ -227,7 +227,7 @@ export const ISOLATED_DENY =
 export function withSelfProtection<P extends (tool: string, input: Record<string, unknown>, id?: string) => Promise<PermissionResult>>(note: WritePolicyDeps['note'], inner: P): P {
   return (async (tool: string, input: Record<string, unknown>, id?: string) => {
     const command = tool === 'Bash' && typeof input['command'] === 'string' ? (input['command'] as string) : undefined;
-    if (command !== undefined && killsAppProcess(command)) {
+    if (command !== undefined && killsAppProcess(command, [process.pid])) {
       note?.({ kind: 'denied', path: command, reason: APP_KILL_DENY });
       return deny(APP_KILL_DENY);
     }
@@ -377,7 +377,9 @@ export function createWritePolicy(deps: WritePolicyDeps): (tool: string, input: 
       }
       // Solo lectura: solo lo sencillo que no crea nada, y sin preguntar [R47.9].
       if (deps.level === 'readonly') {
-        if ((await classifyCommand(command, deps.root, deps.root, { readOnly: true })).safe) return allow(input);
+        // git sin textconv ni diff externo del repositorio [R90.2].
+        const hardened = hardenReadOnlyGit(command);
+        if ((await classifyCommand(hardened, deps.root, deps.root, { readOnly: true })).safe) return allow(hardened === command ? input : { ...input, command: hardened });
         deps.note?.({ kind: 'denied', path: command, reason: 'agente de solo lectura' });
         return deny(READONLY_DENY);
       }

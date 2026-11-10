@@ -10,6 +10,8 @@ import { crashLine } from './crash';
 import { Background } from './background';
 import { cleanupSpaces, composeOrchestrator } from './composition';
 import { openOutside, previewResponse } from './preview-protocol';
+import { secureStorageAvailable } from './secure-storage';
+import { IPC_FRAME_DENY, fromMainFrame } from './ipc-guard';
 import { DesktopHandlers } from './handlers';
 import { TerminalService, type SpawnPty } from './terminal';
 import { parseWindowTone, secureWebContents, titleBarOverlay, windowOptions, TITLEBAR, WINDOW_TONE_CHANNEL } from './window';
@@ -49,7 +51,8 @@ if (process.platform === 'win32') {
 
 const dataDir = (): string => app.getPath('userData');
 const cipher = {
-  available: () => safeStorage.isEncryptionAvailable(),
+  // En Linux sin llavero no cuenta como cifrado [R90.8].
+  available: () => secureStorageAvailable(safeStorage),
   encrypt: (plain: string) => safeStorage.encryptString(plain),
   decrypt: (data: Buffer) => safeStorage.decryptString(data),
 };
@@ -266,7 +269,8 @@ ipcMain.on(WINDOW_TONE_CHANNEL, (e, value: unknown) => {
 app.whenReady().then(() => {
   if (process.platform !== 'darwin') Menu.setApplicationMenu(null);
   for (const channel of Object.values(CHANNELS)) {
-    ipcMain.handle(channel, (_event, payload: unknown) => handlers.invoke(channel, payload));
+    // Solo el marco principal de la ventana [R90.11].
+    ipcMain.handle(channel, (event, payload: unknown) => (fromMainFrame(event) ? handlers.invoke(channel, payload) : { ok: false, error: { code: 'forbidden', message: IPC_FRAME_DENY } }));
   }
   void session; // la política de contenido se fija por ventana en secureWebContents
   // La CSP va en la propia respuesta [R89.9].

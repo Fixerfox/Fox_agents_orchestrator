@@ -16,6 +16,7 @@ El hito indica cuándo debe estar cubierto por tests. `npm run spec:check` exige
 ## Índice
 | Spec | Título | Hito | Estado |
 |---|---|---|---|
+| [090](090-seguridad-tercera-parte.md) | Seguridad para la 1.0, tercera parte: «Solo lectura» sin rg --pre ni textconv de git, secretos conocidos ocultos en los registros y .gitignore de .orquestador, llavero de Linux, más protección contra cerrar el orquestador, IPC solo del marco principal, modo prueba sin terminales, blame con <datos> y skills sin enlaces que salen | M16i | Implementada |
 | [089](089-seguridad-segunda-parte.md) | Seguridad para la 1.0, segunda parte: Bash con código en línea o subidas pregunta, nada toca los datos de la app, ajustes dañados vuelven a «Preguntar», secretos MCP sin pérdidas, CSP en las vistas previas y «Abrir fuera» sin ejecutables | M16h | Implementada |
 | [088](088-confianza-en-el-proyecto.md) | Confianza en el proyecto: la configuración de Claude Code de un repositorio con hooks, env o helpers solo se carga si se confía en ella (decisión con huella en los datos de la app), y las aprobaciones de comprobaciones salen del repositorio | M16g | Implementada |
 | [087](087-confinamiento-de-los-agentes.md) | Confinamiento de los agentes: carpetas protegidas como las ve Windows, secretos nunca, lecturas de fuera según el nivel y web por dominio | M16f | Implementada |
