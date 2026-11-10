@@ -51,7 +51,7 @@ export interface LiveView {
   reviews: Record<string, ReviewInfo>;
   /** Revisiones que acabaron por ⏱ Agotado, con su ruta [R34.18]. */
   exhausted: { nodeId: Id; nodePath: Id[] }[];
-  usage: { inputTokens: number; outputTokens: number; costUsd: number };
+  usage: { inputTokens: number; outputTokens: number; costUsd: number; /** Leídos de la caché, ya incluidos en la entrada [R83.5]. */ cachedTokens?: number };
   budgetReached?: { limit: 'tokens' | 'cost'; used: number; max: number };
   pending: PendingItem[];
   /** Texto de salida de la ejecución (nodo `output` raíz). */
@@ -214,6 +214,7 @@ export function deriveLive(events: readonly RunEvent[]): LiveView {
         v.usage.inputTokens += e.inputTokens;
         v.usage.outputTokens += e.outputTokens;
         v.usage.costUsd += e.costUsd ?? 0;
+        if (e.cachedTokens) v.usage.cachedTokens = (v.usage.cachedTokens ?? 0) + e.cachedTokens;
         break;
       case 'edge.traversed':
         v.edges.add(pathKey(np, e.edgeId));

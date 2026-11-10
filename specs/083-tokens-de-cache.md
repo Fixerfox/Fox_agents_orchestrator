@@ -22,6 +22,8 @@ Consecuencias:
 - **R83.2** [M16b] Si `cache_read_input_tokens` es mayor que 0, el uso lleva también `cachedTokens` con esa cifra (ya incluida en `inputTokens`). El evento `agent.usage` de un paso de agente lo copia.
 - **R83.3** [M16b] El límite de tokens de la ejecución suma `inputTokens + outputTokens` de R83.1: con un agente que lee 1.000 tokens de caché y un límite de 500, la ejecución se para por presupuesto.
 - **R83.4** [M16b] En Ajustes, el campo «Límite de tokens por defecto» explica que cuenta todo lo que lee Claude, también lo que sale de la caché, y que para limitar el gasto conviene el límite de coste del agente o del paso.
+- **R83.5** [M16b] La vista en vivo y el resumen de una ejecución suman aparte lo leído de la caché (`usage.cachedTokens`).
+- **R83.6** [M16b] `usageText(usage)` escribe los tokens de forma compacta (hasta 9999 tal cual; después «433 k» o «1,2 M») y, si hay caché, «· 396 k de caché»: «433 k tokens · 396 k de caché». La barra superior, el resumen en vivo y el aviso de fin lo usan, con una pista que explica que lo leído de la caché cuesta alrededor de una décima parte.
 
 ## Casos
 - **E83.a** *Dado* un resultado del SDK con `input_tokens: 26`, `cache_creation_input_tokens: 4000`, `cache_read_input_tokens: 90000` y `output_tokens: 900`, *entonces* el uso es `inputTokens: 94026`, `outputTokens: 900`, `cachedTokens: 90000`.
