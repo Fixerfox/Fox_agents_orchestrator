@@ -31,13 +31,21 @@ async function setProject(h: HandlerState, root: string, store: ProjectStore): P
   h.settings = (await h.deps.settings?.load()) ?? defaultSettings();
   // Copias de lo que usa cada ejecución, compartidas por el motor y el servicio [R52.1].
   const snapshots = new RunSnapshots();
+  // La clave y los secretos MCP que se cargan se ocultan tal cual en los eventos [R90.6].
+  const secrets = new Set<string>();
+  const remember = <T,>(v: T): T => {
+    if (typeof v === 'string' && v) secrets.add(v);
+    else if (v && typeof v === 'object') for (const x of Object.values(v)) if (typeof x === 'string' && x) secrets.add(x);
+    return v;
+  };
   h.runs = new RunService(composeRunPorts(store), h.deps.createOrchestrator({
       store,
       snapshots,
       projectRoot: root,
       settings: () => h.settings,
-      apiKey: async () => (await h.deps.vault?.read()),
-      mcpSecrets: async (id, scope) => (await h.deps.mcpVault?.read(mcpVaultKey(root, id, scope))) ?? {},
+      apiKey: async () => remember(await h.deps.vault?.read()),
+      mcpSecrets: async (id, scope) => remember((await h.deps.mcpVault?.read(mcpVaultKey(root, id, scope))) ?? {}),
+      secretValues: () => [...secrets],
       projectConfigTrusted: (dir) => projectConfigTrusted(h, dir),
       ...(h.deps.trustDir ? { checksApprovalsFile: join(h.deps.trustDir, `${projectKey(root)}-checks.json`) } : {}),
     }), () => runDefaultsFrom(h.settings), snapshots);

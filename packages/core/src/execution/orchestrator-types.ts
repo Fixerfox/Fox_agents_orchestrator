@@ -57,6 +57,8 @@ export interface OrchestratorDeps {
   coalesceTokens?: { ms: number; chars: number };
   /** Cada agente dentro de un bucle recibe vuelta, criterio, petición y último motivo [R84.3]. */
   loopContext?: boolean;
+  /** Valores secretos que la app conoce y se ocultan en los eventos tal cual [R90.4]. */
+  secretValues?(): readonly string[];
 }
 
 export interface RunResult {

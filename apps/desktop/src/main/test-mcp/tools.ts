@@ -20,6 +20,8 @@ export interface TestHost {
 
 /** Las acciones de la app que no tienen sentido sin una persona delante [R82.7]. */
 export const EXCLUDED_APP_TOOLS: ReadonlySet<string> = new Set(['request_secret', 'ask_user', 'open_terminal']);
+/** Métodos de la API que `call_api` no deja usar: las terminales [R90.12]. */
+export const EXCLUDED_API_METHODS: ReadonlySet<string> = new Set(['terminalStart', 'terminalWrite', 'terminalResize', 'terminalKill']);
 export const UI_TIMEOUT_MS = 60_000;
 export const APP_TOOL_TIMEOUT_MS = 10 * 60_000;
 export const WAIT_RUN_DEFAULT_MS = 60_000;
@@ -54,7 +56,8 @@ export function testTools(host: TestHost): TestTool[] {
     run: async (args) => text(await host.renderer(`app:${t.name}`, args, APP_TOOL_TIMEOUT_MS)),
   }));
 
-  const methods = Object.keys(CHANNELS) as InvokeMethod[];
+  // Las terminales no se abren desde fuera, igual que open_terminal [R90.12].
+  const methods = (Object.keys(CHANNELS) as InvokeMethod[]).filter((m) => !EXCLUDED_API_METHODS.has(m));
   const tools: TestTool[] = [
     ui('app_state', 'Estado de la app: pantalla (start o la sección), proyecto abierto, diagrama abierto, si el asistente está abierto y si hay una ejecución en marcha.', {}),
     ui(
