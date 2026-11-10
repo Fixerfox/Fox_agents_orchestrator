@@ -13,6 +13,21 @@ Aplicación de escritorio para **orquestar agentes de IA de forma visual**: se d
   - [06 Roadmap](docs/06-roadmap.md)
   - [ADR-0001 Stack](docs/adr/0001-stack.md)
 
+## Descargar
+Instaladores de la última versión (llevan dentro el binario de Claude Code; no hace falta Node):
+
+| Sistema | Enlace |
+|---|---|
+| Windows x64 | https://github.com/Fixerfox/Fox_agents_orchestrator/releases/latest/download/Orquestador-Windows-x64.exe |
+| Linux x64 (AppImage) | https://github.com/Fixerfox/Fox_agents_orchestrator/releases/latest/download/Orquestador-Linux-x86_64.AppImage |
+| macOS Apple Silicon | https://github.com/Fixerfox/Fox_agents_orchestrator/releases/latest/download/Orquestador-macOS-arm64.dmg |
+| macOS Intel | https://github.com/Fixerfox/Fox_agents_orchestrator/releases/latest/download/Orquestador-macOS-x64.dmg |
+
+- **Linux:** `chmod +x Orquestador-Linux-x86_64.AppImage` y ejecutarlo. En Ubuntu 24.04 o posterior, si no arranca por el *sandbox*, añade `--no-sandbox`.
+- **Sin firma:** mientras no haya certificados, Windows avisa con SmartScreen («Más información» → «Ejecutar de todas formas»), y macOS pide `xattr -cr /Applications/Orquestador.app` tras copiarla.
+- **Publicar una versión:** sube la versión en `apps/desktop/package.json` y crea la etiqueta (`git tag v0.9.0 && git push origin v0.9.0`). El flujo `release` construye los tres sistemas, los prueba y publica la release (SPEC-091).
+- **En local:** `npm run dist` construye el instalador del sistema actual en `release/dist`.
+
 ## Cómo empezar
 Requiere Node.js 22 o superior.
 

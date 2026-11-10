@@ -13,7 +13,7 @@ export { TERMINAL_EVENTS_CHANNEL, TERMINAL_LIMITS, type ProjectInfo, type Projec
 export type { DiagramSummary, JobInfo } from './diagrams';
 export { MAX_ATTACHMENT_BYTES, MAX_INPUT_FILES, type CorrectionProposal, type FilePreview, type InputAttachment, type InputProjectFile, type OpenRunTarget, type OutputFileInfo, type QueuedRunView, type RunAction, type RunFileContent, type RunSummary, type StartRunRequest, type StartRunResult } from './runs';
 export { SKILL_FILE_MAX, type ImportKind, type McpTestResult, type McpView } from './knowledge';
-export type { ConnectionResult, SettingsView } from './settings';
+export type { AppInfo, ConnectionResult, SettingsView } from './settings';
 export type { DraftRequest, DraftResult } from './assistant';
 export { TEST_ARG, TEST_CALL_CHANNEL, TEST_READY_CHANNEL, TEST_REPLY_CHANNEL, parseTestReply, type TestBridgeApi, type TestCall, type TestReply } from './test-bridge';
 
