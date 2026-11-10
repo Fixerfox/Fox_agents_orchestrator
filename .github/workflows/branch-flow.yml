@@ -1,0 +1,28 @@
+# Flujo de ramas (SPEC-094): los PR van a develop, y a main solo desde develop.
+# pull_request_target: el workflow y el script salen de la rama destino, no del PR, así que un PR no puede saltárselo.
+# No se descarga código del PR y las ramas se leen solo como variables de entorno.
+name: flujo-de-ramas
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize, edited]
+
+permissions:
+  contents: read
+
+jobs:
+  flujo-de-ramas:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts/branch-flow.mjs
+          sparse-checkout-cone-mode: false
+      - run: node scripts/branch-flow.mjs
+        env:
+          PR_BASE: ${{ github.event.pull_request.base.ref }}
+          PR_HEAD: ${{ github.event.pull_request.head.ref }}
+          PR_BASE_REPO: ${{ github.event.pull_request.base.repo.full_name }}
+          PR_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
