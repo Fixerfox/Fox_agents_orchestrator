@@ -21,7 +21,7 @@
   "publish": null,
   "win": {
     "target": [{ "target": "nsis", "arch": ["x64"] }],
-    "icon": "apps/desktop/assets/icon.png",
+    "icon": "apps/desktop/build/icon.png",
     "artifactName": "Orquestador-Windows-${arch}.${ext}"
   },
   "nsis": {
