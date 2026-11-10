@@ -26,7 +26,7 @@ interface Props {
   /** Lo que usa la ejecución en curso: no se guarda ni se elimina [R32.37]. */
   busy?: { agents: Set<string>; skills: Set<string>; contexts: Set<string>; mcp?: Set<string> } | undefined;
   /** Abre el asistente con una petición (alta asistida de MCP) [R30.10]. */
-  onAskClaude?: (text: string) => void;
+  onAskClaude?: (text: string, title?: string) => void;
   /** Abre una terminal de Claude Code [R30.10]. */
   onOpenTerminal?: () => void;
   /** Sube cuando algo de fuera (el asistente) cambia la biblioteca: se recarga [R38.7]. */

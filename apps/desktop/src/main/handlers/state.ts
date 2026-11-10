@@ -41,6 +41,8 @@ export interface DesktopDeps {
   pushAssistant?(turnId: string, event: AssistantEvent): void;
   /** Tiempo máximo de espera de una herramienta (permiso del usuario incluido). */
   assistantToolTimeoutMs?: number;
+  /** Carpeta de datos de la app donde se guardan las pestañas del asistente de cada proyecto [R86.11]. */
+  assistantTabsDir?: string;
   /** Carpetas que el asistente nunca lee (la de datos de la app, con la clave y los secretos) [R29.8]. */
   assistantProtectedDirs?: string[];
   /** Envía un lote de eventos al renderer (R15.7/R20.4). */

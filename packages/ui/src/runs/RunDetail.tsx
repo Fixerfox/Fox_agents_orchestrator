@@ -185,7 +185,7 @@ export function RunDetail(
             {/* En lugar del panel de pestañas, un aviso con la frase y el botón al modal [R44.5]. */}
             <RunDoneBanner events={d.events} labelOf={label} running={running} interrupted={status === 'interrupted'} onSummary={() => setModal(running ? 'gantt' : 'summary')} onCorrect={fixable.length > 0 ? () => setFix({}) : undefined}
               onAccept={status === 'failed' ? () => setAccepting(true) : undefined}
-              onTalk={p.onAskAssistant && status !== 'running' ? () => p.onAskAssistant!(t('talk.prompt', { runId: p.runId, diagram: d.title, status: statusLabel(status, false) })) : undefined}
+              onTalk={p.onAskAssistant && status !== 'running' ? () => p.onAskAssistant!(t('talk.prompt', { runId: p.runId, diagram: d.title, status: statusLabel(status, false) }), t('as.tabTitle.run', { name: d.title })) : undefined}
             />
           </div>
         </div>

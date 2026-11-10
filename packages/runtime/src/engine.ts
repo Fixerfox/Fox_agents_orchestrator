@@ -111,6 +111,7 @@ export function createEngineOrchestrator(ctx: EngineContext, engines: readonly A
     coalesceTokens: { ms: TOKEN_GROUP_MS, chars: TOKEN_GROUP_CHARS },
     // El tope de la memoria de la ejecución, de Ajustes [R72.15].
     memory: { tokens: () => ctx.settings().memoryTokens },
+    loopContext: true,
     agentProfile: (id, extra, runId) => profileOf(ctx.library, id, extra, runId),
     ...(ctx.restoreFiles ? { restoreFiles: (runId: Id, files: { path: string; change?: 'created' | 'modified' }[], dir?: string) => ctx.restoreFiles!(runId, files, dir) } : {}),
     // Las ramas en paralelo, aisladas si Ajustes lo dice (activo por defecto) [R73.2].

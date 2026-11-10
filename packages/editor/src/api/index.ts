@@ -15,6 +15,7 @@ export { MAX_ATTACHMENT_BYTES, MAX_INPUT_FILES, type CorrectionProposal, type Fi
 export { SKILL_FILE_MAX, type ImportKind, type McpTestResult, type McpView } from './knowledge';
 export type { ConnectionResult, SettingsView } from './settings';
 export type { DraftRequest, DraftResult } from './assistant';
+export { TEST_ARG, TEST_CALL_CHANNEL, TEST_READY_CHANNEL, TEST_REPLY_CHANNEL, parseTestReply, type TestBridgeApi, type TestCall, type TestReply } from './test-bridge';
 
 const PARSERS = [parseProjectRequest, parseDiagramsRequest, parseRunsRequest, parseKnowledgeRequest, parseSettingsRequest, parseAssistantRequest];
 

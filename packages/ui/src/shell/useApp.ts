@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { EditorSession, createDiagram, t, type ProjectApi } from '@orquestador/editor';
+import { EditorSession, createDiagram, t, type ProjectApi, type TestBridgeApi } from '@orquestador/editor';
 import { isolatesBranches } from '@orquestador/core';
 import { DraftStore, type LibraryTarget, type OpenLibrary } from '../common';
-import type { AssistantHost, ChatState } from '../assistant';
+import { useAssistantTabs, type AssistantHost } from '../assistant';
 import { useDesigner, useDesignerSelection, useDiagramDocument, useProjectCatalog, useSession, type AgentOption } from '../diagrams';
 import { askingIdsOf, runningIdsOf, useLiveRun, useRunLauncher, useRunsIndex, type RunsNav } from '../runs';
 import { useAppSettings } from '../settings';
@@ -19,6 +19,8 @@ export interface AppProps {
   confirm?: (message: string) => boolean;
   /** Abre el editor directamente, sin pantalla de inicio: para pruebas y para desarrollar la vista. */
   initialProject?: string;
+  /** Puente del modo prueba; solo existe con la app arrancada en modo prueba [R82.7]. */
+  test?: TestBridgeApi;
 }
 
 /** Estado de la aplicación: compone los hooks de cada contexto y lo que los une (proyecto, sección y asistente) [R32.13]. */
@@ -65,18 +67,18 @@ export function useApp({ api, agents: builtIn = [], confirm = (m) => window.conf
   const terminals = useTerminals(api, project, fail);
   const sel = useDesignerSelection(snap);
   const layout = useShellLayout(sel.hasSelection);
-  const [chat, setChat] = useState<ChatState>({ items: [] });
+  const assistant = useAssistantTabs(api, project);
   /** Sube cuando el asistente cambia agentes, skills, contextos o MCP, para que Agentes y Conocimiento recarguen [R38.7]. */
   const [libVersion, setLibVersion] = useState(0);
   /**
    * Abre el asistente y le envía una petición ya escrita [R30.10]. Se queda en la sección actual salvo que la
    * petición hable de un paso del diagrama [R38.1].
    */
-  const askAssistant = (text: string, toDiagrams = false) => {
+  const askAssistant = (text: string, toDiagrams = false, title?: string) => {
     if (toDiagrams) setSection('diagrams');
     layout.setRightOpen(true);
     layout.setAssistOpen(true);
-    setChat((c) => ({ ...c, pending: text }));
+    assistant.ask(text, title);
   };
   /** Historial y preguntas pendientes de todas las ejecuciones del proyecto [R35.6]. */
   const runsIndex = useRunsIndex(api, run, project);
@@ -106,7 +108,7 @@ export function useApp({ api, agents: builtIn = [], confirm = (m) => window.conf
     newDiagram: doc.createNamed,
     run: async (input) => {
       await doc.save();
-      await launcher.onStart(input);
+      return launcher.onStart(input);
     },
     refresh: () => {
       void lib.reloadAgents();
@@ -173,7 +175,7 @@ export function useApp({ api, agents: builtIn = [], confirm = (m) => window.conf
 
   return {
     api, session, snap, client, run, section, setSection, runModal, setRunModal, runsNav, setRunsNav, goRuns, goDiagrams, goSection,
-    message, setMessage, fail, guard, project, onProject, closeProject, onOpened, terminals, sel, layout, chat, setChat, libVersion,
+    message, setMessage, fail, guard, project, onProject, closeProject, onOpened, terminals, sel, layout, assistant, libVersion,
     askAssistant, runsIndex, askingIds, runningIds, lib, doc, config, launcher, libOpen, drafts, startSettings, setStartSettings, wizard,
     setWizard, openLibrary, designer, assistantHost,
   };

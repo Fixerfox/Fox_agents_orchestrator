@@ -1031,6 +1031,18 @@ button:disabled { opacity: 0.4; cursor: default; }
 .orq-assist { display: flex; flex-direction: column; height: 100%; min-height: 0; }
 .orq-assist__head { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
 .orq-assist__head h2 { font-size: 14px; margin: 0; flex: 1; }
+/* Pestañas del asistente [R86.7] */
+.orq-assist__tabs { display: flex; gap: 4px; padding: 6px 12px; border-bottom: 1px solid var(--line); overflow-x: auto; }
+.orq-assist__tabs::-webkit-scrollbar { height: 3px; }
+.orq-assist__tabs::-webkit-scrollbar-thumb { border-width: 0; min-height: 0; }
+.orq-assist__tab { display: flex; align-items: center; flex: 0 0 auto; max-width: 150px; border-radius: 7px; color: var(--text2); }
+.orq-assist__tab:hover { background: var(--raised); }
+.orq-assist__tab.is-active { background: var(--raised); color: var(--text); box-shadow: inset 0 -2px 0 var(--accent); }
+.orq-assist__tabbtn { display: flex; align-items: center; gap: 5px; min-width: 0; padding: 4px 2px 4px 8px; border: 0; background: none; color: inherit; font: inherit; font-size: 12px; cursor: pointer; }
+.orq-assist__tablabel { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.orq-assist__tabdot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex: none; }
+.orq-assist__tabclose { display: grid; place-items: center; width: 18px; height: 18px; margin-right: 3px; border: 0; border-radius: 5px; background: none; color: inherit; cursor: pointer; opacity: 0.6; flex: none; }
+.orq-assist__tabclose:hover { opacity: 1; background: var(--line); }
 .orq-assist__list { flex: 1; min-height: 0; overflow-y: auto; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
 .orq-assist__empty { display: flex; flex-direction: column; gap: 8px; color: var(--text2); font-size: 13px; }
 .orq-assist__empty p { margin: 0 0 4px; }

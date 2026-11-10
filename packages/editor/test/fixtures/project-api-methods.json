@@ -6,6 +6,8 @@
   "answerRun",
   "assistantCancel",
   "assistantSend",
+  "assistantTabsLoad",
+  "assistantTabsSave",
   "assistantToolResult",
   "cancelImport",
   "clearApiKey",

@@ -41,9 +41,11 @@ export interface SecureWebPreferences {
   webSecurity: true;
   allowRunningInsecureContent: false;
   preload: string;
+  /** Solo en modo prueba: el preload expone el puente [R82.7]. */
+  additionalArguments?: string[];
 }
 
-export function windowOptions(preload: string, platform: string = process.platform, icon?: string) {
+export function windowOptions(preload: string, platform: string = process.platform, icon?: string, test?: { title: string; args: string[] }) {
   const webPreferences: SecureWebPreferences = {
     contextIsolation: true,
     sandbox: true,
@@ -51,13 +53,14 @@ export function windowOptions(preload: string, platform: string = process.platfo
     webSecurity: true,
     allowRunningInsecureContent: false,
     preload,
+    ...(test ? { additionalArguments: test.args } : {}),
   };
   return {
     width: 1280,
     height: 800,
     minWidth: 900,
     minHeight: 600,
-    title: 'Orquestador',
+    title: test?.title ?? 'Orquestador',
     show: false,
     ...(icon ? { icon } : {}),
     // Ventana propia: sin barra de título ni menú del sistema; la barra superior de la app hace de barra de título [R19.8].

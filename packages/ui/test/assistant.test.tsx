@@ -29,7 +29,7 @@ describe('SPEC-029 · asistente en la interfaz', () => {
     expect(panel.getAllByRole('button', { name: /^(¿Qué agentes|Crea un agente|Pon tres agentes)/ })).toHaveLength(3);
     await say(panel, 'hola');
     expect(await panel.findByText(/modo simulado/)).toBeTruthy();
-    expect(panel.getByText('hola')).toBeTruthy();
+    expect(within(panel.getByRole('log')).getByText('hola')).toBeTruthy();
   });
 
   it('[R29.9] cada lectura se ve como una línea discreta, la denegada lo dice y no van al historial', async () => {
@@ -138,6 +138,6 @@ describe('SPEC-029 · asistente en la interfaz', () => {
     const rail = within(screen.getByRole('navigation', { name: 'Secciones' }));
     await userEvent.click(rail.getByRole('button', { name: 'Agentes' }));
     await userEvent.click(rail.getByRole('button', { name: 'Diseñador' }));
-    expect(within(await screen.findByRole('region', { name: 'Asistente' })).getByText('hola')).toBeTruthy();
+    expect(within(within(await screen.findByRole('region', { name: 'Asistente' })).getByRole('log')).getByText('hola')).toBeTruthy();
   });
 });

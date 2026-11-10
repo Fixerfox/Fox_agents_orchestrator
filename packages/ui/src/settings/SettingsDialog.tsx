@@ -353,7 +353,7 @@ export function SettingsDialog({ api, onClose, onSaved }: Props) {
               <option value="finish-running">{t('settings.onBudget.finish')}</option>
             </select>
           </Row>
-          <Row id="set-tokens" label={t('settings.tokens')} error={errors['defaultMaxTokens']}>
+          <Row id="set-tokens" label={t('settings.tokens')} hint={t('settings.tokens.hint')} error={errors['defaultMaxTokens']}>
             <input id="set-tokens" type="number" min={1} value={tokens} onChange={(e) => ((touched.current = true), setTokens(e.target.value), setStatus(t('settings.saving')))} />
           </Row>
           <Row id="set-isolate" label={t('settings.isolate')} hint={t('settings.isolate.hint')}>
