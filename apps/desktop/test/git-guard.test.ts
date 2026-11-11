@@ -63,7 +63,8 @@ beforeEach(async () => {
 });
 afterEach(async () => {
   h.dispose();
-  await fs.rm(dir, { recursive: true, force: true });
+  // Al terminar, git apunta en segundo plano dónde quedó la carpeta [R98.4]; en Windows eso la bloquea un instante.
+  await fs.rm(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
 });
 
 async function open(withRepo = true) {
