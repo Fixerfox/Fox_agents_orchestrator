@@ -23,8 +23,9 @@ export function historyOf(items: ChatItem[]): AssistantMessage[] {
 }
 
 /** Dónde está el usuario: cambia las sugerencias y la cabecera [R38.3][R38.4]. */
-export type AssistantWhere = 'diagrams' | 'library' | 'agents' | 'knowledge' | 'jobs' | 'runs' | 'project' | 'settings';
-const SUGGESTIONS: Record<'diagrams' | 'agents' | 'knowledge', readonly MessageKey[]> = {
+export type AssistantWhere = 'diagrams' | 'library' | 'agents' | 'knowledge' | 'jobs' | 'runs' | 'versions' | 'project' | 'settings';
+const SUGGESTIONS: Record<'diagrams' | 'agents' | 'knowledge' | 'versions', readonly MessageKey[]> = {
+  versions: ['as.sug.v.1', 'as.sug.v.2', 'as.sug.v.3'],
   diagrams: ['as.sug.1', 'as.sug.2', 'as.sug.3'],
   agents: ['as.sug.a.1', 'as.sug.a.2', 'as.sug.a.3'],
   knowledge: ['as.sug.k.1', 'as.sug.k.2', 'as.sug.k.3'],
@@ -191,7 +192,7 @@ export function AssistantPanel({ api, host, tabs, setTabs, onClose, where = 'dia
     setTabs((s) => closeTab(s, tab.id));
   };
 
-  const suggestions = SUGGESTIONS[where === 'agents' || where === 'knowledge' ? where : 'diagrams'];
+  const suggestions = SUGGESTIONS[where === 'agents' || where === 'knowledge' || where === 'versions' ? where : 'diagrams'];
   const toolName = (name: string) => t(`as.t.${name}` as MessageKey);
   const toolCard = (it: ToolItem) => (
     <article key={it.id} className={`orq-assist__tool is-${it.status}`} aria-label={t('as.action', { name: toolName(it.name) })}>
@@ -492,6 +493,11 @@ function askText(name: string, args: Record<string, unknown>): string {
   if (name === 'resume_run') return t('as.ask.resume', { id: v('runId') });
   if (name === 'accept_run') return t('as.ask.accept', { id: v('runId'), reason: v('reason') });
   if (name === 'remove_step') return t('as.ask.remove', { node: v('nodeId') });
+  if (name === 'git_switch_branch') return t('as.ask.git.switch', { branch: v('name') });
+  if (name === 'git_push') return t('as.ask.git.push');
+  if (name === 'git_pull') return t('as.ask.git.pull');
+  if (name === 'git_merge_branch') return t('as.ask.git.merge', { branch: v('name') });
+  if (name === 'git_delete_branch') return t('as.ask.git.delete', { branch: v('name') });
   return t('as.ask.delete', { id: v('id') });
 }
 

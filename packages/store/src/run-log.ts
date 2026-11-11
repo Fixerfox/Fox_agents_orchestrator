@@ -118,6 +118,9 @@ export class RunLogWriter {
       this.writeMeta();
     }
     if (e.type === 'deliverable.done') this.writeDeliverable(e);
+    // Lo que la ejecución creó en git, para el visor [R98.4].
+    if (e.type === 'run.git') this.meta.git = { ...this.meta.git, branch: e.branch, ...(e.created ? { created: true } : {}), ...(e.sha ? { fromSha: e.sha } : {}) };
+    if (e.type === 'git.branch' && e.created && !(this.meta.git?.branches ?? []).includes(e.branch)) this.meta.git = { ...this.meta.git, branches: [...(this.meta.git?.branches ?? []), e.branch] };
     // La memoria se guarda al terminar cada paso y al terminar la ejecución [R72.20].
     if (e.type === 'node.finished' || e.type === 'run.finished') this.writeMemory();
     if (e.type === 'run.finished') {
@@ -312,6 +315,8 @@ export async function appendRunEvent(runDir: string, body: Record<string, unknow
   const meta = await readRunMeta(runDir);
   await appendEvent(runDir, meta.runId, body, now.toISOString());
   const usage = body['usage'] as { inputTokens?: number; outputTokens?: number; costUsd?: number } | undefined;
+  const sha = body['type'] === 'run.git.ended' && typeof body['sha'] === 'string' ? (body['sha'] as string) : undefined;
+  if (sha) meta.git = { ...meta.git, toSha: sha };
   const next = { ...meta, eventCount: meta.eventCount + 1, ...(usage ? { usage: { inputTokens: meta.usage.inputTokens + (usage.inputTokens ?? 0), outputTokens: meta.usage.outputTokens + (usage.outputTokens ?? 0), costUsd: meta.usage.costUsd + (usage.costUsd ?? 0) } } : {}) };
   atomicWriteSync(path.join(runDir, 'meta.json'), `${JSON.stringify(next, null, 2)}\n`);
 }

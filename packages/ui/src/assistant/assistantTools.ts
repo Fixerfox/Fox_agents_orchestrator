@@ -1,5 +1,5 @@
 import { COORDINATOR_ID } from '@orquestador/core';
-import { canResume, deliverableProblems, validateDiagram, newAgent, newContext, newMcpServer, newSkill, slugify, type AgentDefinition, type DeliverableItem, type DeliverableSpec, type Diagram, type McpServerDefinition, type MemoryKind } from '@orquestador/core';
+import { canResume, deliverableProblems, validateDiagram, newAgent, newContext, newMcpServer, newSkill, slugify, type AgentDefinition, type DeliverableItem, type DeliverableSpec, type Diagram, type GitAction, type McpServerDefinition, type MemoryKind } from '@orquestador/core';
 import { ASSISTANT_TOOLS, deliverableLabel, summarizeRun, t, type EditorSession, type McpView, type ProjectApi, type TerminalProgram } from '@orquestador/editor';
 import { nodeLabel } from '../runs';
 
@@ -384,6 +384,75 @@ export async function runAssistantTool(host: AssistantHost, name: string, args: 
         if (!host.openTerminal) throw new Error('La terminal no está disponible aquí.');
         const r = await host.openTerminal(program, program === 'claude' ? str(args['prompt']) : undefined);
         return { ok: true, summary: t(r.external ? 'as.tool.terminalExternal' : 'as.tool.terminal'), result: { opened: true, external: r.external } };
+      }
+      case 'git_status': {
+        const o = must(await api.gitOverview());
+        if (!o) return { ok: true, summary: t('as.git.read'), result: { repo: false } };
+        return {
+          ok: true,
+          summary: t('as.git.read'),
+          result: {
+            repo: true,
+            branch: o.state.branch ?? null,
+            ...(o.state.busy ? { busy: o.state.busy } : {}),
+            changes: o.changes.slice(0, 100).map((c) => ({ path: c.path, status: c.status })),
+            branches: o.branches.filter((b) => !b.remote).map((b) => ({ name: b.name, ...(b.current ? { current: true } : {}), ...(b.upstream ? { upstream: b.upstream, ahead: b.ahead, behind: b.behind } : {}), ...(o.origins[b.name] ? { createdBy: o.origins[b.name] } : {}) })),
+            stashes: o.stashes,
+            runningExecutions: o.running,
+          },
+        };
+      }
+      case 'git_history': {
+        const limit = Math.min(100, Math.max(1, typeof args['limit'] === 'number' ? Math.floor(args['limit']) : 20));
+        const h = must(await api.gitHistory({ limit }));
+        return { ok: true, summary: t('as.git.read'), result: h.commits.map((c) => ({ sha: c.sha.slice(0, 7), subject: c.subject, author: c.author, date: c.date, ...(c.refs.length > 0 ? { refs: c.refs } : {}), ...(h.origins[c.sha] ? { madeBy: h.origins[c.sha] } : {}) })) };
+      }
+      case 'git_create_branch':
+      case 'git_switch_branch':
+      case 'git_commit':
+      case 'git_push':
+      case 'git_pull':
+      case 'git_merge_branch':
+      case 'git_delete_branch':
+      case 'git_stash': {
+        const branch = str(args['name']);
+        const action: GitAction =
+          name === 'git_create_branch'
+            ? { kind: 'create', name: branch, ...(str(args['from']) ? { from: str(args['from']) } : {}) }
+            : name === 'git_switch_branch'
+              ? { kind: 'switch', name: branch }
+              : name === 'git_commit'
+                ? { kind: 'commit', message: str(args['message']) }
+                : name === 'git_push'
+                  ? { kind: 'push' }
+                  : name === 'git_pull'
+                    ? { kind: 'pull' }
+                    : name === 'git_merge_branch'
+                      ? { kind: 'merge', name: branch }
+                      : name === 'git_delete_branch'
+                        ? { kind: 'delete', name: branch }
+                        : { kind: 'stash', ...(str(args['label']) ? { label: str(args['label']) } : {}) };
+        const before = must(await api.gitOverview());
+        const o = must(await api.gitAct(action));
+        host.refresh();
+        const now = o.state.branch ?? '';
+        const summary =
+          action.kind === 'create'
+            ? t('as.git.created', { branch: action.name, from: action.from ?? before?.state.branch ?? '' })
+            : action.kind === 'switch'
+              ? t('as.git.switched', { branch: action.name })
+              : action.kind === 'commit'
+                ? t('as.git.committed', { n: before?.changes.length ?? 0, branch: now })
+                : action.kind === 'push'
+                  ? t('as.git.pushed', { branch: now })
+                  : action.kind === 'pull'
+                    ? t('as.git.pulled', { branch: now })
+                    : action.kind === 'merge'
+                      ? t('as.git.merged', { branch: action.name, into: now })
+                      : action.kind === 'delete'
+                        ? t('as.git.deleted', { branch: action.name })
+                        : t('as.git.stashed');
+        return { ok: true, summary, result: { done: true, branch: o.state.branch ?? null, changes: o.changes.length, ...(o.state.commit ? { commit: o.state.commit } : {}) } };
       }
       case 'run_diagram': {
         // Lo mismo que comprueba el lanzador, con todos los problemas [R85.5].

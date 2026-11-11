@@ -1,11 +1,11 @@
 import { promises as fsp } from 'node:fs';
 import { basename, isAbsolute, relative, sep } from 'node:path';
 import { isSensitivePath } from '@orquestador/claude';
-import { CHECK_TIMEOUT_SEC, clipMiddle, redactString, type CheckResult, type RunEvent, type StepCheck } from '@orquestador/core';
+import { CHECK_TIMEOUT_SEC, clipMiddle, redactString, type CheckResult, type GitAction, type RunEvent, type StepCheck } from '@orquestador/core';
 import { checkRunnerFor } from '../checks';
 import type { ProjectStore } from '@orquestador/store';
 import { CHANNELS, type RunAction, type StartRunRequest } from '@orquestador/editor';
-import { Batcher, type RunService } from '@orquestador/runtime';
+import { Batcher, type GitService, type RunService } from '@orquestador/runtime';
 import { MAX_ATTACHMENT_BYTES, MAX_INPUT_FILES, StoreError } from '@orquestador/store';
 import { UNHANDLED, requireRuns, requireStore, type HandlerState } from './state';
 
@@ -29,10 +29,35 @@ async function subscribe(h: HandlerState, runId: string, fromSeq: number): Promi
   return backlog;
 }
 
+/** El git del proyecto abierto, para el visor [R98.1]. */
+function requireGit(h: HandlerState): GitService {
+  const git = requireRuns(h).git;
+  if (!git) throw new StoreError('unavailable', 'Este proyecto no tiene control de versiones');
+  return git;
+}
+
 export async function handleRuns(h: HandlerState, channel: string, arg: unknown): Promise<unknown> {
   switch (channel) {
     case CHANNELS.startRun:
       return requireRuns(h).submit(arg as StartRunRequest);
+    case CHANNELS.gitOverview:
+      return (await requireRuns(h).git?.overview()) ?? null;
+    case CHANNELS.gitHistory:
+      return requireGit(h).history((arg as { limit?: number }).limit ?? 200);
+    case CHANNELS.gitDiff:
+      // Lo que puede llevar secretos no llega a la interfaz, como en el visor de ficheros [R98.3].
+      if (isSensitivePath((arg as { path: string }).path)) return 'Este archivo puede contener secretos: no se enseña.';
+      return requireGit(h).diff((arg as { path: string }).path);
+    case CHANNELS.gitAct: {
+      const git = requireGit(h);
+      const action = arg as GitAction;
+      // Un commit se lleva todo lo que haya: si hay algo nuevo que puede llevar secretos, no se hace desde aquí [R98.10].
+      if (action.kind === 'commit') {
+        const risky = ((await git.overview())?.changes ?? []).filter((c) => (c.status === 'untracked' || c.status === 'added') && isSensitivePath(c.path)).map((c) => c.path);
+        if (risky.length > 0) throw new StoreError('invalid', `No se hace el commit: ${risky.slice(0, 3).join(', ')} puede llevar secretos y entraría en él. Añádelo a .gitignore, o haz el commit en la terminal.`);
+      }
+      return git.act(action);
+    }
     case CHANNELS.gitGuard:
       return requireRuns(h).gitGuard((arg as { diagramId: string }).diagramId);
     case CHANNELS.listQueue:

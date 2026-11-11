@@ -73,7 +73,7 @@ describe('SPEC-097 · git de la carpeta', () => {
     git('commit', '-q', '-am', 'main');
     expect(() => git('merge', 'otra')).toThrow();
     expect((await cli().state()).busy).toBe('merge');
-    expect(parseStatus('# branch.oid abcdef0123\n# branch.head feature/x\n# branch.upstream origin/feature/x\n# branch.ab +1 -4\n1 .M N... 100644 100644 100644 a b a.txt\n? nuevo.txt\n')).toEqual({ commit: 'abcdef0', branch: 'feature/x', behind: 4, dirty: 2 });
+    expect(parseStatus('# branch.oid abcdef0123\n# branch.head feature/x\n# branch.upstream origin/feature/x\n# branch.ab +1 -4\n1 .M N... 100644 100644 100644 a b a.txt\n? nuevo.txt\n')).toEqual({ commit: 'abcdef0', head: 'abcdef0123', branch: 'feature/x', behind: 4, dirty: 2 });
     expect(parseStatus('# branch.oid (initial)\n# branch.head (detached)\n')).toEqual({ dirty: 0 });
   });
 

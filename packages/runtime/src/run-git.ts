@@ -1,4 +1,4 @@
-import { branchGuard, defaultChoice, suggestBranchName, type GitChoice, type GitState, type RunGit, type VersionControl } from '@orquestador/core';
+import { branchGuard, defaultChoice, suggestBranchName, type GitChoice, type GitState, type RunGit, type BranchGuardPort } from '@orquestador/core';
 import { RunError } from './errors';
 
 /** Lo que el diálogo «Ejecutar» necesita saber de git: estado sin rutas, nombre propuesto y si hay otras en marcha [R97.2]. */
@@ -14,7 +14,7 @@ export interface RunGitContext {
   now: Date;
 }
 
-export async function gitGuardInfo(git: VersionControl, ctx: RunGitContext): Promise<GitGuardInfo> {
+export async function gitGuardInfo(git: BranchGuardPort, ctx: RunGitContext): Promise<GitGuardInfo> {
   const state = await git.state();
   return { state, suggested: suggestBranchName(ctx.diagramName, ctx.now, state.branches), otherRuns: ctx.otherRuns };
 }
@@ -24,13 +24,13 @@ export async function gitGuardInfo(git: VersionControl, ctx: RunGitContext): Pro
  * Sin elección (cola, asistente, trabajos) se aplica la de por defecto. Devuelve lo que la ejecución apunta, o
  * `undefined` si la carpeta no es un repositorio.
  */
-export async function prepareRunGit(git: VersionControl, choice: GitChoice | undefined, ctx: RunGitContext): Promise<RunGit | undefined> {
+export async function prepareRunGit(git: BranchGuardPort, choice: GitChoice | undefined, ctx: RunGitContext): Promise<RunGit | undefined> {
   const state = await git.state();
   const verdict = branchGuard(state, choice ?? defaultChoice(state, ctx.diagramName, ctx.now), { otherRuns: ctx.otherRuns, explicit: choice !== undefined, label: ctx.diagramName });
   if (!verdict) return undefined;
   if (!verdict.ok) throw new RunError('git-guard', verdict.problem.message);
   const { plan } = verdict;
-  if (!plan.create) return { branch: plan.branch, ...(state.commit ? { commit: state.commit } : {}), ...(state.dirty > 0 ? { dirty: state.dirty } : {}) };
+  if (!plan.create) return { branch: plan.branch, ...(state.commit ? { commit: state.commit } : {}), ...(state.head ? { sha: state.head } : {}), ...(state.dirty > 0 ? { dirty: state.dirty } : {}) };
   let stashed = false;
   try {
     if (plan.stash) stashed = await git.stash(plan.stash);
@@ -43,6 +43,7 @@ export async function prepareRunGit(git: VersionControl, choice: GitChoice | und
   return {
     branch: plan.branch,
     ...(after.commit ? { commit: after.commit } : {}),
+    ...(after.head ? { sha: after.head } : {}),
     created: true,
     from: plan.create.from ?? state.branch!,
     ...(stashed ? { stash: plan.stash! } : {}),
@@ -51,8 +52,8 @@ export async function prepareRunGit(git: VersionControl, choice: GitChoice | und
 }
 
 /** Rama en la que está la carpeta, para reanudar y corregir: no se cambia nada [R97.9]. */
-export async function currentRunGit(git: VersionControl): Promise<RunGit | undefined> {
+export async function currentRunGit(git: BranchGuardPort): Promise<RunGit | undefined> {
   const state = await git.state().catch(() => undefined);
   if (!state?.repo || state.branch === undefined) return undefined;
-  return { branch: state.branch, ...(state.commit ? { commit: state.commit } : {}), ...(state.dirty > 0 ? { dirty: state.dirty } : {}) };
+  return { branch: state.branch, ...(state.commit ? { commit: state.commit } : {}), ...(state.head ? { sha: state.head } : {}), ...(state.dirty > 0 ? { dirty: state.dirty } : {}) };
 }

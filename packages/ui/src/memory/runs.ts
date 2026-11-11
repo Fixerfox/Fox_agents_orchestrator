@@ -11,13 +11,15 @@ import {
   validateDiagram,
   branchGuard,
   defaultChoice,
+  gitActionProblem,
   suggestBranchName,
   type Diagram,
+  type GitAction,
   type RunEvent,
   type RunGit,
   type RunOptions,
 } from '@orquestador/core';
-import { fail, ok, type ApiResult, type QueuedRunView, type RunSummary } from '@orquestador/editor';
+import { fail, ok, type ApiResult, type GitOverviewView, type QueuedRunView, type RunSummary } from '@orquestador/editor';
 import type { MemoryApi, MemoryApiOptions, MemoryState, RunEntry } from './types';
 import { memoryProjectMemory } from './project-memory';
 
@@ -47,6 +49,49 @@ export function memoryRuns(s: MemoryState, options: MemoryApiOptions) {
   const orchestrator = options.orchestrator ?? defaultOrchestrator(saved);
   const listeners = new Set<(runId: string, events: RunEvent[]) => void>();
   const gitChoices: MemoryApi['gitChoices'] = [];
+  const gitActions: MemoryApi['gitActions'] = [];
+  const repo = options.repo ? structuredClone(options.repo) : undefined;
+  /** Aplica una acción al repositorio simulado, lo justo para que la interfaz vea el efecto [R98.6]. */
+  const applyGit = (o: GitOverviewView, a: GitAction): void => {
+    const local = o.branches.filter((b) => !b.remote);
+    const current = local.find((b) => b.current);
+    const go = (name: string) => {
+      for (const b of o.branches) delete b.current;
+      const to = o.branches.find((b) => !b.remote && b.name === name);
+      if (to) to.current = true;
+      o.state.branch = name;
+    };
+    if (a.kind === 'create') {
+      o.branches.unshift({ name: a.name, sha: current?.sha ?? '0'.repeat(40) });
+      o.state.branches = [...o.state.branches, a.name];
+      go(a.name);
+    } else if (a.kind === 'switch') go(a.name);
+    else if (a.kind === 'commit') {
+      const sha = `c${String(gitActions.length).padStart(39, '0')}`;
+      if (repo?.history) repo.history.commits.unshift({ sha, parents: current ? [current.sha] : [], subject: a.message, author: 'tú', date: new Date().toISOString(), refs: current ? [current.name] : [] });
+      if (current) {
+        current.sha = sha;
+        current.ahead = (current.ahead ?? 0) + 1;
+      }
+      o.changes = [];
+      o.state.dirty = 0;
+    } else if (a.kind === 'push') {
+      if (current) Object.assign(current, { ahead: 0, upstream: current.upstream ?? `origin/${current.name}`, behind: current.behind ?? 0 });
+    } else if (a.kind === 'pull') {
+      if (current) current.behind = 0;
+    } else if (a.kind === 'delete') {
+      o.branches = o.branches.filter((b) => b.remote || b.name !== a.name);
+      o.state.branches = o.state.branches.filter((b) => b !== a.name);
+    } else if (a.kind === 'stash') {
+      o.stashes = [{ index: 0, label: a.label ?? 'orquestador: apartado a mano' }, ...o.stashes.map((s) => ({ ...s, index: s.index + 1 }))];
+      o.changes = [];
+      o.state.dirty = 0;
+    } else if (a.kind === 'stash-pop') {
+      o.stashes = o.stashes.filter((s) => s.index !== a.index);
+      o.state.dirty = 1;
+      o.changes = [{ path: 'recuperado.txt', status: 'modified' }];
+    }
+  };
   /** Ejecución que reanudó a cada una [R41.2]. */
   const resumedBy = new Map<string, string>();
   /** Ejecuciones que corrigieron a cada una [R53.11]. */
@@ -215,6 +260,26 @@ export function memoryRuns(s: MemoryState, options: MemoryApiOptions) {
       return ok({ state: structuredClone(options.git.state), suggested: options.git.suggested ?? suggestBranchName(d.name, new Date(), options.git.state.branches), otherRuns: options.git.otherRuns ?? 0 });
     },
     gitChoices,
+    gitActions,
+    async gitOverview() {
+      return ok(repo ? structuredClone(repo.overview) : null);
+    },
+    async gitHistory() {
+      return ok(structuredClone(repo?.history ?? { commits: [], origins: {} }));
+    },
+    async gitDiff(req) {
+      return ok(repo?.diffs?.[req.path] ?? '');
+    },
+    async gitAct(action) {
+      if (!repo) return fail('unavailable', 'Este proyecto no tiene control de versiones');
+      const o = repo.overview;
+      const problem = gitActionProblem(action, o.state, { running: o.running, branches: o.branches.filter((b) => !b.remote).map((b) => b.name) });
+      if (problem) return fail('git-guard', problem);
+      if (repo.actError) return fail('git-guard', repo.actError);
+      gitActions.push(action);
+      applyGit(o, action);
+      return ok(structuredClone(o));
+    },
     async startRun(req) {
       const d = saved.get(req.diagramId);
       if (!d) return fail('not-found', 'No existe ese diagrama');

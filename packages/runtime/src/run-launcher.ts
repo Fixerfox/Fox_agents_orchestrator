@@ -1,4 +1,4 @@
-import { deliverableProblems, validateDiagram, type Diagram, type LibraryReader, type Payload, type RunGit, type RunOptions, type RunRepository, type VersionControl } from '@orquestador/core';
+import { deliverableProblems, validateDiagram, type Diagram, type LibraryReader, type Payload, type RunGit, type RunOptions, type RunRepository, type BranchGuardPort } from '@orquestador/core';
 import { currentRunGit, gitGuardInfo, prepareRunGit, type GitGuardInfo } from './run-git';
 import { RunError } from './errors';
 import { takeSnapshot, type LibrarySnapshot, type RunSnapshots } from './snapshot';
@@ -13,7 +13,7 @@ export class RunLauncher {
     readonly defaults: () => RunOptions,
     private readonly snapshots: RunSnapshots | undefined,
     /** Git de la carpeta y cuántas ejecuciones hay en marcha en ella [R97.1]. */
-    private readonly git?: VersionControl,
+    private readonly git?: BranchGuardPort,
     private readonly otherRuns: () => number = () => 0,
     private readonly now: () => Date = () => new Date(),
   ) {}

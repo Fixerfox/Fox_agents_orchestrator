@@ -9,6 +9,8 @@ export interface GitState {
   branch?: string;
   /** Commit de `HEAD`, abreviado; un repositorio sin commits no lo tiene. */
   commit?: string;
+  /** El mismo commit, entero. */
+  head?: string;
   /** Archivos con cambios sin commit (también los nuevos sin seguir). */
   dirty: number;
   busy?: GitBusy;
@@ -31,6 +33,8 @@ export const FROM_HERE = 'here';
 export interface RunGit {
   branch: string;
   commit?: string;
+  /** El commit de partida, entero, para saber luego qué commits hizo la ejecución [R98.4]. */
+  sha?: string;
   /** La rama se creó para esta ejecución, y desde cuál. */
   created?: boolean;
   from?: string;
