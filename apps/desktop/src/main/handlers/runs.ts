@@ -82,7 +82,7 @@ export async function handleRuns(h: HandlerState, channel: string, arg: unknown)
       return requireRuns(h).saveMemoryEntry(entry, by ?? 'user');
     }
     case CHANNELS.tryCheck:
-      return tryCheck(requireStore(h), h.root ?? requireStore(h).paths.root, arg as StepCheck);
+      return tryCheck(requireStore(h), arg as StepCheck);
     case CHANNELS.controlRun: {
       const { runId, action } = arg as { runId: string; action: RunAction };
       const runs = requireRuns(h);
@@ -165,8 +165,8 @@ export async function handleRuns(h: HandlerState, channel: string, arg: unknown)
  * «Ejecutar ahora» desde el lateral [R75.24]: la persona escribe y lanza el comando, así que queda aprobado. Las que
  * miran la salida del paso solo se pueden probar al ejecutarlo.
  */
-export async function tryCheck(store: ProjectStore, root: string, check: StepCheck): Promise<CheckResult> {
-  const runner = checkRunnerFor(store, root);
+export async function tryCheck(store: ProjectStore, check: StepCheck): Promise<CheckResult> {
+  const runner = checkRunnerFor(store);
   const started = Date.now();
   const base = { checkId: check.id, label: check.label, kind: check.kind };
   if (check.kind === 'command') {

@@ -16,7 +16,6 @@ let h: DesktopHandlers;
 let pushed: RunEvent[];
 let seen: { cwd?: string; system?: string; tools?: string[] };
 let script: (canUse: NonNullable<Parameters<QueryFn>[0]['options']['canUseTool']>) => Promise<string>;
-let workPick: string | null;
 
 const cipher = { available: () => true, encrypt: (s: string) => Buffer.from(`c:${s}`), decrypt: (b: Buffer) => b.toString().slice(2) };
 const query: QueryFn = async function* ({ options }) {
@@ -46,12 +45,11 @@ beforeEach(async () => {
   await fs.mkdir(join(work, 'src'), { recursive: true });
   await fs.writeFile(join(work, 'README.md'), '# Mi juego de naves');
   await fs.writeFile(join(work, 'src', 'viejo.ts'), 'original');
-  workPick = work;
   pushed = [];
   seen = {};
   script = async () => 'Hecho';
   h = new DesktopHandlers({
-    pickFolder: async (purpose) => (purpose === 'work' ? workPick : join(dir, 'proyecto')),
+    pickFolder: async () => work,
     createOrchestrator: (ctx) => composeOrchestrator(ctx, query),
     claudeQuery: query,
     settings: new SettingsStore(join(dir, 'config')),
@@ -88,44 +86,38 @@ const question = async () => {
 };
 
 describe('SPEC-031 · carpeta de trabajo por IPC', () => {
-  it('[R31.1] elegir devuelve solo nombre y número de archivos, y se recupera después sin ruta', async () => {
+  it('[R31.1][R96.1][R96.2] la carpeta es la del proyecto: nombre y número de archivos, nunca la ruta', async () => {
     await open();
-    expect(val(await h.invoke(CHANNELS.getWorkFolder, undefined))).toBeNull();
-    const picked = val(await h.invoke(CHANNELS.pickWorkFolder, undefined));
-    expect(picked).toEqual({ name: 'mi-juego', files: 2 });
-    expect(val(await h.invoke(CHANNELS.getWorkFolder, undefined))).toEqual(picked);
-    expect(JSON.stringify(picked)).not.toContain(dir);
+    const folder = val(await h.invoke(CHANNELS.getWorkFolder, undefined));
+    expect(folder).toEqual({ name: 'mi-juego', files: 2 });
+    expect(JSON.stringify(folder)).not.toContain(dir);
+    // `.orquestador` está dentro de la carpeta en la que se trabaja.
+    expect((await fs.stat(join(work, '.orquestador', 'project.json'))).isFile()).toBe(true);
   });
 
-  it('[R31.1] cancelar el diálogo no cambia nada y quitar la carpeta la deja sin elegir', async () => {
+  it('[R31.1][R96.2] ya no se puede elegir ni quitar una carpeta aparte', async () => {
     await open();
-    workPick = null;
-    expect(val(await h.invoke(CHANNELS.pickWorkFolder, undefined))).toBeNull();
-    workPick = work;
-    val(await h.invoke(CHANNELS.pickWorkFolder, undefined));
-    val(await h.invoke(CHANNELS.clearWorkFolder, undefined));
-    expect(val(await h.invoke(CHANNELS.getWorkFolder, undefined))).toBeNull();
+    expect(CHANNELS).not.toHaveProperty('pickWorkFolder');
+    expect(CHANNELS).not.toHaveProperty('clearWorkFolder');
+    expect(await h.invoke('workfolder:pick', undefined)).toMatchObject({ ok: false });
+    expect(await h.invoke('workfolder:clear', undefined)).toMatchObject({ ok: false });
   });
 
-  it('[R31.1] la carpeta se recuerda al reabrir el proyecto y desaparece si ya no existe', async () => {
+  it('[R31.1] la carpeta sigue siendo la misma al reabrir el proyecto', async () => {
     await open();
-    val(await h.invoke(CHANNELS.pickWorkFolder, undefined));
     val(await h.invoke(CHANNELS.closeProject, undefined));
     val(await h.invoke(CHANNELS.openProject, undefined));
     expect(val(await h.invoke(CHANNELS.getWorkFolder, undefined))).toMatchObject({ name: 'mi-juego' });
-    await fs.rm(work, { recursive: true, force: true });
-    expect(val(await h.invoke(CHANNELS.getWorkFolder, undefined))).toBeNull();
   });
 
   it('[R31.1] sin proyecto abierto se explica y no se crea nada', async () => {
-    expect(await h.invoke(CHANNELS.pickWorkFolder, undefined)).toMatchObject({ ok: false });
     expect(await h.invoke(CHANNELS.getWorkFolder, undefined)).toMatchObject({ ok: false });
   });
 
   it('[R31.10] el contrato rechaza argumentos de más y campos extra', async () => {
     await open();
-    expect(await h.invoke(CHANNELS.pickWorkFolder, '/etc')).toMatchObject({ ok: false, error: { code: 'bad-request' } });
-    expect(await h.invoke(CHANNELS.clearWorkFolder, { path: '/' })).toMatchObject({ ok: false, error: { code: 'bad-request' } });
+    expect(await h.invoke(CHANNELS.getWorkFolder, '/etc')).toMatchObject({ ok: false, error: { code: 'bad-request' } });
+    expect(await h.invoke(CHANNELS.inspectWorkFolder, { path: '/' })).toMatchObject({ ok: false, error: { code: 'bad-request' } });
     expect(await h.invoke(CHANNELS.restoreBackup, { runId: 'r1', path: 'a.ts', to: '/x' })).toMatchObject({ ok: false, error: { code: 'bad-request' } });
     expect(await h.invoke(CHANNELS.restoreBackup, { runId: '../r', path: 'a.ts' })).toMatchObject({ ok: false, error: { code: 'bad-request' } });
     expect(await h.invoke(CHANNELS.listBackups, '../r')).toMatchObject({ ok: false, error: { code: 'bad-request' } });
@@ -143,7 +135,6 @@ describe('SPEC-031 · carpeta de trabajo por IPC', () => {
 describe('SPEC-031 · los agentes trabajan sobre la carpeta', () => {
   it('[R31.2] el agente recibe la carpeta como directorio de trabajo y su resumen', async () => {
     await open();
-    val(await h.invoke(CHANNELS.pickWorkFolder, undefined));
     await startRun();
     await finished();
     expect(seen.cwd).toBe(work);
@@ -154,7 +145,6 @@ describe('SPEC-031 · los agentes trabajan sobre la carpeta', () => {
 
   it('[R31.3] crear un archivo nuevo no genera ninguna pregunta', async () => {
     await open();
-    val(await h.invoke(CHANNELS.pickWorkFolder, undefined));
     script = async (canUse) => {
       const r = await canUse('Write', { file_path: 'src/nave.ts', content: 'x' });
       return r.behavior;
@@ -167,7 +157,6 @@ describe('SPEC-031 · los agentes trabajan sobre la carpeta', () => {
 
   it('[R31.4][R31.6] modificar uno existente pregunta en el chat del nodo; al permitir se guarda la copia y se puede restaurar', async () => {
     await open();
-    val(await h.invoke(CHANNELS.pickWorkFolder, undefined));
     script = async (canUse) => {
       const r = await canUse('Edit', { file_path: 'src/viejo.ts' });
       if (r.behavior === 'allow') await fs.writeFile(join(work, 'src', 'viejo.ts'), 'cambiado por el agente');
@@ -187,7 +176,6 @@ describe('SPEC-031 · los agentes trabajan sobre la carpeta', () => {
 
   it('[R31.4] si el usuario deniega, el archivo no se toca y no hay copia', async () => {
     await open();
-    val(await h.invoke(CHANNELS.pickWorkFolder, undefined));
     script = async (canUse) => (await canUse('Write', { file_path: 'src/viejo.ts', content: 'x' })).behavior;
     const runId = await startRun();
     const q = await question();
@@ -199,7 +187,6 @@ describe('SPEC-031 · los agentes trabajan sobre la carpeta', () => {
 
   it('[R31.4] con el modo automático no pregunta pero guarda la copia', async () => {
     await open({ permissions: 'auto' });
-    val(await h.invoke(CHANNELS.pickWorkFolder, undefined));
     script = async (canUse) => (await canUse('Edit', { file_path: 'src/viejo.ts' })).behavior;
     const runId = await startRun();
     await finished();
@@ -209,7 +196,6 @@ describe('SPEC-031 · los agentes trabajan sobre la carpeta', () => {
 
   it('[R31.5] no se puede escribir ni restaurar fuera de la carpeta', async () => {
     await open({ permissions: 'auto' });
-    val(await h.invoke(CHANNELS.pickWorkFolder, undefined));
     let verdict = '';
     script = async (canUse) => {
       verdict = (await canUse('Write', { file_path: join(dir, 'fuera.txt'), content: 'x' })).behavior;
@@ -240,7 +226,7 @@ describe('SPEC-031 · los agentes trabajan sobre la carpeta', () => {
 });
 
 describe('SPEC-032 · carpeta del proyecto con .claude', () => {
-  it('[R32.16] analiza .claude, .mcp.json y los documentos guía de la carpeta sin instalar nada; confirmar instala', async () => {
+  it('[R32.16][R96.3] analiza .claude, .mcp.json y los documentos guía de la carpeta del proyecto, sin elegirla ni instalar nada; confirmar instala', async () => {
     await fs.mkdir(join(work, '.claude', 'agents'), { recursive: true });
     await fs.mkdir(join(work, '.claude', 'skills', 'pixel-art'), { recursive: true });
     await fs.writeFile(join(work, '.claude', 'agents', 'pixelador.md'), '---\nname: pixelador\ndescription: Pinta sprites\nskills: pixel-art\n---\nDibuja.\n');
@@ -248,8 +234,6 @@ describe('SPEC-032 · carpeta del proyecto con .claude', () => {
     await fs.writeFile(join(work, '.mcp.json'), '{"mcpServers":{"pixelart-mcp":{"command":"npx"}}}');
     await fs.writeFile(join(work, 'CLAUDE.md'), '# Normas\nTodo en español.');
     await open();
-    expect(await h.invoke(CHANNELS.inspectWorkFolder, undefined)).toMatchObject({ ok: false });
-    val(await h.invoke(CHANNELS.pickWorkFolder, undefined));
     const r = val<{ importId: string; report: { items: { key: string; kind: string; name: string }[]; mcp: { name: string }[] }; folder: { name: string }; summary: string; docs: { name: string; text: string }[] }>(
       await h.invoke(CHANNELS.inspectWorkFolder, undefined),
     );
@@ -268,7 +252,6 @@ describe('SPEC-032 · carpeta del proyecto con .claude', () => {
 
   it('[R32.16] una carpeta sin .claude devuelve un informe vacío con el resumen; el contrato rechaza argumentos', async () => {
     await open();
-    val(await h.invoke(CHANNELS.pickWorkFolder, undefined));
     const r = val<{ report: { items: unknown[] }; docs: unknown[] }>(await h.invoke(CHANNELS.inspectWorkFolder, undefined));
     expect(r.report.items).toEqual([]);
     expect(r.docs).toEqual([]);
@@ -279,7 +262,6 @@ describe('SPEC-032 · carpeta del proyecto con .claude', () => {
 describe('SPEC-045 · ver los ficheros que tocó una ejecución', () => {
   it('[R45.11] readRunFile da lo de ahora y la copia de antes, solo de ficheros que registró la ejecución', async () => {
     await open({ permissions: 'auto' });
-    val(await h.invoke(CHANNELS.pickWorkFolder, undefined));
     await fs.writeFile(join(work, '.env'), 'CLAVE=1');
     script = async (canUse) => {
       await canUse('Edit', { file_path: 'src/viejo.ts' });

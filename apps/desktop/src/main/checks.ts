@@ -42,7 +42,7 @@ async function listFiles(root: string, max = 20_000): Promise<string[]> {
 }
 
 /** Comprobaciones del proyecto: comandos aprobados en su carpeta y archivos que existen [R75.4][R75.6]. */
-export function checkRunnerFor(store: Pick<ProjectStore, 'paths' | 'getWorkFolder'>, projectRoot: string, approvalsFile?: string): CheckRunner {
+export function checkRunnerFor(store: Pick<ProjectStore, 'paths' | 'getWorkFolder'>, approvalsFile?: string): CheckRunner {
   // Las aprobaciones viven en los datos de la app: las de un repositorio no cuentan [R88.5].
   const file = approvalsFile ?? store.paths.approvedChecksFile;
   const read = async (): Promise<string[]> => {
@@ -53,7 +53,7 @@ export function checkRunnerFor(store: Pick<ProjectStore, 'paths' | 'getWorkFolde
       return [];
     }
   };
-  const root = async (dir?: string) => dir ?? (await store.getWorkFolder()) ?? projectRoot;
+  const root = async (dir?: string) => dir ?? (await store.getWorkFolder());
   return {
     approved: async (run) => (await read()).includes(hashOf(run)),
     async approve(run) {
@@ -99,10 +99,10 @@ export function checkRunnerFor(store: Pick<ProjectStore, 'paths' | 'getWorkFolde
 }
 
 /** El diff de lo que tocó un paso, contra la copia de antes (R31.6) [R75.7]. */
-export function evidenceFor(store: Pick<ProjectStore, 'paths' | 'getWorkFolder'>, projectRoot: string): EvidenceSource {
+export function evidenceFor(store: Pick<ProjectStore, 'paths' | 'getWorkFolder'>): EvidenceSource {
   return {
     async diff({ runId, files, dir, priority, maxChars }) {
-      const root = dir ?? (await store.getWorkFolder()) ?? projectRoot;
+      const root = dir ?? (await store.getWorkFolder());
       const backups = store.paths.backupsDir(runId);
       const read = (abs: string) => fs.readFile(abs, 'utf8').catch(() => undefined);
       const parts: { path: string; text: string; size: number; first: boolean }[] = [];

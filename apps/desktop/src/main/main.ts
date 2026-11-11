@@ -158,7 +158,7 @@ const handlers = new DesktopHandlers({
   }),
   pickFolder: (purpose) => dialogs.one(async () => {
     const res = await dialog.showOpenDialog({
-      title: purpose === 'create' ? 'Elige o crea la carpeta del proyecto' : purpose === 'work' ? 'Elige la carpeta de trabajo de los agentes' : 'Abre la carpeta de un proyecto',
+      title: purpose === 'create' ? 'Elige o crea la carpeta del proyecto' : 'Abre la carpeta de un proyecto',
       properties: purpose === 'create' ? ['openDirectory', 'createDirectory'] : ['openDirectory'],
     });
     return res.canceled ? null : (res.filePaths[0] ?? null);

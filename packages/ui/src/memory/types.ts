@@ -29,8 +29,12 @@ export interface MemoryApiOptions {
   skillFiles?: Record<string, Record<string, string>>;
   /** Archivos que «elegirá» el usuario al añadir referencias; sin ellos el diálogo se cancela [R24.9]. */
   pickedFiles?: SourceTree;
-  /** Carpeta que «elegirá» el usuario como carpeta de trabajo; sin ella el diálogo se cancela [R31.1]. */
-  workFolderPick?: { name: string; files: number };
+  /** La carpeta del proyecto; `separate` simula un proyecto antiguo sin unir [R96.2][R96.4]. */
+  workFolder?: { name: string; files: number; separate?: boolean };
+  /** Motivo con el que falla «Unir» [R96.6]. */
+  joinError?: string;
+  /** La opción «Orquestador y git»; sin ella no se ofrece [R96.9]. */
+  gitIgnore?: { available: boolean; exists: boolean; mode: 'shared' | 'all' };
   /** Lo que devuelven «Adjuntar» y «Del proyecto…» (en los tests) [R48.3]. */
   attachPick?: { name: string; size: number }[];
   projectPick?: { path: string; size: number }[];

@@ -51,8 +51,7 @@ describe('SPEC-047 · permisos en la ficha del agente', () => {
   });
 
   it('[R47.11] «Proyecto · Acceso» muestra el nivel de los permisos', async () => {
-    const api = await mount({ workFolderPick: { name: 'INCWars', files: 10 } }, 'full');
-    await api.pickWorkFolder();
+    await mount({ workFolder: { name: 'INCWars', files: 10 } }, 'full');
     const rail = within(screen.getByRole('navigation', { name: 'Secciones' }));
     await userEvent.click(rail.getByRole('button', { name: 'Proyecto' }));
     const access = within(await screen.findByRole('region', { name: 'Acceso' }));

@@ -313,7 +313,7 @@ describe('SPEC-071 · volver al punto de partida', () => {
           return true;
         },
       };
-      const r = await restoreAttemptFiles(store as never, dir)('run-1', [
+      const r = await restoreAttemptFiles(store as never)('run-1', [
         { path: 'nuevo.ts', change: 'created' },
         { path: 'viejo.ts', change: 'modified' },
         { path: 'sin-copia.ts', change: 'modified' },

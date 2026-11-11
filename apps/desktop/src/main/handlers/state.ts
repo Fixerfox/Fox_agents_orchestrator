@@ -12,7 +12,7 @@ export interface DesktopDeps {
   /** Los proyectos nuevos traen Spec Kit (skills y agentes en la carpeta «Spec Kit») [R38.15]. La app lo activa. */
   preinstallSpecKit?: boolean;
   /** Diálogo del sistema para elegir carpeta; `null` si se cancela. El renderer nunca elige rutas. */
-  pickFolder(purpose: 'create' | 'open' | 'work'): Promise<string | null>;
+  pickFolder(purpose: 'create' | 'open'): Promise<string | null>;
   /** Diálogo para elegir la carpeta o el Zip a instalar; `null` si se cancela [R25.1]. */
   pickImport?(kind: ImportKind): Promise<string | null>;
   /** Diálogo para elegir archivos o una carpeta de referencia de una skill [R24.9]. */
@@ -123,8 +123,10 @@ export function scrubPaths(message: string, root?: string): string {
 /** Clave de los secretos de un servidor MCP: proyecto (por su carpeta) e id, o `app:<id>` si es de la app [R30.8][R30.9]. */
 export function mcpVaultKey(root: string, id: string, scope?: 'project' | 'app'): string {
   if (scope === 'app') return `app:${id}`;
-  return `${createHash('sha256').update(root).digest('hex').slice(0, 16)}:${id}`;
+  return `${mcpVaultPrefix(root)}:${id}`;
 }
+/** Lo que llevan delante las claves de los secretos de un proyecto: sale de su carpeta [R30.8][R96.7]. */
+export const mcpVaultPrefix = (root: string): string => createHash('sha256').update(root).digest('hex').slice(0, 16);
 
 /**
  * Lo que trae la configuración de Claude Code del proyecto abierto (su carpeta, la de trabajo y `dir`) y la decisión
@@ -132,7 +134,7 @@ export function mcpVaultKey(root: string, id: string, scope?: 'project' | 'app')
  */
 export async function projectTrustState(h: HandlerState, dir?: string): Promise<{ items: ConfigRisk[]; fingerprint: string; decision: TrustDecision | null }> {
   if (!h.root) return { items: [], fingerprint: '', decision: null };
-  const work = await h.store?.getWorkFolder().catch(() => undefined);
+  const work = await h.store?.separateWorkFolder().catch(() => undefined);
   const scan = await scanClaudeConfig([h.root, ...(work ? [work] : []), ...(dir ? [dir] : [])]);
   const decision = scan.items.length > 0 ? ((await h.deps.trust?.decision(h.root, scan.fingerprint)) ?? null) : null;
   return { ...scan, decision };

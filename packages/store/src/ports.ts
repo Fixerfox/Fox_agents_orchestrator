@@ -25,7 +25,7 @@ export function runRepositoryOf(store: ProjectStore): RunRepository {
     findPreview: (runId, key, rel) => findPreview(dir(runId), key, rel),
     findConflict: (runId, rel) => findConflict(dir(runId), rel),
     outputFolder: (runId) => path.join(dir(runId), 'output'),
-    workRoot: async () => (await store.getWorkFolder()) ?? store.paths.root,
+    workRoot: () => store.getWorkFolder(),
     inputFiles: (rels) => store.inputFiles(rels),
     attachmentInputPath: (id) => store.attachmentInputPath(id),
   };

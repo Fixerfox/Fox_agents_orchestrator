@@ -5,9 +5,9 @@ import { summarizeFolder } from '@orquestador/claude';
 import { analyzeImport, defaultSettings, folderLabel, type RecentView } from '@orquestador/core';
 import { CHANNELS, installSpecKitInto, type ProjectInfo, type SpecKitTarget, type TerminalStartRequest } from '@orquestador/editor';
 import { RunService, RunSnapshots, runDefaultsFrom } from '@orquestador/runtime';
-import { StoreError, projectKey, readFolder, type ProjectStore } from '@orquestador/store';
+import { StoreError, joinProjectIntoWorkFolder, projectKey, readFolder, rootGitignoreState, setRootGitignore, type ProjectStore } from '@orquestador/store';
 import { composeRunPorts, createProject, openProject } from '../composition';
-import { UNHANDLED, disposeHandlers, mcpVaultKey, projectConfigTrusted, projectTrustState, requireStore, type HandlerState } from './state';
+import { UNHANDLED, disposeHandlers, mcpVaultKey, mcpVaultPrefix, projectConfigTrusted, projectTrustState, requireStore, type HandlerState } from './state';
 
 /** Documentos guía de la raíz de la carpeta del proyecto que se ofrecen como contexto común [R32.16]. */
 const GUIDE_DOCS = ['CLAUDE.md', 'TRABAJO.md', 'AGENTS.md'] as const;
@@ -150,26 +150,30 @@ export async function handleProject(h: HandlerState, channel: string, arg: unkno
     case CHANNELS.terminalKill:
       return h.deps.terminals?.kill(arg as string) ?? false;
     case CHANNELS.getWorkFolder: {
-      const folder = await requireStore(h).getWorkFolder();
-      if (!folder) return null;
-      const s = await summarizeFolder(folder);
-      return { name: s.name, files: s.files };
-    }
-    case CHANNELS.pickWorkFolder: {
       const store = requireStore(h);
-      const picked = await h.deps.pickFolder('work');
-      if (!picked) return null;
-      await store.setWorkFolder(picked);
-      const s = await summarizeFolder(picked);
-      return { name: s.name, files: s.files };
+      const s = await summarizeFolder(await store.getWorkFolder());
+      return { name: s.name, files: s.files, ...((await store.separateWorkFolder()) ? { separate: true } : {}) };
     }
-    case CHANNELS.clearWorkFolder:
-      await requireStore(h).setWorkFolder(null);
-      return null;
+    case CHANNELS.joinWorkFolder: {
+      const store = requireStore(h);
+      const from = h.root!;
+      if ((h.runs?.runningCount() ?? 0) + (h.runs?.queued().length ?? 0) > 0) throw new StoreError('unavailable', 'Hay ejecuciones en marcha o en cola: espera a que terminen o cancélalas antes de unir el proyecto');
+      const joined = await joinProjectIntoWorkFolder(store);
+      // Lo que la app guarda por carpeta pasa a la nueva: secretos MCP y recientes [R96.7].
+      await h.deps.mcpVault?.movePrefix(mcpVaultPrefix(from), mcpVaultPrefix(joined.root)).catch(() => undefined);
+      const old = (await h.deps.recents?.list().catch(() => []))?.find((r) => r.root === from);
+      if (old) await h.deps.recents?.forget(old.id).catch(() => undefined);
+      return setProject(h, joined.root, joined.store);
+    }
+    case CHANNELS.getGitIgnore:
+      requireStore(h);
+      return rootGitignoreState(h.root!);
+    case CHANNELS.setGitIgnore:
+      requireStore(h);
+      return setRootGitignore(h.root!, arg as 'all' | 'shared');
     case CHANNELS.inspectWorkFolder: {
       const store = requireStore(h);
       const folder = await store.getWorkFolder();
-      if (!folder) throw new StoreError('not-found', 'Elige primero la carpeta del proyecto');
       h.pending = undefined;
       const files = (await isDir(join(folder, '.claude'))) ? (await readFolder(join(folder, '.claude'))).files : [];
       const mcp = await readSmall(join(folder, '.mcp.json'), 200_000);

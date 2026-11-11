@@ -5,6 +5,7 @@ import { t, type LiveView, type MessageKey, type ProjectApi, type WorkFolderInsp
 import { MarkdownField } from '../common';
 import { permissionName } from '../common';
 import { ProjectMemoryPanel } from './ProjectMemoryPanel';
+import { SeparateFolderNotice } from './ProjectFolderOptions';
 
 interface Props {
   api: ProjectApi;
@@ -21,7 +22,7 @@ interface Props {
 
 /** Proyecto (prototipo «Carpeta 3»): la carpeta conectada, sus agentes, lo último que se tocó y el acceso [R32.17]. */
 export function ProjectScreen({ api, live, startWizard, onWizardShown, onChanged, onGoDiagrams, onOpenSettings, onOpenRun }: Props) {
-  const [folder, setFolder] = useState<WorkFolderView | null>();
+  const [folder, setFolder] = useState<WorkFolderView>();
   const [agents, setAgents] = useState<AgentDefinition[]>([]);
   const [level, setLevel] = useState<ProjectPermission>('auto');
   const [wizard, setWizard] = useState(Boolean(startWizard));
@@ -33,7 +34,7 @@ export function ProjectScreen({ api, live, startWizard, onWizardShown, onChanged
   }, [startWizard, onWizardShown]);
   const reload = useCallback(async () => {
     const [f, a, s] = await Promise.all([api.getWorkFolder(), api.listAgents(), api.getSettings()]);
-    setFolder(f.ok ? f.value : null);
+    setFolder(f.ok ? f.value : undefined);
     setAgents(a.ok ? a.value : []);
     if (s.ok) setLevel(projectPermission(s.value));
   }, [api]);
@@ -60,17 +61,19 @@ export function ProjectScreen({ api, live, startWizard, onWizardShown, onChanged
       <header className="orq-page__head">
         <h1>{t('proj.title')}</h1>
       </header>
-      {folder === undefined ? null : folder === null ? (
-        <div className="orq-proj__empty">
-          <FolderGit2 size={32} strokeWidth={1.4} aria-hidden="true" />
-          <h2>{t('proj.folder.none')}</h2>
-          <p className="orq-hint">{t('proj.folder.none.hint')}</p>
-          <button type="button" className="orq-btn orq-btn--primary" onClick={() => setWizard(true)}>
-            {t('proj.folder.connect')}
-          </button>
-        </div>
-      ) : (
+      {folder === undefined ? null : (
         <div className="orq-proj__grid">
+          {/* Proyecto antiguo con dos carpetas: se ofrece unirlas [R96.8]. */}
+          {folder.separate && (
+            <SeparateFolderNotice
+              api={api}
+              folder={folder}
+              onJoined={() => {
+                onChanged();
+                void reload();
+              }}
+            />
+          )}
           <section className="orq-panel orq-proj__folder" aria-label={folder.name}>
             <FolderGit2 size={22} strokeWidth={1.5} aria-hidden="true" />
             <div>
@@ -80,20 +83,6 @@ export function ProjectScreen({ api, live, startWizard, onWizardShown, onChanged
             <span className="orq-proj__gap" />
             <button type="button" className="orq-btn orq-btn--small orq-btn--accent" onClick={() => setWizard(true)}>
               {t('proj.folder.analyze')}
-            </button>
-            <button
-              type="button"
-              className="orq-btn orq-btn--small"
-              onClick={() =>
-                void api.pickWorkFolder().then((r) => {
-                  if (r.ok && r.value) setWizard(true);
-                })
-              }
-            >
-              {t('proj.folder.change')}
-            </button>
-            <button type="button" className="orq-btn orq-btn--small orq-btn--ghost" onClick={() => void api.clearWorkFolder().then(() => reload())}>
-              {t('proj.folder.clear')}
             </button>
           </section>
           <section className="orq-panel" aria-label={t('proj.agents')}>
@@ -152,7 +141,7 @@ const STEPS: { id: Step; label: MessageKey }[] = [
 /** Asistente «Conectar la carpeta del proyecto» en tres pasos (prototipos «Carpeta 1» y «Carpeta 2») [R32.16][R32.17]. */
 export function FolderWizard({ api, onCancel, onDone }: { api: ProjectApi; onCancel: () => void; onDone: (to: 'diagrams' | 'project') => void }) {
   const [step, setStep] = useState<Step>('folder');
-  const [folder, setFolder] = useState<WorkFolderView | null>();
+  const [folder, setFolder] = useState<WorkFolderView>();
   const [scan, setScan] = useState<WorkFolderInspection>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
@@ -178,20 +167,13 @@ export function FolderWizard({ api, onCancel, onDone }: { api: ProjectApi; onCan
   }, [api]);
   useEffect(() => {
     void api.getWorkFolder().then((r) => {
-      const f = r.ok ? r.value : null;
-      setFolder(f);
-      if (f) void inspect();
+      if (!r.ok) return setError(r.error.message);
+      setFolder(r.value);
+      void inspect();
     });
     void api.getSettings().then((r) => r.ok && setLevel(projectPermission(r.value)));
   }, [api, inspect]);
 
-  const pick = async () => {
-    const r = await api.pickWorkFolder();
-    if (!r.ok) return setError(r.error.message);
-    if (!r.value) return;
-    setFolder(r.value);
-    await inspect();
-  };
   const cancel = () => {
     if (scan) void api.cancelImport(scan.importId);
     onCancel();
@@ -293,17 +275,15 @@ export function FolderWizard({ api, onCancel, onDone }: { api: ProjectApi; onCan
           <div className="orq-wiz__col">
             <h1>{t('wiz.q')}</h1>
             <p className="orq-hint orq-wiz__lead">{t('wiz.q.hint')}</p>
-            <div className={`orq-panel orq-wiz__folder${folder ? ' is-on' : ''}`}>
-              <FolderGit2 size={22} strokeWidth={1.5} aria-hidden="true" />
-              <div>
-                <strong>{folder ? folder.name : t('settings.work.none')}</strong>
-                {folder && <span className="orq-hint">{t('proj.folder.files', { count: folder.files })}</span>}
+            {folder && (
+              <div className="orq-panel orq-wiz__folder is-on">
+                <FolderGit2 size={22} strokeWidth={1.5} aria-hidden="true" />
+                <div>
+                  <strong>{folder.name}</strong>
+                  <span className="orq-hint">{t('proj.folder.files', { count: folder.files })}</span>
+                </div>
               </div>
-              <span className="orq-proj__gap" />
-              <button type="button" className={`orq-btn${folder ? '' : ' orq-btn--primary'}`} onClick={() => void pick()}>
-                {folder ? t('wiz.change') : t('wiz.pick')}
-              </button>
-            </div>
+            )}
             {scan && (
               <div className="orq-panel orq-wiz__tree">
                 <div className="orq-wiz__treehead">
