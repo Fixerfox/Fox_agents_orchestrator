@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { portsOf } from './ports';
-import { MockAgent, MockDecider, Orchestrator, type Diagram, type GitBranchInfo, type GitState, type RunEvent, type VersionControl } from '@orquestador/core';
+import { MockAgent, MockDecider, Orchestrator, type Diagram, type GitBranchInfo, type GitState, type RemoteRepo, type ReviewDraft, type ReviewHost, type ReviewInfo, type RunEvent, type VersionControl } from '@orquestador/core';
 import { ProjectStore } from '@orquestador/store';
 import { GitService, RunService } from '../src';
 
@@ -24,6 +24,10 @@ class FakeRepo implements VersionControl {
   names = ['main', 'develop', 'vieja'];
   dirty = 0;
   fail?: string;
+  remote?: string;
+  /** Ramas locales que ya siguen a una remota. */
+  pushed: string[] = [];
+  remoteUrl = async () => this.remote;
   async state(): Promise<GitState> {
     return { repo: true, branch: this.current, commit: sha(this.head).slice(0, 7), head: sha(this.head), dirty: this.dirty, branches: [...this.names] };
   }
@@ -38,7 +42,7 @@ class FakeRepo implements VersionControl {
     return true;
   }
   async branches(): Promise<GitBranchInfo[]> {
-    return [...this.names.map((name) => ({ name, sha: sha(this.head), ...(name === this.current ? { current: true } : {}) })), { name: 'origin/main', sha: sha(1), remote: true }];
+    return [...this.names.map((name) => ({ name, sha: sha(this.head), ...(name === this.current ? { current: true } : {}), ...(this.pushed.includes(name) ? { upstream: `origin/${name}`, ahead: 0, behind: 0 } : {}) })), { name: 'origin/main', sha: sha(1), remote: true }];
   }
   async history() {
     return Array.from({ length: this.head }, (_, i) => ({ sha: sha(this.head - i), parents: this.head - i > 1 ? [sha(this.head - i - 1)] : [], subject: `c${this.head - i}`, author: 'a', date: '2026-11-11T09:00:00Z', refs: [] }));
@@ -213,5 +217,68 @@ describe('SPEC-098 · acciones de git', () => {
     expect(await svcOf(repo).overview()).toBeNull();
     const plain = new RunService(portsOf(store), new Orchestrator({ getAdapter: () => new MockAgent({ a: { output: 'ok' } }), decider: new MockDecider() }));
     expect(plain.git).toBeUndefined();
+  });
+});
+
+describe('SPEC-099 · PR y MR en el servicio', () => {
+  const open: ReviewInfo = { number: 31, title: 'Menú', state: 'open', head: 'feature/x', base: 'develop', url: 'https://github.com/Fixerfox/app/pull/31' };
+  function setup(opts: { remote?: string; via?: 'cli' | 'token'; listError?: string; createError?: string } = {}) {
+    const repo = new FakeRepo();
+    if (opts.remote !== undefined) repo.remote = opts.remote;
+    repo.names.push('feature/x', 'feature/y', 'local');
+    repo.current = 'feature/y';
+    repo.pushed = ['main', 'develop', 'feature/x', 'feature/y'];
+    const drafts: ReviewDraft[] = [];
+    const asked: RemoteRepo[] = [];
+    const host: ReviewHost = {
+      list: async () => {
+        if (opts.listError) throw new Error(opts.listError);
+        return [open];
+      },
+      create: async (d) => {
+        if (opts.createError) throw new Error(opts.createError);
+        drafts.push(d);
+        return { number: 32, title: d.title, state: d.draft ? 'draft' : 'open', head: d.head, base: d.base };
+      },
+    };
+    const git = new GitService(repo, { list: async () => [], appendEvent: async () => undefined }, () => 0, () => new Set(), async (r) => {
+      asked.push(r);
+      return opts.via ? { host, via: opts.via } : {};
+    });
+    return { git, drafts, asked };
+  }
+  const GH = 'https://github.com/Fixerfox/app.git';
+
+  it('[R99.7] da el proveedor, el proyecto, cómo está conectado, las revisiones y el destino propuesto', async () => {
+    const { git, asked } = setup({ remote: GH, via: 'cli' });
+    expect(await git.reviews()).toEqual({ provider: 'github', word: 'PR', host: 'github.com', project: 'Fixerfox/app', base: 'develop', via: 'cli', reviews: [open] });
+    expect(asked).toEqual([{ provider: 'github', host: 'github.com', path: 'Fixerfox/app', name: 'app' }]);
+    expect(await setup({ remote: 'git@gitlab.com:g/s/app.git', via: 'token' }).git.reviews()).toMatchObject({ provider: 'gitlab', word: 'MR', project: 'g/s/app', via: 'token' });
+  });
+
+  it('[R99.7] sin origin, o con uno que no es GitHub ni GitLab, no hay nada; sin conexión lo dice; si la lista falla, da el motivo', async () => {
+    expect(await setup().git.reviews()).toBeNull();
+    expect(await setup({ remote: 'https://bitbucket.org/a/b.git', via: 'cli' }).git.reviews()).toBeNull();
+    const off = await setup({ remote: GH }).git.reviews();
+    expect(off).toEqual({ provider: 'github', word: 'PR', host: 'github.com', project: 'Fixerfox/app', base: 'develop', reviews: [] });
+    expect(off!.via).toBeUndefined();
+    expect(await setup({ remote: GH, via: 'token', listError: 'github.com rechazó la petición de las PR: el token no vale o no tiene permiso.' }).git.reviews()).toMatchObject({ via: 'token', reviews: [], error: expect.stringMatching(/el token no vale/) });
+    // Sin quien conecte (un proyecto sin esa pieza) tampoco hay nada.
+    const bare = new FakeRepo();
+    bare.remote = GH;
+    expect(await new GitService(bare, { list: async () => [], appendEvent: async () => undefined }, () => 0, () => new Set()).reviews()).toBeNull();
+  });
+
+  it('[R99.9] abrir una revisión comprueba antes de llamar fuera y devuelve la creada', async () => {
+    const { git, drafts } = setup({ remote: GH, via: 'cli' });
+    expect(await git.createReview({ title: '  Opciones  ', body: '  ', head: 'feature/y', base: 'develop' })).toEqual({ number: 32, title: 'Opciones', state: 'open', head: 'feature/y', base: 'develop' });
+    expect(drafts).toEqual([{ title: 'Opciones', head: 'feature/y', base: 'develop' }]);
+    await expect(git.createReview({ title: 'x', head: 'local', base: 'develop' })).rejects.toMatchObject({ code: 'git-guard', message: expect.stringMatching(/todavía no está subida/) });
+    await expect(git.createReview({ title: 'x', head: 'feature/x', base: 'develop' })).rejects.toMatchObject({ message: expect.stringMatching(/Ya hay una PR abierta.*#31/) });
+    await expect(git.createReview({ title: 'x', head: 'feature/y', base: 'feature/y' })).rejects.toMatchObject({ message: expect.stringMatching(/son la misma/) });
+    expect(drafts).toHaveLength(1);
+    await expect(setup({ remote: GH }).git.createReview({ title: 'x', head: 'feature/y', base: 'develop' })).rejects.toMatchObject({ message: expect.stringMatching(/No hay conexión con github\.com: inicia sesión con gh o guarda un token/) });
+    await expect(setup().git.createReview({ title: 'x', head: 'feature/y', base: 'develop' })).rejects.toMatchObject({ message: expect.stringMatching(/no tiene un origin de GitHub ni de GitLab/) });
+    await expect(setup({ remote: GH, via: 'cli', createError: 'sin permiso' }).git.createReview({ title: 'x', head: 'feature/y', base: 'develop' })).rejects.toMatchObject({ message: 'No se pudo abrir la PR: sin permiso' });
   });
 });

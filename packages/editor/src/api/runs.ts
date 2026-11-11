@@ -1,5 +1,5 @@
-import { checkProblems, deliverableProblems, isRelativeInside, memoryEntryProblems, readGitAction, readUnanswered, validBranchName } from '@orquestador/core';
-import type { CheckResult, DeliverableSpec, Diagram, GitAction, GitBranchInfo, GitChoice, GitCommit, GitFileChange, GitOrigin, GitStash, GitState, Id, MemoryEntry, MemoryKind, PendingQuestion, RuleStats, RunEvent, StepCheck, UnansweredPolicy } from '@orquestador/core';
+import { MAX_REVIEW_BODY, MAX_REVIEW_TITLE, checkProblems, deliverableProblems, isRelativeInside, memoryEntryProblems, readGitAction, readUnanswered, validBranchName } from '@orquestador/core';
+import type { CheckResult, DeliverableSpec, Diagram, ReviewDraft, ReviewInfo, ReviewProvider, GitAction, GitBranchInfo, GitChoice, GitCommit, GitFileChange, GitOrigin, GitStash, GitState, Id, MemoryEntry, MemoryKind, PendingQuestion, RuleStats, RunEvent, StepCheck, UnansweredPolicy } from '@orquestador/core';
 import { UNHANDLED, isObject, safeId, type RequestCheck } from './check';
 import { CHANNELS } from './contract';
 import type { ApiResult } from './result';
@@ -141,6 +141,23 @@ export interface GitHistoryView {
   /** Commit → el trabajo que lo hizo [R98.4]. */
   origins: Record<string, GitOrigin>;
 }
+/** Las PR o MR del repositorio en GitHub o GitLab [R99.7]. */
+export interface GitReviewsView {
+  provider: ReviewProvider;
+  /** «PR» o «MR». */
+  word: 'PR' | 'MR';
+  host: string;
+  project: string;
+  /** Cómo está conectado; sin valor, no lo está. */
+  via?: 'cli' | 'token';
+  reviews: ReviewInfo[];
+  /** Destino que se propone para una revisión nueva. */
+  base?: string;
+  error?: string;
+}
+/** Tope de un token de GitHub o GitLab [R99.10]. */
+export const MAX_REVIEW_TOKEN = 400;
+
 /** Tope de commits que se piden de una vez [R98.11]. */
 export const MAX_GIT_HISTORY = 500;
 
@@ -153,6 +170,13 @@ export interface RunsApi {
   gitDiff(req: { path: string }): Promise<ApiResult<string>>;
   /** Hace una acción de git y devuelve cómo queda todo [R98.6]. */
   gitAct(action: GitAction): Promise<ApiResult<GitOverviewView>>;
+  // --- PR y MR (SPEC-099) ---
+  /** Revisiones del repositorio; `null` si `origin` no es de GitHub ni de GitLab [R99.7]. */
+  gitReviews(): Promise<ApiResult<GitReviewsView | null>>;
+  gitCreateReview(draft: ReviewDraft): Promise<ApiResult<ReviewInfo>>;
+  /** Guarda cifrado el token para el servidor de `origin`; nunca vuelve a la interfaz [R99.8]. */
+  setReviewToken(req: { token: string }): Promise<ApiResult<null>>;
+  clearReviewToken(): Promise<ApiResult<null>>;
   // --- ejecución (R19.7) ---
   startRun(req: StartRunRequest): Promise<ApiResult<StartRunResult>>;
   /** Estado de git de la carpeta del proyecto para elegir la rama; `null` si no hay git [R97.2]. */
@@ -265,8 +289,23 @@ export function parseRunsRequest(channel: string, payload: unknown, { bad, exact
       return payload;
     }
     case CHANNELS.gitOverview:
+    case CHANNELS.gitReviews:
+    case CHANNELS.clearReviewToken:
       if (payload !== undefined) throw bad('no admite argumentos');
       return undefined;
+    case CHANNELS.gitCreateReview:
+      if (!isObject(payload)) throw bad('se esperaba un objeto');
+      exact(payload, ['title', 'body', 'head', 'base', 'draft']);
+      if (typeof payload.title !== 'string' || payload.title.trim() === '' || payload.title.length > MAX_REVIEW_TITLE || /[\r\n]/.test(payload.title)) throw bad('title no válido');
+      if (payload.body !== undefined && (typeof payload.body !== 'string' || payload.body.length > MAX_REVIEW_BODY)) throw bad('body no válido');
+      if (typeof payload.head !== 'string' || !validBranchName(payload.head) || typeof payload.base !== 'string' || !validBranchName(payload.base)) throw bad('rama no válida');
+      if (payload.draft !== undefined && typeof payload.draft !== 'boolean') throw bad('draft no válido');
+      return payload;
+    case CHANNELS.setReviewToken:
+      if (!isObject(payload)) throw bad('se esperaba un objeto');
+      exact(payload, ['token']);
+      if (typeof payload.token !== 'string' || payload.token.length < 8 || payload.token.length > MAX_REVIEW_TOKEN || /\s/.test(payload.token)) throw bad('token no válido');
+      return payload;
     case CHANNELS.gitHistory:
       if (!isObject(payload)) throw bad('se esperaba un objeto');
       exact(payload, ['limit']);

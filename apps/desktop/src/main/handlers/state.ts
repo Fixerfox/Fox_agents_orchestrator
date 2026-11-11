@@ -4,6 +4,7 @@ import type { CreateAppServer, QueryFn } from '@orquestador/claude';
 import { createHash } from 'node:crypto';
 import type { Batcher, RunService } from '@orquestador/runtime';
 import { StoreError, type ApiKeyVault, type McpSecretVault, type ProjectStore, type ProjectTrustStore, type RecentStore, type SettingsStore, type TrustDecision } from '@orquestador/store';
+import type { CliRunner, FetchFn } from '@orquestador/git';
 import { scanClaudeConfig, type ConfigRisk } from '@orquestador/claude';
 import type { OrchestratorContext } from '../composition';
 import type { TerminalService } from '../terminal';
@@ -32,6 +33,8 @@ export interface DesktopDeps {
   vault?: ApiKeyVault;
   /** Secretos de los servidores MCP, cifrados [R30.8]. */
   mcpVault?: McpSecretVault;
+  /** Sustitutos de `gh`/`glab` y de la red para las PR y MR, en los tests [R99.4]. */
+  reviewTools?: { run?: CliRunner; fetch?: FetchFn };
   /** Terminales integradas [R30.13]. */
   terminals?: TerminalService;
   /** Abre un archivo con el programa del sistema («Abrir fuera» de la vista previa) [R54.5]. */

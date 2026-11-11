@@ -6,7 +6,7 @@ import { analyzeImport, defaultSettings, folderLabel, type RecentView } from '@o
 import { CHANNELS, installSpecKitInto, type ProjectInfo, type SpecKitTarget, type TerminalStartRequest } from '@orquestador/editor';
 import { RunService, RunSnapshots, runDefaultsFrom } from '@orquestador/runtime';
 import { StoreError, joinProjectIntoWorkFolder, projectKey, readFolder, rootGitignoreState, setRootGitignore, type ProjectStore } from '@orquestador/store';
-import { composeRunPorts, createProject, openProject } from '../composition';
+import { composeRunPorts, createProject, openProject, reviewTokenKey } from '../composition';
 import { UNHANDLED, disposeHandlers, mcpVaultKey, mcpVaultPrefix, projectConfigTrusted, projectTrustState, requireStore, type HandlerState } from './state';
 
 /** Documentos guía de la raíz de la carpeta del proyecto que se ofrecen como contexto común [R32.16]. */
@@ -38,7 +38,7 @@ async function setProject(h: HandlerState, root: string, store: ProjectStore): P
     else if (v && typeof v === 'object') for (const x of Object.values(v)) if (typeof x === 'string' && x) secrets.add(x);
     return v;
   };
-  h.runs = new RunService(composeRunPorts(store, { git: () => h.settings.engine === 'claude' }), h.deps.createOrchestrator({
+  h.runs = new RunService(composeRunPorts(store, { git: () => h.settings.engine === 'claude', reviews: { token: async (host) => (await h.deps.mcpVault?.read(reviewTokenKey(host)).catch(() => ({} as Record<string, string>)))?.['token'], ...h.deps.reviewTools } }), h.deps.createOrchestrator({
       store,
       snapshots,
       projectRoot: root,

@@ -1,11 +1,12 @@
 import { promises as fsp } from 'node:fs';
 import { basename, isAbsolute, relative, sep } from 'node:path';
 import { isSensitivePath } from '@orquestador/claude';
-import { CHECK_TIMEOUT_SEC, clipMiddle, redactString, type CheckResult, type GitAction, type RunEvent, type StepCheck } from '@orquestador/core';
+import { CHECK_TIMEOUT_SEC, clipMiddle, redactString, type CheckResult, type GitAction, type ReviewDraft, type RunEvent, type StepCheck } from '@orquestador/core';
 import { checkRunnerFor } from '../checks';
 import type { ProjectStore } from '@orquestador/store';
 import { CHANNELS, type RunAction, type StartRunRequest } from '@orquestador/editor';
 import { Batcher, type GitService, type RunService } from '@orquestador/runtime';
+import { reviewTokenKey } from '../composition';
 import { MAX_ATTACHMENT_BYTES, MAX_INPUT_FILES, StoreError } from '@orquestador/store';
 import { UNHANDLED, requireRuns, requireStore, type HandlerState } from './state';
 
@@ -57,6 +58,20 @@ export async function handleRuns(h: HandlerState, channel: string, arg: unknown)
         if (risky.length > 0) throw new StoreError('invalid', `No se hace el commit: ${risky.slice(0, 3).join(', ')} puede llevar secretos y entraría en él. Añádelo a .gitignore, o haz el commit en la terminal.`);
       }
       return git.act(action);
+    }
+    case CHANNELS.gitReviews:
+      return (await requireRuns(h).git?.reviews()) ?? null;
+    case CHANNELS.gitCreateReview:
+      return requireGit(h).createReview(arg as ReviewDraft);
+    case CHANNELS.setReviewToken:
+    case CHANNELS.clearReviewToken: {
+      // El token es del servidor de `origin` de ahora: se guarda cifrado y no vuelve a la interfaz [R99.8].
+      const remote = await requireGit(h).remote();
+      if (!remote) throw new StoreError('invalid', 'Este repositorio no tiene un origin de GitHub ni de GitLab');
+      if (!h.deps.mcpVault) throw new StoreError('unavailable', 'No hay almacén seguro para guardar el token');
+      if (channel === CHANNELS.setReviewToken) await h.deps.mcpVault.set(reviewTokenKey(remote.host), 'token', (arg as { token: string }).token);
+      else await h.deps.mcpVault.remove(reviewTokenKey(remote.host));
+      return null;
     }
     case CHANNELS.gitGuard:
       return requireRuns(h).gitGuard((arg as { diagramId: string }).diagramId);

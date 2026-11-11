@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowDown, ArrowUp, Check, GitBranch, Lock, Play, Plus, RefreshCw } from 'lucide-react';
 import { gitActionAlwaysAsks, gitActionProblem, isProtectedBranch, validBranchName, type GitAction, type GitBranchInfo, type GitCommit, type GitFileChange, type GitOrigin } from '@orquestador/core';
-import { agoText, commitGraph, t, type GitHistoryView, type GitOverviewView, type GraphRow, type ProjectApi } from '@orquestador/editor';
+import { agoText, commitGraph, t, type GitHistoryView, type GitOverviewView, type GitReviewsView, type GraphRow, type ProjectApi } from '@orquestador/editor';
+import { ReviewBlock } from './ReviewBlock';
 
 interface Props {
   api: ProjectApi;
@@ -13,6 +14,8 @@ interface Props {
   version?: number;
 }
 
+/** Cada cuánto, como mucho, se vuelven a pedir las PR o MR al volver a la ventana [R99.11]. */
+const REVIEWS_EVERY_MS = 60_000;
 const ROW = 40;
 const LANE = 18;
 const TONES = ['var(--accent)', 'var(--tone-blue)', 'var(--tone-teal)', 'var(--tone-violet)', 'var(--tone-rose)', 'var(--tone-green)'];
@@ -69,6 +72,7 @@ function UnifiedDiff({ text }: { text: string }) {
 export function VersionsScreen({ api, onOpenRun, confirm = (m) => window.confirm(m), version = 0 }: Props) {
   const [view, setView] = useState<GitOverviewView | null>();
   const [history, setHistory] = useState<GitHistoryView>({ commits: [], origins: {} });
+  const [reviews, setReviews] = useState<GitReviewsView | null>(null);
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
   const [picked, setPicked] = useState<string>();
@@ -84,7 +88,19 @@ export function VersionsScreen({ api, onOpenRun, confirm = (m) => window.confirm
     const h = await api.gitHistory({ limit: 200 });
     if (h.ok) setHistory(h.value);
   }, [api]);
-  const reload = useCallback(async () => {
+  // Las PR o MR van aparte: hablan con el servidor y no deben frenar lo local [R99.11].
+  const reviewsAt = useRef(0);
+  const loadReviews = useCallback(
+    async (force = true) => {
+      // Al volver a la ventana no se llama al servidor más de una vez por minuto.
+      if (!force && Date.now() - reviewsAt.current < REVIEWS_EVERY_MS) return;
+      reviewsAt.current = Date.now();
+      const r = await api.gitReviews();
+      setReviews(r.ok ? r.value : null);
+    },
+    [api],
+  );
+  const reload = useCallback(async (forceReviews = true) => {
     const r = await api.gitOverview();
     if (!r.ok) {
       setError(r.error.message);
@@ -92,14 +108,16 @@ export function VersionsScreen({ api, onOpenRun, confirm = (m) => window.confirm
       return;
     }
     setView(r.value);
-    if (r.value) await loadHistory();
-  }, [api, loadHistory]);
+    if (!r.value) return;
+    await loadHistory();
+    void loadReviews(forceReviews);
+  }, [api, loadHistory, loadReviews]);
   useEffect(() => {
     void reload();
   }, [reload, version]);
   // Git cambia también desde fuera (la terminal): al volver a la ventana se mira otra vez.
   useEffect(() => {
-    const onFocus = () => void reload();
+    const onFocus = () => void reload(false);
     window.addEventListener('focus', onFocus);
     return () => window.removeEventListener('focus', onFocus);
   }, [reload]);
@@ -139,6 +157,7 @@ export function VersionsScreen({ api, onOpenRun, confirm = (m) => window.confirm
     if (!r.ok) return setError(r.error.message);
     setView(r.value);
     await loadHistory();
+    if (a.kind === 'push' || a.kind === 'fetch' || a.kind === 'switch' || a.kind === 'create') void loadReviews();
     return true;
   };
   const action = (label: string, a: GitAction, opts: { icon?: typeof Plus; primary?: boolean } = {}) => {
@@ -162,6 +181,8 @@ export function VersionsScreen({ api, onOpenRun, confirm = (m) => window.confirm
   };
   const branchRow = (b: GitBranchInfo) => {
     const origin = view.origins[b.name];
+    // La PR o MR abierta de la rama, si la hay [R99.11].
+    const review = b.remote ? undefined : reviews?.reviews.find((r) => r.head === b.name && (r.state === 'open' || r.state === 'draft'));
     const on = picked === b.name;
     return (
       <li key={`${b.remote ? 'r' : 'l'}:${b.name}`} className={`orq-ver__branch${b.current ? ' is-current' : ''}${on ? ' is-on' : ''}`}>
@@ -170,6 +191,11 @@ export function VersionsScreen({ api, onOpenRun, confirm = (m) => window.confirm
         </button>
         {!b.remote && isProtectedBranch(b.name) && <Lock size={11} aria-label={t('ver.protected')} />}
         {origin && <OriginChip origin={origin} {...(onOpenRun ? { onOpenRun } : {})} />}
+        {review && (
+          <span className="orq-ver__revbadge" title={t('ver.rev.badge', { word: reviews!.word, n: review.number })} aria-label={t('ver.rev.badge', { word: reviews!.word, n: review.number })}>
+            #{review.number}
+          </span>
+        )}
         {(b.ahead ?? 0) > 0 && <span className="orq-ver__ab">↑{b.ahead}</span>}
         {(b.behind ?? 0) > 0 && <span className="orq-ver__ab">↓{b.behind}</span>}
       </li>
@@ -356,6 +382,7 @@ export function VersionsScreen({ api, onOpenRun, confirm = (m) => window.confirm
             </div>
           </form>
         )}
+        {reviews && <ReviewBlock api={api} view={reviews} current={current} branches={names} suggestedTitle={history.commits.find((c) => c.sha === current?.sha)?.subject ?? current?.subject ?? ''} onChanged={() => void loadReviews()} />}
       </aside>
     </section>
   );

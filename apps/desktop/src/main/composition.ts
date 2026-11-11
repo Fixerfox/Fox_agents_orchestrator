@@ -1,6 +1,6 @@
 import { promises as fsp } from 'node:fs';
 import path from 'node:path';
-import { GitCli } from '@orquestador/git';
+import { GitCli, connectReviewHost, type CliRunner, type FetchFn } from '@orquestador/git';
 import { MEMORY_SERVER, claudePathPolicy, createClaudeEngine, type AppToolDef, type ClaudeEnvironment, type CreateAppServer, type QueryFn } from '@orquestador/claude';
 import { agentsTotal, defaultSettings, searchMemory, type MemoryEntry } from '@orquestador/core';
 import type { AppSettings, BranchGuardPort, LibraryReader, Orchestrator } from '@orquestador/core';
@@ -153,8 +153,21 @@ export function projectGit(store: Pick<ProjectStore, 'getWorkFolder'>, enabled: 
   };
 }
 
-export function composeRunPorts(store: ProjectStore, opts: { git?: () => boolean } = {}): RunPorts {
-  return { runs: runRepositoryOf(store), library: libraryReaderOf(store), policy: claudePathPolicy, files: workspaceFiles, stepDir: stepSpaceDir, memory: { load: () => store.loadProjectMemory(), save: (entries) => store.saveProjectMemory(entries) }, git: projectGit(store, opts.git), repo: new GitCli(() => store.getWorkFolder()) };
+/** Clave del token de las PR o MR de un servidor en el almacén cifrado [R99.8]. */
+export const reviewTokenKey = (host: string): string => `review:${host.toLowerCase()}`;
+
+export interface ReviewDeps {
+  /** Token guardado para ese servidor, si lo hay. */
+  token?: (host: string) => Promise<string | undefined>;
+  run?: CliRunner;
+  fetch?: FetchFn;
+}
+
+export function composeRunPorts(store: ProjectStore, opts: { git?: () => boolean; reviews?: ReviewDeps } = {}): RunPorts {
+  return { runs: runRepositoryOf(store), library: libraryReaderOf(store), policy: claudePathPolicy, files: workspaceFiles, stepDir: stepSpaceDir, memory: { load: () => store.loadProjectMemory(), save: (entries) => store.saveProjectMemory(entries) }, git: projectGit(store, opts.git), repo: new GitCli(() => store.getWorkFolder()),
+    // El token solo se lee para el servidor de `origin`, y solo viaja a él [R99.5].
+    reviews: async (repo) => connectReviewHost(repo, { cwd: await store.getWorkFolder(), token: await opts.reviews?.token?.(repo.host), ...(opts.reviews?.run ? { run: opts.reviews.run } : {}), ...(opts.reviews?.fetch ? { fetch: opts.reviews.fetch } : {}) }),
+  };
 }
 
 /** Biblioteca del proyecto sin copias, para listar trabajos [R52.4]. */

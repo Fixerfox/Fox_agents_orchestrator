@@ -1,4 +1,4 @@
-import type { GitBranchInfo, GitCommit, GitFileChange, GitStash, GitState } from '../execution';
+import type { GitBranchInfo, GitCommit, GitFileChange, GitStash, GitState, ReviewDraft, ReviewInfo } from '../execution';
 
 /** Lo mínimo de git para preparar la rama de una ejecución [R97.1]. */
 export interface BranchGuardPort {
@@ -35,4 +35,12 @@ export interface VersionControl extends BranchGuardPort {
   /** Borra una rama local ya fusionada. */
   deleteBranch(name: string): Promise<void>;
   stashPop(index: number): Promise<void>;
+  /** Dirección de `origin`, si lo hay [R99.1]. */
+  remoteUrl(): Promise<string | undefined>;
+}
+
+/** Las PR o MR del repositorio en GitHub o GitLab [R99.3]. */
+export interface ReviewHost {
+  list(): Promise<ReviewInfo[]>;
+  create(draft: ReviewDraft): Promise<ReviewInfo>;
 }
