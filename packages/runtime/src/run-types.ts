@@ -1,5 +1,5 @@
 import type { ProjectMemoryPort } from './run-memory';
-import type { DeliverableSpec, Diagram, GitChoice, VersionControl, LibraryReader, Payload, PathPolicy, RunHandle, RunOptions, RunRepository, WorkspaceFiles, UnansweredPolicy } from '@orquestador/core';
+import type { BranchGuardPort, DeliverableSpec, Diagram, GitChoice, VersionControl, LibraryReader, Payload, PathPolicy, RunHandle, RunOptions, RunRepository, WorkspaceFiles, UnansweredPolicy } from '@orquestador/core';
 import { RunError } from './errors';
 import type { LibrarySnapshot } from './snapshot';
 
@@ -14,7 +14,9 @@ export interface RunPorts {
   /** Memoria del proyecto [R76.2]. */
   memory?: ProjectMemoryPort;
   /** Git de la carpeta del proyecto, para la guarda de rama [R97.1]. */
-  git?: VersionControl;
+  git?: BranchGuardPort;
+  /** Git completo de la carpeta, para el visor de control de versiones [R98.1]. */
+  repo?: VersionControl;
 }
 
 export interface StartRunInput {

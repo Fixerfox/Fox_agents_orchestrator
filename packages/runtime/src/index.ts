@@ -1,4 +1,5 @@
 export * from './run-git';
+export * from './git-service';
 export * from './errors';
 export * from './batcher';
 export * from './run-service';

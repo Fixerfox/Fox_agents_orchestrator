@@ -1,5 +1,5 @@
-import { checkProblems, deliverableProblems, isRelativeInside, memoryEntryProblems, readUnanswered, validBranchName } from '@orquestador/core';
-import type { CheckResult, DeliverableSpec, Diagram, GitChoice, GitState, Id, MemoryEntry, MemoryKind, PendingQuestion, RuleStats, RunEvent, StepCheck, UnansweredPolicy } from '@orquestador/core';
+import { checkProblems, deliverableProblems, isRelativeInside, memoryEntryProblems, readGitAction, readUnanswered, validBranchName } from '@orquestador/core';
+import type { CheckResult, DeliverableSpec, Diagram, GitAction, GitBranchInfo, GitChoice, GitCommit, GitFileChange, GitOrigin, GitStash, GitState, Id, MemoryEntry, MemoryKind, PendingQuestion, RuleStats, RunEvent, StepCheck, UnansweredPolicy } from '@orquestador/core';
 import { UNHANDLED, isObject, safeId, type RequestCheck } from './check';
 import { CHANNELS } from './contract';
 import type { ApiResult } from './result';
@@ -125,7 +125,34 @@ export interface OpenRunTarget {
 }
 
 /** Ejecuciones: lanzar y controlar, cola, entrada, resultados, correcciones y copias. */
+/** La sección «Versiones» de un vistazo: estado, ramas, cambios y apartados, sin rutas del equipo [R98.2]. */
+export interface GitOverviewView {
+  state: GitState;
+  branches: GitBranchInfo[];
+  changes: GitFileChange[];
+  stashes: GitStash[];
+  /** Ejecuciones en marcha en la carpeta [R98.8]. */
+  running: number;
+  /** Rama → el trabajo que la creó [R98.4]. */
+  origins: Record<string, GitOrigin>;
+}
+export interface GitHistoryView {
+  commits: GitCommit[];
+  /** Commit → el trabajo que lo hizo [R98.4]. */
+  origins: Record<string, GitOrigin>;
+}
+/** Tope de commits que se piden de una vez [R98.11]. */
+export const MAX_GIT_HISTORY = 500;
+
 export interface RunsApi {
+  // --- control de versiones (SPEC-098) ---
+  /** Estado de git de la carpeta del proyecto; `null` si no es un repositorio [R98.2]. */
+  gitOverview(): Promise<ApiResult<GitOverviewView | null>>;
+  gitHistory(req: { limit?: number }): Promise<ApiResult<GitHistoryView>>;
+  /** Diferencia de un archivo con cambios, relativa al repositorio [R98.3]. */
+  gitDiff(req: { path: string }): Promise<ApiResult<string>>;
+  /** Hace una acción de git y devuelve cómo queda todo [R98.6]. */
+  gitAct(action: GitAction): Promise<ApiResult<GitOverviewView>>;
   // --- ejecución (R19.7) ---
   startRun(req: StartRunRequest): Promise<ApiResult<StartRunResult>>;
   /** Estado de git de la carpeta del proyecto para elegir la rama; `null` si no hay git [R97.2]. */
@@ -237,6 +264,22 @@ export function parseRunsRequest(channel: string, payload: unknown, { bad, exact
       if (!(payload.data instanceof Uint8Array) || payload.data.byteLength === 0 || payload.data.byteLength > MAX_ATTACHMENT_BYTES) throw bad('el archivo está vacío o supera los 20 MB');
       return payload;
     }
+    case CHANNELS.gitOverview:
+      if (payload !== undefined) throw bad('no admite argumentos');
+      return undefined;
+    case CHANNELS.gitHistory:
+      if (!isObject(payload)) throw bad('se esperaba un objeto');
+      exact(payload, ['limit']);
+      if (payload.limit !== undefined && (!Number.isInteger(payload.limit) || (payload.limit as number) < 1 || (payload.limit as number) > MAX_GIT_HISTORY)) throw bad('limit no válido');
+      return payload;
+    case CHANNELS.gitDiff:
+      if (!isObject(payload)) throw bad('se esperaba un objeto');
+      exact(payload, ['path']);
+      if (typeof payload.path !== 'string' || payload.path.length > 1000 || payload.path.startsWith('-') || !isRelativeInside(payload.path)) throw bad('path no válido');
+      return payload;
+    case CHANNELS.gitAct:
+      if (!readGitAction(payload)) throw bad('acción de git no válida');
+      return payload;
     case CHANNELS.gitGuard:
       if (!isObject(payload)) throw bad('se esperaba un objeto');
       exact(payload, ['diagramId']);

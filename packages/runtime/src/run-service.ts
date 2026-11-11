@@ -7,6 +7,7 @@ import { RunError } from './errors';
 import { RunFiles, type FilePreview, type OutputFile } from './run-files';
 import { RunHistory } from './run-history';
 import { RunLauncher } from './run-launcher';
+import { GitService } from './git-service';
 import { RunQueue, type QueuedRun, type RunWatcher } from './run-queue';
 import { LiveRuns, type RunPorts, type StartRunInput } from './run-types';
 import type { RunSnapshots } from './snapshot';
@@ -37,12 +38,15 @@ export class RunService {
     this.files = new RunFiles(live, ports.runs, ports.policy, ports.files, this.history, ports.stepDir ? (runId, key) => ports.stepDir!(runId, key) : undefined);
     this.launcher = new RunLauncher(ports.runs, ports.library, defaults, snapshots, ports.git, () => this.queue.runningCount());
     this.memory = ports.memory ? new RunMemory(ports.runs, orchestrator, ports.memory) : undefined;
-    this.queue = new RunQueue(live, ports.runs, orchestrator, snapshots, (runId, key, files) => this.files.snapshotStep(runId, key, files), (runId, diagram) => void this.proposeAfter(runId, diagram));
+    this.queue = new RunQueue(live, ports.runs, orchestrator, snapshots, (runId, key, files) => this.files.snapshotStep(runId, key, files), (runId, diagram, options) => void this.afterRun(runId, diagram, options.git !== undefined));
+    this.git = ports.repo ? new GitService(ports.repo, ports.runs, () => this.queue.runningCount(), () => live.runningIds()) : undefined;
     this.control = new RunControl(live);
     this.corrections = new RunCorrections(live, ports.runs, orchestrator, this.history, this.launcher, this.queue);
     this.feedback = new RunFeedback(live, ports.runs);
   }
 
+  /** Git de la carpeta para el visor; sin él, el proyecto no tiene control de versiones [R98.1]. */
+  readonly git: GitService | undefined;
   private readonly feedback: RunFeedback;
   private readonly memory: RunMemory | undefined;
   /** Propuestas pendientes, para esperar a ellas (pruebas y cierre). */
@@ -50,10 +54,13 @@ export class RunService {
   private readonly memoryWatchers = new Set<(n: { runId: string; diagramName: string; count: number }) => void>();
 
   /** Al terminar, qué recordar; un fallo aquí no afecta a la ejecución [R76.5]. */
-  private proposeAfter(runId: string, diagram: Diagram): void {
-    if (!this.memory) return;
-    const job = this.memory
-      .afterRun(runId)
+  private afterRun(runId: string, diagram: Diagram, tracksGit: boolean): void {
+    // Primero dónde quedó git y después la memoria: los dos añaden al mismo registro [R98.4].
+    const ended = tracksGit && this.git ? this.git.noteRunEnd(runId).catch(() => undefined) : Promise.resolve();
+    if (!this.memory && !(tracksGit && this.git)) return;
+    const memory = this.memory;
+    const job = ended
+      .then(() => (memory ? memory.afterRun(runId) : []))
       .then((ps) => {
         if (ps.length > 0) for (const w of this.memoryWatchers) w({ runId, diagramName: diagram.name, count: ps.length });
       })

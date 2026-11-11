@@ -11,7 +11,9 @@ export type EventBody =
   | { type: 'run.started'; diagramId: Id; /** Ejecución que esta reanuda [R41.1]. */ resumedFrom?: string; /** Ejecución que esta corrige [R53.8]. */ correctedFrom?: string; /** Entregable efectivo [R46.3]. */ deliverable?: DeliverableSpec }
   | { type: 'run.finished'; status: RunStatus; reason?: string }
   /** Rama y commit de git con los que empieza la ejecución, y si la rama se creó para ella [R97.12]. */
-  | { type: 'run.git'; branch: string; commit?: string; created?: boolean; from?: string; stash?: string; dirty?: number }
+  | { type: 'run.git'; branch: string; commit?: string; sha?: string; created?: boolean; from?: string; stash?: string; dirty?: number }
+  /** Rama y commit en los que quedó la carpeta al terminar; se añade después de `run.finished` [R98.4]. */
+  | { type: 'run.git.ended'; branch?: string; sha?: string }
   /** La persona (o el asistente, con su permiso) dio por buena una ejecución fallida; va después de `run.finished` [R65.5]. */
   | { type: 'run.accepted'; by: 'user' | 'assistant'; reason: string; previousReason?: string }
   | { type: 'run.cancelled'; reason?: string }

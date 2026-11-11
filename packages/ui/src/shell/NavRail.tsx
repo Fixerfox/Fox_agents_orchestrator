@@ -1,8 +1,8 @@
-import { Bot, BookOpen, Clock3, FolderGit2, FolderTree, Rocket, Settings, Workflow, Waypoints } from 'lucide-react';
+import { Bot, BookOpen, Clock3, FolderGit2, FolderTree, GitBranch, Rocket, Settings, Workflow, Waypoints } from 'lucide-react';
 import { t, type MessageKey } from '@orquestador/editor';
 import { HandMark } from '../common';
 
-export type SectionId = 'project' | 'diagrams' | 'library' | 'agents' | 'knowledge' | 'jobs' | 'runs' | 'settings';
+export type SectionId = 'project' | 'diagrams' | 'library' | 'agents' | 'knowledge' | 'jobs' | 'runs' | 'versions' | 'settings';
 
 const ITEMS: { id: SectionId; icon: typeof Bot; label: MessageKey; full?: MessageKey }[] = [
   // Orden pedido por el usuario (05/11): lo que se usa al trabajar arriba, el proyecto al final.
@@ -12,6 +12,7 @@ const ITEMS: { id: SectionId; icon: typeof Bot; label: MessageKey; full?: Messag
   { id: 'library', icon: FolderTree, label: 'nav.library' },
   { id: 'agents', icon: Bot, label: 'nav.agents' },
   { id: 'knowledge', icon: BookOpen, label: 'nav.knowledge', full: 'nav.knowledge.full' },
+  { id: 'versions', icon: GitBranch, label: 'nav.versions', full: 'nav.versions.full' },
   { id: 'project', icon: FolderGit2, label: 'nav.project' },
 ];
 

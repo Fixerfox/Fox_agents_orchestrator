@@ -13,9 +13,10 @@ const RULES: Record<string, string[]> = {
   diagrams: ['common'],
   knowledge: ['common'],
   settings: ['common'],
+  versions: ['common'],
   runs: ['common', 'diagrams'],
   assistant: ['common', 'runs'],
-  shell: ['common', 'diagrams', 'knowledge', 'settings', 'runs', 'assistant'],
+  shell: ['common', 'diagrams', 'knowledge', 'settings', 'versions', 'runs', 'assistant'],
 };
 const AREAS = Object.keys(RULES);
 

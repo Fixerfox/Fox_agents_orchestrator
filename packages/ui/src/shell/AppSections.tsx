@@ -5,6 +5,7 @@ import { DesignerScreen, DiagramsScreen } from '../diagrams';
 import { AgentQuickEditor, LibraryScreen } from '../knowledge';
 import { JobsScreen, RunsScreen } from '../runs';
 import { ProjectScreen, SettingsDialog } from '../settings';
+import { VersionsScreen } from '../versions';
 import type { AppModel } from './useApp';
 
 /** El asistente, en el lateral del Diseñador o en el panel acoplado [R29.5][R38.1]. */
@@ -95,6 +96,7 @@ export function AppSections({ app }: { app: AppModel }) {
           onOpenRun={(runId) => app.goRuns({ section: 'history', runId })}
         />
       )}
+      {section === 'versions' && <VersionsScreen api={api} version={app.libVersion + app.runningIds.length} onOpenRun={(runId) => app.goRuns({ section: 'history', runId })} />}
       {section === 'settings' && <SettingsDialog api={api} onSaved={app.config.setSettings} />}
       {section === 'jobs' && (
         <JobsScreen

@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { portsOf } from './ports';
-import { MockAgent, MockDecider, Orchestrator, branchRule, type Diagram, type GitState, type RunEvent, type VersionControl } from '@orquestador/core';
+import { MockAgent, MockDecider, Orchestrator, branchRule, type Diagram, type GitState, type RunEvent, type BranchGuardPort } from '@orquestador/core';
 import { ProjectStore } from '@orquestador/store';
 import { RunService } from '../src';
 
@@ -16,7 +16,7 @@ const D: Diagram = {
 };
 
 /** Git de mentira: guarda lo que se le pide y cambia de rama al crear. */
-class FakeGit implements VersionControl {
+class FakeGit implements BranchGuardPort {
   calls: string[] = [];
   failCreate?: string;
   constructor(public current: GitState) {}
@@ -47,7 +47,7 @@ beforeEach(async () => {
 });
 afterEach(() => fs.rm(dir, { recursive: true, force: true }));
 
-const service = (git?: VersionControl, orch = new Orchestrator({ getAdapter: () => agent, decider: new MockDecider() })) => new RunService({ ...portsOf(store), ...(git ? { git } : {}) }, orch);
+const service = (git?: BranchGuardPort, orch = new Orchestrator({ getAdapter: () => agent, decider: new MockDecider() })) => new RunService({ ...portsOf(store), ...(git ? { git } : {}) }, orch);
 async function gitEvent(svc: RunService, runId: string) {
   await svc.settled(runId);
   const { backlog } = await svc.subscribe(runId, 1, () => {});

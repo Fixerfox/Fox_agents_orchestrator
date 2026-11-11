@@ -7,6 +7,7 @@ export * from './deliverable';
 export * from './replay';
 export * from './resume';
 export * from './git-guard';
+export * from './git-view';
 export { Orchestrator, type OrchestratorDeps, type PendingQuestion, type RunHandle, type RunResult } from './orchestrator';
 export { matchCandidate, proposeCorrectionWith } from './corrections';
 export { CONFIRM_APPROVE, composeConfirmInput, isApproval } from './text/confirm';

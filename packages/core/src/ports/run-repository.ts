@@ -22,6 +22,8 @@ export interface RunMeta {
   /** Ejecución que esta corrige, y las que corrigieron a esta [R53.11]. */
   correctedFrom?: string;
   correctedBy?: string[];
+  /** Lo que la ejecución apuntó de git: rama, si la creó, ramas de sus agentes y commits de inicio y fin [R98.4]. */
+  git?: { branch?: string; created?: boolean; branches?: string[]; fromSha?: string; toSha?: string };
   /** Avisos de una ejecución que terminó bien con algo pendiente, p. ej. el entregable [R46.11]. */
   warnings?: string[];
   /** Último paso que terminó bien (`ruta/nodo#pasada`) y cuántos terminaron, para la bandeja [R74.11]. */
