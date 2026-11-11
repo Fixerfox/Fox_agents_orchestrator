@@ -1,5 +1,5 @@
 import type { ProjectMemoryPort } from './run-memory';
-import type { DeliverableSpec, Diagram, LibraryReader, Payload, PathPolicy, RunHandle, RunOptions, RunRepository, WorkspaceFiles, UnansweredPolicy } from '@orquestador/core';
+import type { DeliverableSpec, Diagram, GitChoice, VersionControl, LibraryReader, Payload, PathPolicy, RunHandle, RunOptions, RunRepository, WorkspaceFiles, UnansweredPolicy } from '@orquestador/core';
 import { RunError } from './errors';
 import type { LibrarySnapshot } from './snapshot';
 
@@ -13,6 +13,8 @@ export interface RunPorts {
   stepDir?(runId: string, key: string): string | undefined;
   /** Memoria del proyecto [R76.2]. */
   memory?: ProjectMemoryPort;
+  /** Git de la carpeta del proyecto, para la guarda de rama [R97.1]. */
+  git?: VersionControl;
 }
 
 export interface StartRunInput {
@@ -30,6 +32,8 @@ export interface StartRunInput {
   whenBusy?: 'parallel' | 'queue';
   /** Qué hacer si nadie responde; sustituye al de Ajustes [R70.19]. */
   unanswered?: UnansweredPolicy;
+  /** En qué rama de git corre; sin elegir, la de por defecto [R97.3][R97.9]. */
+  git?: GitChoice;
 }
 
 /** Una ejecución lista para arrancar. */

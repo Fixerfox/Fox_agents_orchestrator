@@ -29,8 +29,10 @@ export class RunCorrections {
     const { diagram, events, order, deliverable } = await this.history.past(runId);
     // Se reutiliza por clave de paso en cualquier nivel: salidas, decisiones y respuestas [R74.2][R74.3].
     const plan = replayPlan(events);
+    const git = await this.launcher.currentGit();
     const options: RunOptions = {
       ...this.launcher.defaults(),
+      ...(git ? { git } : {}),
       reuse: { fromRunId: runId, outputs: plan.outputs, approvedReviews: plan.approvedReviews, trail: plan.trail, decisions: plan.decisions, answers: plan.answers, interrupted: plan.interrupted, costs: plan.costs },
       ...(deliverable ? { deliverable } : {}),
     };
@@ -72,8 +74,10 @@ export class RunCorrections {
       const extra = await this.launcher.inputPayload({ order: text, ...(req.files ? { files: req.files } : {}), ...(req.attachments ? { attachments: req.attachments } : {}) });
       files = typeof extra === 'string' ? [] : extra.files;
     }
+    const git = await this.launcher.currentGit();
     const options: RunOptions = {
       ...this.launcher.defaults(),
+      ...(git ? { git } : {}),
       reuse: { fromRunId: runId, outputs: plan.outputs, approvedReviews: plan.approvedReviews, trail: reusedTrail(plan.outputs, run.events) },
       correction: { fromRunId: runId, nodeId: req.nodeId, text, previous: plan.previous!, before: redoneSteps(run.diagram, run.events, plan.outputs), ...(files.length > 0 ? { files } : {}) },
       ...(run.deliverable ? { deliverable: run.deliverable } : {}),

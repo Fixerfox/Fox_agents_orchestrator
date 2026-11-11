@@ -116,7 +116,7 @@ const LOGIC_EXCEPTIONS: Record<string, string> = {
 
 describe('SPEC-056 · presupuesto de tamaño', () => {
   it('[R56.17] ningún archivo de la lógica pasa de 500 líneas', () => {
-    const dirs = ['core', 'runtime', 'editor', 'store', 'claude', 'workspace'].map((p) => `packages/${p}/src`);
+    const dirs = ['core', 'runtime', 'editor', 'store', 'claude', 'workspace', 'git'].map((p) => `packages/${p}/src`);
     expect(oversized(dirs, 500, LOGIC_EXCEPTIONS)).toEqual([]);
   });
 });

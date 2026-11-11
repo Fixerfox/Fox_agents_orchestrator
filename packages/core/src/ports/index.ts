@@ -6,3 +6,4 @@ export type * from './workspace-files';
 export type * from './branch-spaces';
 export type * from './checks';
 export type * from './shared-resources';
+export type * from './version-control';

@@ -6,7 +6,7 @@ import { builtinModules } from 'node:module';
 
 /** Matriz de SPEC-056: el editor avisa al escribir y el test de arquitectura falla en `npm run check` [R56.7]. */
 const architecture = JSON.parse(readFileSync(new URL('./scripts/architecture.json', import.meta.url), 'utf8'));
-const OWN = ['core', 'editor', 'ui', 'claude', 'store', 'workspace', 'runtime'];
+const OWN = ['core', 'editor', 'ui', 'claude', 'store', 'workspace', 'git', 'runtime'];
 
 function layerRules(layer) {
   const banned = OWN.filter((p) => !layer.allowed.includes(p) && p !== layer.name).map((p) => `@orquestador/${p}`);

@@ -2,6 +2,7 @@ import type { RunEvent } from './events';
 import type { RetryConfig } from './run/retry-policy';
 import type { ReplayDecision } from './replay-plan';
 import type { DeliverableSpec } from '../diagrams';
+import type { RunGit } from './git-guard';
 import type { Payload, StepLimits, UnansweredPolicy } from '../shared';
 
 export type NodeStatus =
@@ -17,6 +18,8 @@ export type NodeStatus =
 export type RunStatus = 'running' | 'succeeded' | 'failed' | 'cancelled';
 
 export interface RunOptions {
+  /** Rama de git acordada para la ejecución y de dónde partió [R97.10][R97.12]. */
+  git?: RunGit;
   budget?: { maxTokens?: number; maxCostUsd?: number };
   /** Al llegar al 100 % del presupuesto: parar ya (por defecto) o dejar terminar lo que está en marcha [R77.8]. */
   onBudget?: 'stop-now' | 'finish-running';

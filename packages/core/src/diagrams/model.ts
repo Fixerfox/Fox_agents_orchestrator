@@ -91,6 +91,8 @@ export interface DiagramNode {
   model?: string;
   /** Solo en nodos `agent`: al terminar, espera a que el usuario apruebe o pida cambios [R43.2]. */
   confirm?: boolean;
+  /** Solo en nodos `agent`: este paso gestiona ramas de git (commit y PR, por ejemplo) y no recibe la regla de la rama [R97.11]. */
+  ownsBranch?: boolean;
   /** Solo en nodos `agent`: latido, duración y presupuesto propios [R70.7][R77.9]. */
   limits?: StepLimits;
   /** Solo en nodos `agent`: qué hacer con lo que dejó un intento fallido; por defecto, conservarlo [R71.10]. */

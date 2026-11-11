@@ -33,6 +33,8 @@ export async function handleRuns(h: HandlerState, channel: string, arg: unknown)
   switch (channel) {
     case CHANNELS.startRun:
       return requireRuns(h).submit(arg as StartRunRequest);
+    case CHANNELS.gitGuard:
+      return requireRuns(h).gitGuard((arg as { diagramId: string }).diagramId);
     case CHANNELS.listQueue:
       return requireRuns(h).queued();
     case CHANNELS.unqueue:

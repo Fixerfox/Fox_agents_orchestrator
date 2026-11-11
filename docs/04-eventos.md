@@ -9,6 +9,7 @@ interface EventBase { runId: Id; seq: number; ts: string; type: string; nodePath
 |---|---|---|
 | `run.started` | `diagramId, resumedFrom?, deliverable?` | Inicio de la ejecución; `deliverable` es el entregable efectivo (SPEC-046) |
 | `run.finished` | `status` | Fin (éxito, fallo o cancelación) |
+| `run.git` | `branch, commit?, created?, from?, stash?, dirty?` | Rama y commit de git con los que empieza la ejecución; va justo después de `run.started` y solo si la carpeta es un repositorio (SPEC-097) |
 | `run.accepted` | `by, reason, previousReason?` | La persona (o el asistente, con su permiso) dio por buena una ejecución fallida; se añade después de `run.finished` (SPEC-065) |
 | `run.paused` / `run.resumed` | `nodeId?` | Pausa/reanudación global o de un nodo |
 | `run.budget_reached` | `limit, used` | Se alcanza el límite de presupuesto y se detiene la ejecución |

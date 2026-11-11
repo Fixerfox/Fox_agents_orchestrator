@@ -23,6 +23,7 @@ export function LaunchDialog({ api, launcher, runsIndex, engine, currentDiagramI
   return (
     <RunDialog
       diagramName={launch.name}
+      diagramId={launch.id}
       engine={engine}
       runnable={validateDiagram(launch).length === 0}
       lastInput={lastInputs.current.get(launch.id) ?? (launch.id === currentDiagramId ? lastInput : '')}

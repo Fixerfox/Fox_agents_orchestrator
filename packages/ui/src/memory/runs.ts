@@ -9,8 +9,12 @@ import {
   correctionTargets,
   resumePlan,
   validateDiagram,
+  branchGuard,
+  defaultChoice,
+  suggestBranchName,
   type Diagram,
   type RunEvent,
+  type RunGit,
   type RunOptions,
 } from '@orquestador/core';
 import { fail, ok, type ApiResult, type QueuedRunView, type RunSummary } from '@orquestador/editor';
@@ -42,6 +46,7 @@ export function memoryRuns(s: MemoryState, options: MemoryApiOptions) {
   const { saved, runs } = s;
   const orchestrator = options.orchestrator ?? defaultOrchestrator(saved);
   const listeners = new Set<(runId: string, events: RunEvent[]) => void>();
+  const gitChoices: MemoryApi['gitChoices'] = [];
   /** Ejecución que reanudó a cada una [R41.2]. */
   const resumedBy = new Map<string, string>();
   /** Ejecuciones que corrigieron a cada una [R53.11]. */
@@ -203,6 +208,13 @@ export function memoryRuns(s: MemoryState, options: MemoryApiOptions) {
       past.summary = { ...past.summary, status: 'cancelled', finishedAt: ts, reason: 'Se interrumpió y la cancelaste' };
       return ok(true);
     },
+    async gitGuard(req) {
+      const d = saved.get(req.diagramId);
+      if (!d) return fail('not-found', 'No existe ese diagrama');
+      if (!options.git) return ok(null);
+      return ok({ state: structuredClone(options.git.state), suggested: options.git.suggested ?? suggestBranchName(d.name, new Date(), options.git.state.branches), otherRuns: options.git.otherRuns ?? 0 });
+    },
+    gitChoices,
     async startRun(req) {
       const d = saved.get(req.diagramId);
       if (!d) return fail('not-found', 'No existe ese diagrama');
@@ -211,7 +223,16 @@ export function memoryRuns(s: MemoryState, options: MemoryApiOptions) {
       for (const id of req.attachments ?? []) if (!staged.has(id)) return fail('bad-request', 'Ese adjunto ya no existe');
       const files = [...(req.files ?? []), ...(req.attachments ?? []).map((id) => `.orquestador/attachments/${id}/${staged.get(id)!.name}`)];
       if (!req.order.trim() && files.length === 0) return fail('bad-request', 'Escribe la entrada o adjunta algún archivo');
-      const opts: RunOptions = { ...(req.maxTokens !== undefined ? { budget: { maxTokens: req.maxTokens } } : {}), ...(req.deliverable !== undefined ? { deliverable: req.deliverable } : {}) };
+      // La guarda de rama, con el git simulado [R97.6].
+      let git: RunGit | undefined;
+      if (options.git) {
+        const st = options.git.state;
+        const verdict = branchGuard(st, req.git ?? defaultChoice(st, d.name, new Date()), { otherRuns: options.git.otherRuns ?? 0, explicit: req.git !== undefined, label: d.name });
+        if (verdict && !verdict.ok) return fail('git-guard', verdict.problem.message);
+        if (verdict) git = { branch: verdict.plan.branch, ...(st.commit ? { commit: st.commit } : {}), ...(verdict.plan.create ? { created: true, from: verdict.plan.create.from ?? st.branch! } : {}), ...(verdict.plan.stash ? { stash: verdict.plan.stash } : {}) };
+      }
+      gitChoices.push(req.git);
+      const opts: RunOptions = { ...(git ? { git } : {}), ...(req.maxTokens !== undefined ? { budget: { maxTokens: req.maxTokens } } : {}), ...(req.deliverable !== undefined ? { deliverable: req.deliverable } : {}) };
       if (req.whenBusy === 'queue' && (isLive(d.id) || queue.some((q) => q.diagramId === d.id))) {
         const snapshot = structuredClone(d);
         const queuedId = `q${++queueSeq}`;

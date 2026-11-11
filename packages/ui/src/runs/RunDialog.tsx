@@ -1,7 +1,8 @@
-import { useRef, useState, type ClipboardEvent, type DragEvent } from 'react';
+import { useEffect, useRef, useState, type ClipboardEvent, type DragEvent } from 'react';
 import { FileText, FolderOpen, Image as ImageIcon, Paperclip, Play, X } from 'lucide-react';
-import { DEFAULT_UNANSWERED, UNANSWERED_ACTIONS, deliverableProblems, type DeliverableSpec, type UnansweredPolicy } from '@orquestador/core';
-import { MAX_ATTACHMENT_BYTES, MAX_INPUT_FILES, deliverableLabel, t, type ProjectApi } from '@orquestador/editor';
+import { DEFAULT_UNANSWERED, UNANSWERED_ACTIONS, deliverableProblems, hardBlock, type DeliverableSpec, type GitChoice, type UnansweredPolicy } from '@orquestador/core';
+import { MAX_ATTACHMENT_BYTES, MAX_INPUT_FILES, deliverableLabel, t, type GitGuardView, type ProjectApi } from '@orquestador/editor';
+import { BranchField, choiceOf, initialPick, pickProblem, type BranchPick } from './BranchField';
 import { DeliverablePanel } from '../diagrams';
 
 /** Archivo de la entrada: adjunto guardado en el proyecto o archivo de la carpeta de trabajo [R48.3]. */
@@ -15,6 +16,8 @@ export interface RunInputs {
 
 interface Props {
   diagramName: string;
+  /** Con él y con `api`, el diálogo pregunta por git y enseña el campo «Rama» [R97.3]. */
+  diagramId?: string;
   engine: 'simulated' | 'claude';
   runnable: boolean;
   /** Última entrada usada, para repetir rápido. */
@@ -40,7 +43,7 @@ interface Props {
    * Lanzar con todas las opciones [R52.7]; si está, sustituye a `onStart`. `whenBusy` solo cuando hay otras;
    * `stay`: «Quedarme donde estoy».
    */
-  onLaunch?: (input: string, maxTokens: number | undefined, deliverable: DeliverableSpec | null | undefined, inputs: RunInputs | undefined, launch: { whenBusy?: 'parallel' | 'queue'; stay: boolean; unanswered?: UnansweredPolicy }) => void;
+  onLaunch?: (input: string, maxTokens: number | undefined, deliverable: DeliverableSpec | null | undefined, inputs: RunInputs | undefined, launch: { whenBusy?: 'parallel' | 'queue'; stay: boolean; git?: GitChoice; unanswered?: UnansweredPolicy }) => void;
   /** Qué hacer si nadie responde: la última elegida con este diagrama o la de Ajustes [R70.19]. */
   unanswered?: UnansweredPolicy | undefined;
 }
@@ -52,7 +55,7 @@ const keyOf = (f: InputItem) => (f.kind === 'attachment' ? `a:${f.id}` : `p:${f.
  * Diálogo Ejecutar: un modal centrado con las pestañas «Ejecución» y «Entregable», cabecera y pie fijos y el cuerpo
  * con scroll [R48.1][R48.2]. La Entrada admite adjuntos [R48.3].
  */
-export function RunDialog({ diagramName, engine, runnable, lastInput = '', defaultLimit, onEngine, onStart, onClose, deliverable, finals = [], onSaveDeliverable, api, busyRuns, onLaunch, unanswered: initialUnanswered }: Props) {
+export function RunDialog({ diagramName, diagramId, engine, runnable, lastInput = '', defaultLimit, onEngine, onStart, onClose, deliverable, finals = [], onSaveDeliverable, api, busyRuns, onLaunch, unanswered: initialUnanswered }: Props) {
   const [unanswered, setUnanswered] = useState<UnansweredPolicy>(initialUnanswered ?? DEFAULT_UNANSWERED);
   const others = (busyRuns?.running ?? 0) + (busyRuns?.queued ?? 0);
   const [whenBusy, setWhenBusy] = useState<'parallel' | 'queue'>('parallel');
@@ -70,12 +73,30 @@ export function RunDialog({ diagramName, engine, runnable, lastInput = '', defau
   const [saved, setSaved] = useState(false);
   const changed = JSON.stringify(dlv ?? null) !== JSON.stringify(deliverable ?? null);
   const dlvOk = dlv === undefined || deliverableProblems(dlv).length === 0;
-  const ok = runnable && (input.trim() !== '' || files.length > 0) && dlvOk && !busy;
+  // Git de la carpeta: en qué rama corre esta ejecución [R97.3].
+  const [gitView, setGitView] = useState<GitGuardView>();
+  const [pick, setPick] = useState<BranchPick>();
+  useEffect(() => {
+    if (!api || !diagramId) return;
+    let alive = true;
+    // Con el motor simulado no se toca git, así que se vuelve a preguntar al cambiar de motor [R97.1].
+    void api.gitGuard({ diagramId }).then((r) => {
+      if (!alive) return;
+      const view = r.ok && r.value?.state.repo ? r.value : undefined;
+      setGitView(view);
+      setPick(view ? initialPick(view) : undefined);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [api, diagramId, engine]);
+  const gitOk = !gitView || !pick || (!hardBlock(gitView.state) && pickProblem(gitView, pick, diagramName) === undefined);
+  const ok = runnable && (input.trim() !== '' || files.length > 0) && dlvOk && !busy && gitOk;
   const go = () => {
     if (!ok) return;
     if (onLaunch) {
       const inputs = files.length > 0 ? { attachments: files.flatMap((f) => (f.kind === 'attachment' ? [f.id] : [])), files: files.flatMap((f) => (f.kind === 'project' ? [f.path] : [])) } : undefined;
-      onLaunch(input.trim(), limit !== '' && Number(limit) > 0 ? Number(limit) : undefined, changed ? (dlv ?? null) : undefined, inputs, { ...(others > 0 ? { whenBusy } : {}), stay, unanswered });
+      onLaunch(input.trim(), limit !== '' && Number(limit) > 0 ? Number(limit) : undefined, changed ? (dlv ?? null) : undefined, inputs, { ...(others > 0 ? { whenBusy } : {}), stay, unanswered, ...(gitView && pick ? { git: choiceOf(pick) } : {}) });
       return;
     }
     const args: [string, number | undefined, ...unknown[]] = [input.trim(), limit !== '' && Number(limit) > 0 ? Number(limit) : undefined];
@@ -258,6 +279,7 @@ export function RunDialog({ diagramName, engine, runnable, lastInput = '', defau
                   )}
                 </fieldset>
               )}
+              {gitView && pick && <BranchField view={gitView} pick={pick} label={diagramName} onChange={setPick} />}
               {others > 0 && (
                 <fieldset className="orq-rundlg__busy">
                   <legend>{busyRuns!.running > 0 ? (busyRuns!.running === 1 ? t('rundlg.busy.one') : t('rundlg.busy.many', { n: busyRuns!.running })) : t('rundlg.busy.queued', { n: busyRuns!.queued })}</legend>

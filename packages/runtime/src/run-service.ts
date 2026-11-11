@@ -35,7 +35,7 @@ export class RunService {
     const live = new LiveRuns();
     this.history = new RunHistory(live, ports.runs, ports.library);
     this.files = new RunFiles(live, ports.runs, ports.policy, ports.files, this.history, ports.stepDir ? (runId, key) => ports.stepDir!(runId, key) : undefined);
-    this.launcher = new RunLauncher(ports.runs, ports.library, defaults, snapshots);
+    this.launcher = new RunLauncher(ports.runs, ports.library, defaults, snapshots, ports.git, () => this.queue.runningCount());
     this.memory = ports.memory ? new RunMemory(ports.runs, orchestrator, ports.memory) : undefined;
     this.queue = new RunQueue(live, ports.runs, orchestrator, snapshots, (runId, key, files) => this.files.snapshotStep(runId, key, files), (runId, diagram) => void this.proposeAfter(runId, diagram));
     this.control = new RunControl(live);
@@ -134,6 +134,11 @@ export class RunService {
     const run = await this.launcher.prepare(input);
     if (input.whenBusy === 'queue' && this.queue.isBusy(run.diagram.id)) return this.queue.enqueue(run, input.order);
     return { runId: this.queue.launchPrepared(run).handle.runId };
+  }
+
+  /** Estado de git para el diálogo «Ejecutar»; `null` si el proyecto no lo tiene [R97.2]. */
+  gitGuard(diagramId: string): ReturnType<RunLauncher['gitGuard']> {
+    return this.launcher.gitGuard(diagramId);
   }
 
   resumeRun(runId: string): Promise<{ runId: string }> {

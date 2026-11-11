@@ -7,8 +7,9 @@
     { "name": "claude", "src": "packages/claude/src", "manifest": "packages/claude/package.json", "allowed": ["core"] },
     { "name": "store", "src": "packages/store/src", "manifest": "packages/store/package.json", "allowed": ["core"] },
     { "name": "workspace", "src": "packages/workspace/src", "manifest": "packages/workspace/package.json", "allowed": ["core"] },
+    { "name": "git", "src": "packages/git/src", "manifest": "packages/git/package.json", "allowed": ["core"] },
     { "name": "runtime", "src": "packages/runtime/src", "manifest": "packages/runtime/package.json", "allowed": ["core"] },
-    { "name": "desktop-main", "src": "apps/desktop/src/main", "manifest": "apps/desktop/package.json", "allowed": ["core", "editor", "ui", "claude", "store", "workspace", "runtime"] },
+    { "name": "desktop-main", "src": "apps/desktop/src/main", "manifest": "apps/desktop/package.json", "allowed": ["core", "editor", "ui", "claude", "store", "workspace", "git", "runtime"] },
     { "name": "desktop-preload", "src": "apps/desktop/src/preload", "allowed": ["core", "editor"], "typesOnly": ["core"] },
     { "name": "desktop-renderer", "src": "apps/desktop/src/renderer", "allowed": ["editor", "ui"] }
   ],

@@ -169,6 +169,8 @@ export interface NodePatch extends StepPatch {
   model?: string;
   /** Confirmar antes de terminar; `false` lo quita [R43.2]. */
   confirm?: boolean;
+  /** El paso gestiona ramas de git; `false` lo quita [R97.11]. */
+  ownsBranch?: boolean;
   router?: Partial<RouterConfig>;
   loop?: Partial<Omit<LoopConfig, 'body'>>;
   /** Cambios del nodo transformar; un texto vacío quita ese campo [R37.12]. */
@@ -215,6 +217,11 @@ export function updateNode(root: Diagram, path: readonly Id[], id: Id, patch: No
         if (n.kind !== 'agent') throw ERR('invalid');
         if (patch.confirm) next.confirm = true;
         else delete next.confirm;
+      }
+      if (patch.ownsBranch !== undefined) {
+        if (n.kind !== 'agent') throw ERR('invalid');
+        if (patch.ownsBranch) next.ownsBranch = true;
+        else delete next.ownsBranch;
       }
       if (!applyStepPatch(next, n, patch)) throw ERR('invalid');
       if (patch.extra !== undefined) {

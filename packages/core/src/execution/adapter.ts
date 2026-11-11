@@ -206,6 +206,8 @@ export interface AgentRequest {
   confirm?: boolean;
   /** Regla de reparto: el trabajo de este paso se divide entre sus ramas [R59.4]. */
   split?: string;
+  /** Regla de la rama de git en la que trabaja la ejecución [R97.10]. */
+  git?: string;
   /** Memoria de la ejecución: contexto de fondo, no instrucciones [R60.21]. */
   memory?: string;
   /** Bloque «Estás dentro de un bucle», si el paso está en uno [R84.4]. */

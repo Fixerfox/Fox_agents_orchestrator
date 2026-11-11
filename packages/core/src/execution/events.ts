@@ -10,6 +10,8 @@ import type { MemoryStats } from './memory/memory-render';
 export type EventBody =
   | { type: 'run.started'; diagramId: Id; /** Ejecución que esta reanuda [R41.1]. */ resumedFrom?: string; /** Ejecución que esta corrige [R53.8]. */ correctedFrom?: string; /** Entregable efectivo [R46.3]. */ deliverable?: DeliverableSpec }
   | { type: 'run.finished'; status: RunStatus; reason?: string }
+  /** Rama y commit de git con los que empieza la ejecución, y si la rama se creó para ella [R97.12]. */
+  | { type: 'run.git'; branch: string; commit?: string; created?: boolean; from?: string; stash?: string; dirty?: number }
   /** La persona (o el asistente, con su permiso) dio por buena una ejecución fallida; va después de `run.finished` [R65.5]. */
   | { type: 'run.accepted'; by: 'user' | 'assistant'; reason: string; previousReason?: string }
   | { type: 'run.cancelled'; reason?: string }
@@ -41,6 +43,8 @@ export type EventBody =
       confirm?: boolean;
       /** Regla de reparto que recibe este paso [R59.4]. */
       split?: string;
+      /** Regla de la rama de git que recibió el paso [R97.10]. */
+      git?: string;
       /** Memoria que recibe este paso [R60.25]. */
       memory?: string;
       /** Bloque «Estás dentro de un bucle» que recibe este paso [R84.4]. */

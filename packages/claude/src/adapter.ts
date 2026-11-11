@@ -169,6 +169,7 @@ export class ClaudeAdapter implements AgentAdapter {
           buildSystemPrompt(agent, contexts, skills, summary ?? { text: '(carpeta del proyecto)' }, plan, {
             ...(request.confirm ? { confirm: true } : {}),
             ...(request.split ? { split: request.split } : {}),
+            ...(request.git ? { git: request.git } : {}),
             ...(request.deliverable ? { deliverable: request.deliverable } : {}),
             ...(request.projectMemory ? { projectMemory: request.projectMemory.text } : {}),
             level,

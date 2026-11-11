@@ -42,6 +42,8 @@ export interface RunSummaryView {
   reviews: RunReviewSummary[];
   questions: { label: string; text: string; answer?: string }[];
   files: string[];
+  /** Rama y commit con los que empezó, si la carpeta es un repositorio [R97.12]. */
+  git?: { branch: string; commit?: string; created?: boolean; from?: string; stash?: string; dirty?: number };
   /** Ramas de git en las que se actuó y qué pasos lo hicieron [R58.10]. */
   branches: { name: string; created: boolean; deleted: boolean; prUrl?: string; steps: { label: string; actions: string[] }[] }[];
   /** Lo que vio y anotó el Supervisor, si estaba activo [R60.10]. */
@@ -74,6 +76,10 @@ export function summarizeRun(events: readonly RunEvent[], labelOf: (nodeId: stri
   const files: string[] = [];
   const errors: { label: string; message: string }[] = [];
   const splitRejections: RunSummaryView['splitRejections'] = [];
+  const started = events.find((e) => e.type === 'run.git');
+  const gitStart: RunSummaryView['git'] = started
+    ? { branch: started.branch, ...(started.commit ? { commit: started.commit } : {}), ...(started.created ? { created: true } : {}), ...(started.from ? { from: started.from } : {}), ...(started.stash ? { stash: started.stash } : {}), ...(started.dirty !== undefined ? { dirty: started.dirty } : {}) }
+    : undefined;
   let supervisor: RunSummaryView['supervisor'];
   const watched = () => (supervisor ??= { alerts: [], notes: [] });
   const watch = supervisorView(events, false, labelOf);
@@ -216,6 +222,7 @@ export function summarizeRun(events: readonly RunEvent[], labelOf: (nodeId: stri
     reviews: [...reviews.values()],
     questions: [...questions.values()],
     files,
+    ...(gitStart ? { git: gitStart } : {}),
     branches: branchesOf(events).list.map((b) => ({ name: b.name, created: b.created, deleted: b.deleted, ...(b.prUrl ? { prUrl: b.prUrl } : {}), steps: b.steps.map((s) => ({ label: labelOf(s.nodeId, s.nodePath), actions: s.actions })) })),
     splitRejections,
     ...(watch || supervisor ? { supervisor: { ...(supervisor ?? { alerts: [], notes: [] }), notes: memoryCards(events, labelOf), ...(watch ? { balance: { reviewed: watch.reviewed, costUsd: watch.costUsd, ...(watch.model ? { model: watch.model } : {}) } } : {}), ...(watch?.branch ? { branch: watch.branch } : {}) } } : {}),
