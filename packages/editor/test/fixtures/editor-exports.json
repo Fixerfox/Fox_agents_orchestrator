@@ -49,6 +49,8 @@
   "ExampleTemplate",
   "FileKind",
   "FilePreview",
+  "GitIgnoreMode",
+  "GitIgnoreView",
   "HISTORY_MEASURES",
   "HISTORY_SORTS",
   "History",

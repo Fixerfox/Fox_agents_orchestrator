@@ -18,36 +18,19 @@ async function openSettings(options: MemoryApiOptions = {}, createProject = true
   return { api, dlg };
 }
 
-/** La carpeta está en «Este proyecto › Carpeta de trabajo» [R67.1]. */
+/** La carpeta está en «Este proyecto › Carpeta del proyecto» [R67.1]. */
 async function openWork(options: MemoryApiOptions = {}) {
   const r = await openSettings(options);
-  await settingsSection('Carpeta de trabajo');
+  await settingsSection('Carpeta del proyecto');
   return r;
 }
 
 describe('SPEC-031 · carpeta de trabajo en Ajustes', () => {
-  it('[R31.1] sin carpeta lo explica y ofrece elegirla; al elegirla muestra nombre y número de archivos, nunca la ruta', async () => {
-    const { dlg } = await openWork({ workFolderPick: { name: 'mi-juego', files: 42 } });
-    expect(await dlg.findByText(/Sin carpeta: los agentes trabajan en la carpeta del proyecto/)).toBeTruthy();
-    await userEvent.click(dlg.getByRole('button', { name: 'Elegir carpeta…' }));
+  it('[R31.1][R96.3] enseña la carpeta del proyecto con su nombre y número de archivos, sin botones para cambiarla', async () => {
+    const { dlg } = await openWork({ workFolder: { name: 'mi-juego', files: 42 } });
     expect(await dlg.findByText('mi-juego · 42 archivos')).toBeTruthy();
-    expect(dlg.getByRole('button', { name: 'Cambiar carpeta…' })).toBeTruthy();
-  });
-
-  it('[R31.1] cancelar el diálogo del sistema no cambia nada y «Quitar carpeta» la deja sin elegir', async () => {
-    const { dlg, api } = await openWork();
-    await userEvent.click(await dlg.findByRole('button', { name: 'Elegir carpeta…' }));
-    expect(dlg.queryByText(/archivos$/)).toBeNull();
-    const picked = await createMemoryApi([], { workFolderPick: { name: 'x', files: 1 } }).pickWorkFolder();
-    expect(picked.ok && picked.value).toEqual({ name: 'x', files: 1 });
-    expect(await api.getWorkFolder()).toEqual({ ok: true, value: null });
-  });
-
-  it('[R31.1] quitar la carpeta vuelve al estado inicial', async () => {
-    const { dlg } = await openWork({ workFolderPick: { name: 'mi-juego', files: 3 } });
-    await userEvent.click(await dlg.findByRole('button', { name: 'Elegir carpeta…' }));
-    await userEvent.click(await dlg.findByRole('button', { name: 'Quitar carpeta' }));
-    expect(await dlg.findByText(/Sin carpeta/)).toBeTruthy();
+    expect(dlg.queryByRole('button', { name: /Elegir carpeta|Cambiar carpeta|Quitar carpeta/ })).toBeNull();
+    expect(dlg.queryByText(/Sin carpeta/)).toBeNull();
   });
 
   it('[R31.1] desde la pantalla de inicio, sin proyecto, la sección no aparece', async () => {
@@ -56,7 +39,7 @@ describe('SPEC-031 · carpeta de trabajo en Ajustes', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Ajustes' }));
     const dlg = within(await screen.findByRole('region', { name: 'Ajustes' }));
     await waitFor(() => expect(dlg.getByRole('heading', { name: 'Claude' })).toBeTruthy());
-    expect(dlg.queryByText('Carpeta de trabajo')).toBeNull();
+    expect(dlg.queryByText('Carpeta del proyecto')).toBeNull();
   });
 
   it('[R31.4][R47.11][R51.1] los permisos están en «Sin preguntar nunca» por defecto, se cambian y se guardan', async () => {

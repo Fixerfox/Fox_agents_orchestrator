@@ -23,10 +23,10 @@ describe('SPEC-067 · Ajustes por secciones', () => {
   it('[R67.1] índice «General» (y «Este proyecto» con proyecto), con resumen y una sección cada vez', async () => {
     const { page, index } = await mount({ project: true });
     expect(groups()).toEqual(['General', 'Este proyecto']);
-    expect(titles()).toEqual(['Claude', 'Permisos de los agentes', 'Supervisor', 'Ejecución y presupuesto', 'Límites de tiempo', 'Memoria', 'Apariencia', 'Carpeta de trabajo']);
+    expect(titles()).toEqual(['Claude', 'Permisos de los agentes', 'Supervisor', 'Ejecución y presupuesto', 'Límites de tiempo', 'Memoria', 'Apariencia', 'Carpeta del proyecto']);
     expect(index.getByRole('button', { name: /^Claude/ }).getAttribute('aria-current')).toBe('page');
     expect(index.getByRole('button', { name: /^Ejecución y presupuesto/ }).textContent).toContain('4 en paralelo · sin límite');
-    expect(index.getByRole('button', { name: /^Carpeta de trabajo/ }).textContent).toContain('Sin elegir');
+    expect(index.getByRole('button', { name: /^Carpeta del proyecto/ }).textContent).toContain('proyecto');
     expect(page.queryByLabelText(/Agentes en paralelo/)).toBeNull();
     await userEvent.click(index.getByRole('button', { name: /^Ejecución y presupuesto/ }));
     expect(page.getByRole('heading', { name: 'Ejecución y presupuesto' })).toBeTruthy();
@@ -38,7 +38,7 @@ describe('SPEC-067 · Ajustes por secciones', () => {
   it('[R67.1] sin proyecto abierto no hay grupo «Este proyecto»', async () => {
     await mount();
     expect(groups()).toEqual(['General']);
-    expect(titles()).not.toContain('Carpeta de trabajo');
+    expect(titles()).not.toContain('Carpeta del proyecto');
   });
 
   it('[R67.2] la tarjeta de estado: simulado, sin probar y «Claude responde» con el mensaje', async () => {

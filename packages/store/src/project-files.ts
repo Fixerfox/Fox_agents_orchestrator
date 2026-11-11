@@ -9,7 +9,7 @@ import { readRunLog } from './run-log';
 /** Lo que necesitan estas funciones del proyecto. */
 export interface ProjectFiles {
   readonly paths: ProjectPaths;
-  getWorkFolder(): Promise<string | undefined>;
+  getWorkFolder(): Promise<string>;
 }
 
 /** Límites de los adjuntos de la entrada [R48.3][R48.4]. */
@@ -69,13 +69,13 @@ export async function attachmentInputPath(project: ProjectFiles, id: string): Pr
     throw new StoreError('not-found', 'Ese adjunto ya no existe');
   }
   if (names.length !== 1) throw new StoreError('not-found', 'Ese adjunto ya no existe');
-  const base = (await project.getWorkFolder()) ?? project.paths.root;
+  const base = await project.getWorkFolder();
   return path.relative(base, path.join(dir, names[0]!)).split(path.sep).join('/');
 }
 
 /** Comprueba archivos del proyecto para la entrada: dentro de la carpeta de trabajo y fuera de lo reservado [R48.4]. */
 export async function inputFiles(project: ProjectFiles, rels: string[]): Promise<{ path: string; size: number; image: boolean }[]> {
-  const base = (await project.getWorkFolder()) ?? project.paths.root;
+  const base = await project.getWorkFolder();
   const out: { path: string; size: number; image: boolean }[] = [];
   for (const rel of rels) {
     const norm = rel.split('\\').join('/');
@@ -97,7 +97,7 @@ export async function inputFiles(project: ProjectFiles, rels: string[]): Promise
 
 /** Carpeta donde abrir el diálogo de «Del proyecto…» [R48.6]. */
 export async function inputBase(project: ProjectFiles): Promise<string> {
-  return (await project.getWorkFolder()) ?? project.paths.root;
+  return await project.getWorkFolder();
 }
 
 /** Guarda el original de un archivo antes de que un agente lo modifique; solo la primera vez en cada ejecución [R31.6]. */
@@ -155,7 +155,7 @@ export async function readRunFile(project: ProjectFiles, runId: Id, rel: string,
     }
   }
   if (!recorded) throw new StoreError('not-found', 'Esa ejecución no tocó ese fichero');
-  const base = (await project.getWorkFolder()) ?? project.paths.root;
+  const base = await project.getWorkFolder();
   const read = async (abs: string, root: string): Promise<{ text: string; truncated: boolean; binary: boolean } | undefined> => {
     let real: string;
     try {
@@ -195,7 +195,6 @@ export async function readRunFile(project: ProjectFiles, runId: Id, rel: string,
 export async function restoreBackup(project: ProjectFiles, runId: Id, rel: string, dir?: string): Promise<boolean> {
   if (!isRelativeInside(rel)) throw new StoreError('outside-root', 'Ruta de copia no válida');
   const folder = dir ?? (await project.getWorkFolder());
-  if (!folder) throw new StoreError('not-found', 'No hay carpeta de trabajo');
   const from = path.join(project.paths.backupsDir(runId), ...rel.split('/'));
   const to = path.join(folder, ...rel.split('/'));
   try {

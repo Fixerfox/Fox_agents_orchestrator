@@ -18,10 +18,22 @@ export interface WorkFolderInspection {
   docs: { name: string; text: string }[];
 }
 
-/** Lo único que la interfaz sabe de la carpeta de trabajo [R31.1]. */
+/** Lo único que la interfaz sabe de la carpeta en la que se trabaja, que es la del proyecto [R31.1][R96.2]. */
 export interface WorkFolderView {
   name: string;
   files: number;
+  /** Proyecto antiguo sin unir: su configuración está en otra carpeta [R96.4]. */
+  separate?: boolean;
+}
+
+/** `shared`: la configuración de `.orquestador` va a git; `all`: no se sube nada [R96.9]. */
+export type GitIgnoreMode = 'shared' | 'all';
+/** La opción «Orquestador y git» de la carpeta del proyecto [R96.9]. */
+export interface GitIgnoreView {
+  /** Se ofrece: la carpeta está en un repositorio de git o tiene `.gitignore`. */
+  available: boolean;
+  exists: boolean;
+  mode: GitIgnoreMode;
 }
 
 /** Programas que puede abrir la terminal integrada [R30.13]. */
@@ -64,13 +76,16 @@ export interface ProjectSessionApi {
   /** Cierra el proyecto abierto [R28.7]. */
   closeProject(): Promise<ApiResult<null>>;
   // --- carpeta de trabajo y copias (SPEC-031) ---
-  /** Carpeta de trabajo del proyecto: solo nombre y número de archivos, nunca la ruta [R31.1]. */
-  getWorkFolder(): Promise<ApiResult<WorkFolderView | null>>;
-  /** Abre el diálogo del sistema y guarda la carpeta elegida; `null` si se cancela [R31.1]. */
-  pickWorkFolder(): Promise<ApiResult<WorkFolderView | null>>;
-  clearWorkFolder(): Promise<ApiResult<null>>;
+  /** Carpeta en la que se trabaja (la del proyecto): solo nombre y número de archivos, nunca la ruta [R31.1][R96.2]. */
+  getWorkFolder(): Promise<ApiResult<WorkFolderView>>;
+  /** Une un proyecto antiguo con su carpeta de trabajo y lo abre ahí; no borra nada [R96.5]. */
+  joinWorkFolder(): Promise<ApiResult<ProjectInfo>>;
+  /** Qué hace git con `.orquestador` en la carpeta del proyecto [R96.9]. */
+  getGitIgnore(): Promise<ApiResult<GitIgnoreView>>;
+  /** Añade o quita `.orquestador/` del `.gitignore` de la carpeta del proyecto [R96.10][R96.11]. */
+  setGitIgnore(mode: GitIgnoreMode): Promise<ApiResult<GitIgnoreView>>;
   /**
-   * Analiza la carpeta de trabajo: agentes y skills de `.claude/`, MCP de `.mcp.json`, resumen del proyecto y
+   * Analiza la carpeta del proyecto: agentes y skills de `.claude/`, MCP de `.mcp.json`, resumen del proyecto y
    * documentos guía (CLAUDE.md, TRABAJO.md, AGENTS.md). No instala nada; se confirma con `confirmImport` [R32.16].
    */
   inspectWorkFolder(): Promise<ApiResult<WorkFolderInspection>>;
@@ -101,13 +116,16 @@ export function parseProjectRequest(channel: string, payload: unknown, { bad, ex
     case CHANNELS.listRecent:
     case CHANNELS.closeProject:
     case CHANNELS.getWorkFolder:
-    case CHANNELS.pickWorkFolder:
-    case CHANNELS.clearWorkFolder:
+    case CHANNELS.joinWorkFolder:
+    case CHANNELS.getGitIgnore:
     case CHANNELS.inspectWorkFolder:
       if (payload !== undefined && payload !== null) throw bad('no admite argumentos');
       return undefined;
     case CHANNELS.forgetRecent:
       if (!safeId(payload)) throw bad('id no válido');
+      return payload;
+    case CHANNELS.setGitIgnore:
+      if (payload !== 'all' && payload !== 'shared') throw bad('modo no válido');
       return payload;
     case CHANNELS.setProjectTrust:
       if (payload !== 'trusted' && payload !== 'ignored') throw bad('decisión no válida');

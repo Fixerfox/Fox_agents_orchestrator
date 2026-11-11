@@ -216,6 +216,22 @@ export class McpSecretVault {
     });
   }
 
+  /** Pasa a otro prefijo (otra carpeta de proyecto) todas las claves `<prefijo>:<id>` [R96.7]. */
+  async movePrefix(from: string, to: string): Promise<void> {
+    return this.change((data) => {
+      if (from === to) return false;
+      let changed = false;
+      for (const key of Object.keys(data)) {
+        if (!key.startsWith(`${from}:`)) continue;
+        const next = `${to}:${key.slice(from.length + 1)}`;
+        data[next] = { ...(data[next] ?? {}), ...data[key] };
+        delete data[key];
+        changed = true;
+      }
+      return changed;
+    });
+  }
+
   async remove(key: string, name?: string): Promise<void> {
     return this.change((data) => {
       if (!data[key]) return false;

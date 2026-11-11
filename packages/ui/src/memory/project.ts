@@ -6,7 +6,8 @@ import type { MemoryApi, MemoryApiOptions, MemoryState } from './types';
 /** Proyecto: abrir y cerrar, recientes, carpeta de trabajo y terminal simulada. */
 export function memoryProject(s: MemoryState, options: MemoryApiOptions) {
   const { agents, skills } = s;
-  let workFolder: { name: string; files: number } | null = null;
+  const workFolder: { name: string; files: number; separate?: boolean } = { ...(options.workFolder ?? { name: 'proyecto', files: 0 }) };
+  let gitIgnore = { ...(options.gitIgnore ?? { available: false, exists: false, mode: 'shared' as const }) };
   let recent: RecentView[] = (options.recent ?? []).map((r) => ({ ...r }));
   const terminals: MemoryApi['terminals'] = new Map();
   const terminalListeners = new Set<(id: string, event: TerminalEvent) => void>();
@@ -79,23 +80,30 @@ export function memoryProject(s: MemoryState, options: MemoryApiOptions) {
     },
     async getWorkFolder() {
       if (!s.open) return fail('not-found', 'Abre un proyecto');
-      return ok(workFolder ? { ...workFolder } : null);
-    },
-    async pickWorkFolder() {
-      if (!options.workFolderPick) return ok(null);
-      workFolder = { ...options.workFolderPick };
       return ok({ ...workFolder });
     },
+    async joinWorkFolder() {
+      if (!s.open) return fail('not-found', 'Abre un proyecto');
+      if (!workFolder.separate) return fail('invalid', 'Este proyecto ya trabaja en su propia carpeta: no hay nada que unir');
+      if (options.joinError) return fail('exists', options.joinError);
+      delete workFolder.separate;
+      return ok({ name: workFolder.name });
+    },
+    async getGitIgnore() {
+      if (!s.open) return fail('not-found', 'Abre un proyecto');
+      return ok({ ...gitIgnore });
+    },
+    async setGitIgnore(mode) {
+      if (!s.open) return fail('not-found', 'Abre un proyecto');
+      gitIgnore = { ...gitIgnore, mode, exists: gitIgnore.exists || mode === 'all' };
+      return ok({ ...gitIgnore });
+    },
     async inspectWorkFolder() {
-      if (!workFolder) return fail('not-found', 'Elige primero la carpeta del proyecto');
+      if (!s.open) return fail('not-found', 'Abre un proyecto');
       const tree = options.workFolderTree ?? { files: [], summary: `${workFolder.name}/`, docs: [] };
       const plan = analyzeImport({ files: tree.files }, { agentIds: new Set(agents.keys()), skillIds: new Set(skills.keys()) });
       s.pending = { id: `import-${++s.importCount}`, plan };
       return ok({ importId: s.pending.id, report: plan.report, folder: { ...workFolder }, summary: tree.summary, docs: tree.docs.map((d) => ({ ...d })) });
-    },
-    async clearWorkFolder() {
-      workFolder = null;
-      return ok(null);
     },
   } satisfies Partial<MemoryApi>;
 }

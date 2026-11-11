@@ -14,9 +14,9 @@ describe('SPEC-048 · adjuntos de la entrada en el proyecto', () => {
     expect(a).toMatchObject({ name: 'boceto final_.PNG', size: 2, image: true });
     expect(await store.attachmentInputPath(a.id)).toBe(`.orquestador/attachments/${a.id}/boceto final_.PNG`);
     expect(await fs.readFile(path.join(root, '.orquestador', 'attachments', a.id, 'boceto final_.PNG'))).toEqual(Buffer.from([9, 9]));
-    // Con una carpeta de trabajo aparte, la ruta es relativa a ella.
+    // En un proyecto antiguo con la carpeta de trabajo aparte, la ruta es relativa a ella [R96.4].
     const work = await tmp();
-    await store.setWorkFolder(work);
+    await fs.writeFile(store.paths.workFolderFile, JSON.stringify({ schemaVersion: 1, path: work }));
     expect(await store.attachmentInputPath(a.id)).toBe(path.relative(work, path.join(root, '.orquestador', 'attachments', a.id, 'boceto final_.PNG')).split(path.sep).join('/'));
     await expect(store.stageAttachment('vacio.txt', new Uint8Array(0))).rejects.toThrow(/vacío/);
     await expect(store.stageAttachment('grande.bin', new Uint8Array(20 * 1024 * 1024 + 1))).rejects.toThrow(/20 MB/);

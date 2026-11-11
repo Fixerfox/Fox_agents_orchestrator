@@ -44,7 +44,7 @@ export const stepSpaceDir = (runId: string, key: string): string | undefined => 
 /** Espacios de las ramas en paralelo de una ejecución; se olvidan al cerrarlos todos [R73.2][R73.18]. */
 export function branchSpacesFor(ctx: Pick<OrchestratorContext, 'store' | 'projectRoot' | 'spacesRoot'>) {
   return (runId: string): BranchSpaceManager => {
-    const m = new BranchSpaceManager({ workRoot: async () => (await ctx.store.getWorkFolder()) ?? ctx.projectRoot, runDir: ctx.store.paths.runDir(runId), spacesRoot: ctx.spacesRoot ?? path.join(tmpdir(), 'orquestador-spaces') });
+    const m = new BranchSpaceManager({ workRoot: () => ctx.store.getWorkFolder(), runDir: ctx.store.paths.runDir(runId), spacesRoot: ctx.spacesRoot ?? path.join(tmpdir(), 'orquestador-spaces') });
     liveSpaces.set(runId, m);
     const closeAll = m.closeAll.bind(m);
     m.closeAll = async () => {
@@ -100,13 +100,13 @@ export function claudeEnvironment(ctx: OrchestratorContext): ClaudeEnvironment {
  * Devuelve al punto de partida lo que tocó un intento fallido [R71.10]: lo modificado desde la copia de la ejecución
  * (R31.6) y lo creado se borra. Nunca sale de la carpeta de trabajo.
  */
-export function restoreAttemptFiles(store: Pick<ProjectStore, 'restoreBackup' | 'getWorkFolder'>, projectRoot: string) {
+export function restoreAttemptFiles(store: Pick<ProjectStore, 'restoreBackup' | 'getWorkFolder'>) {
   return async (runId: string, files: { path: string; change?: 'created' | 'modified' }[], dir?: string) => {
     const restored: string[] = [];
     const removed: string[] = [];
     const failed: { path: string; reason: string }[] = [];
     // En una rama aislada se devuelve en su espacio [R73.8].
-    const root = path.resolve(dir ?? (await store.getWorkFolder()) ?? projectRoot);
+    const root = path.resolve(dir ?? (await store.getWorkFolder()));
     for (const f of files) {
       const abs = path.resolve(root, ...f.path.split('/'));
       if (abs !== root && !abs.startsWith(root + path.sep)) {
@@ -136,7 +136,7 @@ export const appResources = new AppResources({ maxAgents: () => agentsTotal(appS
 export function composeOrchestrator(ctx: OrchestratorContext, query: QueryFn): Orchestrator {
   appSettings = ctx.settings;
   return createEngineOrchestrator(
-    { ...(ctx.secretValues ? { secretValues: ctx.secretValues } : {}), library: libraryOf(ctx), settings: ctx.settings, resources: appResources, restoreFiles: restoreAttemptFiles(ctx.store, ctx.projectRoot), spaces: branchSpacesFor(ctx), checkRunner: checkRunnerFor(ctx.store, ctx.projectRoot, ctx.checksApprovalsFile), evidence: evidenceFor(ctx.store, ctx.projectRoot) },
+    { ...(ctx.secretValues ? { secretValues: ctx.secretValues } : {}), library: libraryOf(ctx), settings: ctx.settings, resources: appResources, restoreFiles: restoreAttemptFiles(ctx.store), spaces: branchSpacesFor(ctx), checkRunner: checkRunnerFor(ctx.store, ctx.checksApprovalsFile), evidence: evidenceFor(ctx.store) },
     [createClaudeEngine(claudeEnvironment(ctx), query)],
   );
 }

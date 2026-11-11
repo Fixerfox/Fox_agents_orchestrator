@@ -93,8 +93,7 @@ describe('SPEC-032 · fidelidad a los prototipos', () => {
   });
 
   it('[R32.29][R47.11] «Archivos» guarda al momento los permisos de los agentes', async () => {
-    const api = await mount({ workFolderPick: { name: 'INCWars', files: 10 } });
-    await api.pickWorkFolder();
+    const api = await mount({ workFolder: { name: 'INCWars', files: 10 } });
     const rail = within(screen.getByRole('navigation', { name: 'Secciones' }));
     await userEvent.click(rail.getByRole('button', { name: 'Proyecto' }));
     await userEvent.click(rail.getByRole('button', { name: 'Diseñador' }));
@@ -117,7 +116,7 @@ describe('SPEC-032 · fidelidad a los prototipos', () => {
   });
 
   it('[R47.11] si el agente del paso tiene sus propios permisos, «Archivos» lo dice', async () => {
-    await mount({ workFolderPick: { name: 'INCWars', files: 10 }, agents: [agent('lector', 'Lector', { permissions: 'readonly' })] });
+    await mount({ workFolder: { name: 'INCWars', files: 10 }, agents: [agent('lector', 'Lector', { permissions: 'readonly' })] });
     await addAgent(/Lector/);
     await screen.findByRole('tab', { name: 'Permisos' });
     await stepTab('Permisos');

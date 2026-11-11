@@ -102,7 +102,7 @@ describe('SPEC-088 · IPC y motor', () => {
     await fs.mkdir(join(dir, 'repo', '.orquestador'), { recursive: true });
     await fs.writeFile(store.paths.approvedChecksFile, JSON.stringify({ schemaVersion: 1, approved: ['cualquier-hash'] }));
     const file = join(dir, 'datos', 'trust', 'repo-checks.json');
-    const r = checkRunnerFor(store, join(dir, 'repo'), file);
+    const r = checkRunnerFor(store, file);
     expect(await r.approved('npm test')).toBe(false);
     await r.approve('npm test');
     expect(await r.approved('npm test')).toBe(true);

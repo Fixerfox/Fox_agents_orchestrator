@@ -101,7 +101,7 @@ describe('SPEC-032 · M7b carpeta del proyecto', () => {
   ];
   const options: MemoryApiOptions = {
     agents: [agent('dev', 'Dev')],
-    workFolderPick: { name: 'INCWars', files: 412 },
+    workFolder: { name: 'INCWars', files: 412 },
     workFolderTree: { files, summary: 'INCWars/\n  juego/\n  assets/', docs: [{ name: 'CLAUDE.md', text: '# Normas\nTodo en español.' }] },
   };
 
@@ -111,7 +111,6 @@ describe('SPEC-032 · M7b carpeta del proyecto', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Desde la carpeta de un proyecto' }));
     const wiz = within(await screen.findByRole('region', { name: 'Conectar la carpeta del proyecto' }));
     expect(wiz.getByText('Carpeta').closest('li')?.getAttribute('aria-current')).toBe('step');
-    await userEvent.click(wiz.getByRole('button', { name: 'Elegir carpeta…' }));
     expect(await wiz.findByText('INCWars')).toBeTruthy();
     expect(await wiz.findByText('✓ 1 agentes de Claude Code')).toBeTruthy();
     expect(wiz.getByText('✓ 1 skills')).toBeTruthy();
@@ -128,9 +127,8 @@ describe('SPEC-032 · M7b carpeta del proyecto', () => {
   it('[R32.17] aplicar instala lo marcado, crea el contexto común y lo asigna a todos los agentes', async () => {
     const api = await mount(options);
     await userEvent.click(rail().getByRole('button', { name: 'Proyecto' }));
-    await userEvent.click(await screen.findByRole('button', { name: 'Conectar la carpeta del proyecto' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Analizar de nuevo' }));
     const wiz = within(await screen.findByRole('region', { name: 'Conectar la carpeta del proyecto' }));
-    await userEvent.click(wiz.getByRole('button', { name: 'Elegir carpeta…' }));
     await userEvent.click(await wiz.findByRole('button', { name: 'Revisar propuesta' }));
     const summary = wiz.getByRole('textbox', { name: 'Resumen del proyecto' }) as HTMLTextAreaElement;
     expect(summary.value).toContain('INCWars/');
@@ -151,9 +149,8 @@ describe('SPEC-032 · M7b carpeta del proyecto', () => {
   it('[R30.6] marcar un MCP de la carpeta lo añade al proyecto apagado; sin marcar no se añade', async () => {
     const api = await mount(options);
     await userEvent.click(rail().getByRole('button', { name: 'Proyecto' }));
-    await userEvent.click(await screen.findByRole('button', { name: 'Conectar la carpeta del proyecto' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Analizar de nuevo' }));
     const wiz = within(await screen.findByRole('region', { name: 'Conectar la carpeta del proyecto' }));
-    await userEvent.click(wiz.getByRole('button', { name: 'Elegir carpeta…' }));
     await userEvent.click(await wiz.findByRole('button', { name: 'Revisar propuesta' }));
     const box = wiz.getByRole('checkbox', { name: 'pixelart-mcp' }) as HTMLInputElement;
     expect(box.checked).toBe(false);
@@ -166,9 +163,8 @@ describe('SPEC-032 · M7b carpeta del proyecto', () => {
   it('[R32.17] desmarcar un agente no lo instala; cancelar no instala nada', async () => {
     const api = await mount(options);
     await userEvent.click(rail().getByRole('button', { name: 'Proyecto' }));
-    await userEvent.click(await screen.findByRole('button', { name: 'Conectar la carpeta del proyecto' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Analizar de nuevo' }));
     let wiz = within(await screen.findByRole('region', { name: 'Conectar la carpeta del proyecto' }));
-    await userEvent.click(wiz.getByRole('button', { name: 'Elegir carpeta…' }));
     await userEvent.click(await wiz.findByRole('button', { name: 'Cancelar' }));
     expect(api.agents.has('pixelador')).toBe(false);
     await userEvent.click(await screen.findByRole('button', { name: 'Analizar de nuevo' }));
@@ -255,11 +251,10 @@ describe('SPEC-032 · M7b revisión de la carpeta', () => {
       { path: 'agents/pixelador.md', data: enc.encode('---\nname: pixelador\ndescription: Pinta\nskills: pixel-art\n---\nDibuja.\n') },
       { path: 'skills/pixel-art/SKILL.md', data: enc.encode('---\nname: pixel-art\ndescription: Paleta\n---\n# Pasos\n') },
     ];
-    await mount({ workFolderPick: { name: 'Juego', files: 3 }, workFolderTree: { files, summary: 'Juego/', docs: [] } });
+    await mount({ workFolder: { name: 'Juego', files: 3 }, workFolderTree: { files, summary: 'Juego/', docs: [] } });
     await userEvent.click(rail().getByRole('button', { name: 'Proyecto' }));
-    await userEvent.click(await screen.findByRole('button', { name: 'Conectar la carpeta del proyecto' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Analizar de nuevo' }));
     const wiz = within(await screen.findByRole('region', { name: 'Conectar la carpeta del proyecto' }));
-    await userEvent.click(wiz.getByRole('button', { name: 'Elegir carpeta…' }));
     await userEvent.click(await wiz.findByRole('button', { name: 'Revisar propuesta' }));
     const row = wiz.getByRole('checkbox', { name: /pixelador/ }).closest('label')!;
     const tag = within(row).getByText('pixel-art');

@@ -8,6 +8,7 @@ import { applyTheme, loadTheme, saveTheme, type Theme } from './theme';
 import { Choice, PermMatrix, RULES, Row, Shell, type Section, type SectionId } from './SettingsParts';
 import { TrustRow } from './TrustDialog';
 import { AboutLine } from './AboutLine';
+import { GitIgnoreOption, SeparateFolderNotice } from './ProjectFolderOptions';
 
 interface Props {
   api: ProjectApi;
@@ -26,7 +27,7 @@ export function SettingsDialog({ api, onClose, onSaved }: Props) {
   const [key, setKey] = useState('');
   const [changingKey, setChangingKey] = useState(false);
   const [theme, setTheme] = useState<Theme>(() => loadTheme());
-  const [work, setWork] = useState<WorkFolderView | null | undefined>();
+  const [work, setWork] = useState<WorkFolderView | undefined>();
   const [probe, setProbe] = useState<{ running: boolean; result?: ConnectionResult; error?: string }>({ running: false });
   const [section, setSection] = useState<SectionId>('claude');
   /** Cambios del usuario pendientes de guardar (el primer valor cargado no cuenta). */
@@ -45,7 +46,7 @@ export function SettingsDialog({ api, onClose, onSaved }: Props) {
       setDraft(r.value);
       setTokens(r.value.defaultMaxTokens !== undefined ? String(r.value.defaultMaxTokens) : '');
     });
-    // Solo hay carpeta de trabajo con un proyecto abierto; desde la pantalla de inicio no se muestra [R31.1].
+    // Solo hay carpeta con un proyecto abierto; desde la pantalla de inicio no se muestra [R31.1].
     void api.getWorkFolder().then((r) => setWork(r.ok ? r.value : undefined));
   }, [api]);
 
@@ -108,14 +109,6 @@ export function SettingsDialog({ api, onClose, onSaved }: Props) {
     setProbe({ running: true });
     const res = await api.testConnection();
     setProbe(res.ok ? { running: false, result: res.value } : { running: false, error: res.error.message });
-  };
-  const pickWork = async () => {
-    const r = await api.pickWorkFolder();
-    if (r.ok && r.value) setWork(r.value);
-  };
-  const clearWork = async () => {
-    const r = await api.clearWorkFolder();
-    if (r.ok) setWork(null);
   };
   const saveKey = async () => {
     const res = await api.setApiKey(key);
@@ -460,24 +453,27 @@ export function SettingsDialog({ api, onClose, onSaved }: Props) {
       group: 'project',
       icon: Folder,
       label: t('settings.section.work'),
-      summary: work ? work.name : t('settings.sum.work.none'),
+      summary: work.name,
       intro: t('settings.work.intro'),
       content: (
-        <div className="orq-setfolder">
-          <Folder size={20} strokeWidth={1.6} aria-hidden="true" />
-          <div className="orq-setfolder__text">
-            <strong>{work ? t('settings.work.chosen', { name: work.name, files: work.files }) : t('settings.work.none')}</strong>
-            <p className="orq-hint">{t('settings.work.hint')}</p>
+        <>
+          <div className="orq-setfolder">
+            <Folder size={20} strokeWidth={1.6} aria-hidden="true" />
+            <div className="orq-setfolder__text">
+              <strong>{t('settings.work.chosen', { name: work.name, files: work.files })}</strong>
+              <p className="orq-hint">{t('settings.work.hint')}</p>
+            </div>
           </div>
-          <button type="button" className="orq-btn" onClick={() => void pickWork()}>
-            {work ? t('settings.work.change') : t('settings.work.pick')}
-          </button>
-          {work && (
-            <button type="button" className="orq-btn orq-btn--ghost" onClick={() => void clearWork()}>
-              {t('settings.work.clear')}
-            </button>
-          )}
-        </div>
+          {/* Proyecto antiguo con dos carpetas [R96.8] y qué hace git con .orquestador [R96.13]. */}
+          <SeparateFolderNotice
+            api={api}
+            folder={work}
+            onJoined={() => {
+              void api.getWorkFolder().then((r) => setWork(r.ok ? r.value : undefined));
+            }}
+          />
+          <GitIgnoreOption api={api} />
+        </>
       ),
     });
   const current = sections.find((x) => x.id === section) ?? sections[0]!;

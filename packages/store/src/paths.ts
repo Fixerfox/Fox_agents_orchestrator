@@ -34,6 +34,12 @@ export function resolveInside(root: string, rel: string, p: PathModule = path): 
   return abs;
 }
 
+/** ¿Son la misma carpeta? En Windows no distingue mayúsculas. */
+export function samePath(a: string, b: string): boolean {
+  const [x, y] = [path.resolve(a), path.resolve(b)];
+  return process.platform === 'win32' ? x.toLowerCase() === y.toLowerCase() : x === y;
+}
+
 export class ProjectPaths {
   readonly orq: string;
   constructor(readonly root: string) {
@@ -73,7 +79,7 @@ export class ProjectPaths {
   attachmentDir(id: string): string {
     return path.join(this.orq, 'attachments', assertSafeId(id, 'attachmentId'));
   }
-  /** Archivo con la carpeta de trabajo del proyecto [R31.1]. */
+  /** Carpeta de trabajo aparte de los proyectos antiguos; ya no se escribe [R96.4]. */
   get workFolderFile(): string {
     return path.join(this.orq, 'work-folder.json');
   }

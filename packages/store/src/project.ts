@@ -33,7 +33,7 @@ import { atomicWrite } from './fs-util';
 import * as memory from './project-memory';
 import { ensureProjectGitignore, skillFilePath } from './fs-guards';
 import { StoreError } from './errors';
-import { ProjectPaths } from './paths';
+import { ProjectPaths, samePath } from './paths';
 import * as files from './project-files';
 import type { AttachmentView, RunFileView } from './project-files';
 
@@ -284,24 +284,25 @@ export class ProjectStore {
     return clean;
   }
 
-  /** Carpeta de trabajo elegida, si sigue existiendo [R31.1]. */
-  async getWorkFolder(): Promise<string | undefined> {
+  /**
+   * Carpeta de trabajo aparte de un proyecto antiguo sin unir [R96.4]: la de `work-folder.json` si existe y no es la
+   * del propio proyecto.
+   */
+  async separateWorkFolder(): Promise<string | undefined> {
     try {
       const raw = JSON.parse(await fs.readFile(this.paths.workFolderFile, 'utf8')) as { path?: unknown };
       if (typeof raw.path !== 'string' || !path.isAbsolute(raw.path)) return undefined;
-      return (await fs.stat(raw.path)).isDirectory() ? raw.path : undefined;
+      if (!(await fs.stat(raw.path)).isDirectory()) return undefined;
+      const [a, b] = await Promise.all([fs.realpath(raw.path), fs.realpath(this.paths.root)]);
+      return samePath(a, b) ? undefined : raw.path;
     } catch {
       return undefined;
     }
   }
 
-  async setWorkFolder(folder: string | null): Promise<void> {
-    if (folder === null) {
-      await fs.rm(this.paths.workFolderFile, { force: true });
-      return;
-    }
-    if (!path.isAbsolute(folder) || !(await fs.stat(folder)).isDirectory()) throw new StoreError('invalid', 'La carpeta de trabajo no existe');
-    await atomicWrite(this.paths.workFolderFile, JSON.stringify({ schemaVersion: 1, path: folder }, null, 2));
+  /** Carpeta en la que se trabaja: la del proyecto, salvo en un proyecto antiguo sin unir [R96.1]. */
+  async getWorkFolder(): Promise<string> {
+    return (await this.separateWorkFolder()) ?? this.paths.root;
   }
 
   // --- adjuntos de la entrada (SPEC-048), copias y visor: en project-files.ts ---
