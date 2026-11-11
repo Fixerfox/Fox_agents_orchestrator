@@ -25,6 +25,7 @@ export const CHANNELS = {
   listExamples: 'examples:list',
   startRun: 'run:start',
   controlRun: 'run:control',
+  gitGuard: 'run:git-guard',
   resumeRun: 'run:resume',
   dismissRun: 'run:dismiss',
   acceptRun: 'run:accept',

@@ -72,6 +72,8 @@ export interface RunServices {
   root: Diagram;
   /** Conocimiento del diagrama raíz, que reciben todos sus agentes [R33.3]. */
   rootExtra: KnowledgeExtra | undefined;
+  /** Rama de git en la que trabaja la ejecución; la cambia un paso que gestiona ramas [R97.12][R97.13]. */
+  git?: { branch: string };
   /** Entregable efectivo de la ejecución y pasos finales del nivel principal [R46.3][R46.2]. */
   deliverable: DeliverableSpec | undefined;
   finalIds: ReadonlySet<Id>;

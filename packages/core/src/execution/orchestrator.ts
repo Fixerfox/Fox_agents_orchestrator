@@ -109,6 +109,7 @@ export class Orchestrator {
       decisionTimeoutMs: options.decisionTimeoutMs ?? DECISION_TIMEOUT_MS,
       root: diagram,
       rootExtra: diagram.extra,
+      ...(options.git ? { git: { branch: options.git.branch } } : {}),
       deliverable,
       finalIds: new Set(deliverable ? finalSteps(diagram) : []),
       failRun: (reason) => {
@@ -130,6 +131,7 @@ export class Orchestrator {
 
     const result = (async (): Promise<RunResult> => {
       emitter.emit({ type: 'run.started', diagramId: diagram.id, ...(options.reuse && !options.correction ? { resumedFrom: options.reuse.fromRunId } : {}), ...(options.correction ? { correctedFrom: options.correction.fromRunId } : {}), ...(deliverable ? { deliverable } : {}) });
+      if (options.git) emitter.emit({ type: 'run.git', ...options.git });
       let outcome: DiagramOutcome;
       // Todo el árbol se valida antes de ejecutar nada: nada se paga para fallar a mitad [R74.9].
       const problems = await validateTree(diagram, services, this.nodes);

@@ -38,7 +38,7 @@ async function setProject(h: HandlerState, root: string, store: ProjectStore): P
     else if (v && typeof v === 'object') for (const x of Object.values(v)) if (typeof x === 'string' && x) secrets.add(x);
     return v;
   };
-  h.runs = new RunService(composeRunPorts(store), h.deps.createOrchestrator({
+  h.runs = new RunService(composeRunPorts(store, { git: () => h.settings.engine === 'claude' }), h.deps.createOrchestrator({
       store,
       snapshots,
       projectRoot: root,

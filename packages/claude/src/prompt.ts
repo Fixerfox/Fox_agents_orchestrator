@@ -68,7 +68,7 @@ ${DELIVERABLE_RULE}` : d.text;
 }
 
 /** Prompt de sistema: quién es el agente, sus contextos por referencia y sus skills [R27.2][R27.3][R27.4]. */
-export function buildSystemPrompt(agent: AgentDefinition, contexts: ContextDefinition[], skills: SkillDefinition[], folder?: { text: string }, plan?: KnowledgePlan, opts: { confirm?: boolean; split?: string; deliverable?: { role: 'final' | 'goal'; text: string }; level?: PermissionLevel; projectMemory?: string; /** Para decir dónde está todo y que no busque por el disco [R92.4]. */ projectRoot?: string } = {}): string {
+export function buildSystemPrompt(agent: AgentDefinition, contexts: ContextDefinition[], skills: SkillDefinition[], folder?: { text: string }, plan?: KnowledgePlan, opts: { confirm?: boolean; split?: string; git?: string; deliverable?: { role: 'final' | 'goal'; text: string }; level?: PermissionLevel; projectMemory?: string; /** Para decir dónde está todo y que no busque por el disco [R92.4]. */ projectRoot?: string } = {}): string {
   const must = (kind: KnowledgeItem['kind']) => (plan?.items ?? []).filter((i) => i.kind === kind && i.required);
   const isMust = (kind: KnowledgeItem['kind'], id: string) => must(kind).some((i) => i.id === id);
   const optionalContexts = contexts.filter((c) => !isMust('context', c.id));
@@ -107,6 +107,7 @@ export function buildSystemPrompt(agent: AgentDefinition, contexts: ContextDefin
   }
   if (opts.confirm) parts.push(CONFIRM_RULE);
   if (opts.split) parts.push(opts.split);
+  if (opts.git) parts.push(opts.git);
   // La nota para los siguientes, igual en todos los pasos para no romper la caché [R72.13].
   parts.push(NOTE_RULE);
   if (opts.deliverable) parts.push(deliverableSection(opts.deliverable));

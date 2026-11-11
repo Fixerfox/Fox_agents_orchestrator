@@ -1,4 +1,5 @@
-import { deliverableProblems, validateDiagram, type Diagram, type LibraryReader, type Payload, type RunOptions, type RunRepository } from '@orquestador/core';
+import { deliverableProblems, validateDiagram, type Diagram, type LibraryReader, type Payload, type RunGit, type RunOptions, type RunRepository, type VersionControl } from '@orquestador/core';
+import { currentRunGit, gitGuardInfo, prepareRunGit, type GitGuardInfo } from './run-git';
 import { RunError } from './errors';
 import { takeSnapshot, type LibrarySnapshot, type RunSnapshots } from './snapshot';
 import type { PreparedRun, StartRunInput } from './run-types';
@@ -11,7 +12,23 @@ export class RunLauncher {
     /** Opciones por defecto de cada ejecución (p. ej. agentes en paralelo de los ajustes) [R23.6]. */
     readonly defaults: () => RunOptions,
     private readonly snapshots: RunSnapshots | undefined,
+    /** Git de la carpeta y cuántas ejecuciones hay en marcha en ella [R97.1]. */
+    private readonly git?: VersionControl,
+    private readonly otherRuns: () => number = () => 0,
+    private readonly now: () => Date = () => new Date(),
   ) {}
+
+  /** Lo que enseña el diálogo «Ejecutar» sobre la rama [R97.2]. */
+  async gitGuard(diagramId: string): Promise<GitGuardInfo | null> {
+    if (!this.git) return null;
+    const diagram = await this.library.diagram(diagramId);
+    return gitGuardInfo(this.git, { diagramName: diagram.name, otherRuns: this.otherRuns(), now: this.now() });
+  }
+
+  /** La rama actual, para reanudar y corregir [R97.9]. */
+  currentGit(): Promise<RunGit | undefined> {
+    return this.git ? currentRunGit(this.git) : Promise.resolve(undefined);
+  }
 
   async prepare(input: StartRunInput): Promise<PreparedRun> {
     const diagram = await this.library.diagram(input.diagramId);
@@ -34,6 +51,11 @@ export class RunLauncher {
       };
     }
     const order = await this.inputPayload(input);
+    // Lo último, con todo lo demás ya validado: la guarda puede crear una rama [R97.6].
+    if (this.git) {
+      const git = await prepareRunGit(this.git, input.git, { diagramName: diagram.name, otherRuns: this.otherRuns(), now: this.now() });
+      if (git) options.git = git;
+    }
     const snapshot = await this.snapshotOf(diagram);
     return { diagram, order, options, ...(snapshot ? { snapshot } : {}) };
   }

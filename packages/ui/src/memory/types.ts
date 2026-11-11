@@ -1,4 +1,4 @@
-import type { AgentDefinition, AppSettings, ContextDefinition, Diagram, ImportPlan, LibraryFolders, McpServerDefinition, Orchestrator, RecentView, RunEvent, RunHandle, SkillDefinition, SourceTree } from '@orquestador/core';
+import type { AgentDefinition, AppSettings, ContextDefinition, Diagram, GitChoice, GitState, ImportPlan, LibraryFolders, McpServerDefinition, Orchestrator, RecentView, RunEvent, RunHandle, SkillDefinition, SourceTree } from '@orquestador/core';
 import type { ApiResult, AssistantMessage, ConnectionResult, DraftRequest, DraftResult, FilePreview, McpTestResult, ProjectApi, RunSummary, TerminalProgram } from '@orquestador/editor';
 
 export interface MemoryApiOptions {
@@ -31,6 +31,8 @@ export interface MemoryApiOptions {
   pickedFiles?: SourceTree;
   /** La carpeta del proyecto; `separate` simula un proyecto antiguo sin unir [R96.2][R96.4]. */
   workFolder?: { name: string; files: number; separate?: boolean };
+  /** Git simulado de la carpeta del proyecto para la guarda de rama; sin él, no hay repositorio [R97.2]. */
+  git?: { state: GitState; suggested?: string; otherRuns?: number };
   /** Motivo con el que falla «Unir» [R96.6]. */
   joinError?: string;
   /** La opción «Orquestador y git»; sin ella no se ofrece [R96.9]. */
@@ -93,6 +95,8 @@ export type MemoryApi = ProjectApi & {
   terminalOutput(id: string, data: string): void;
   /** Lo que la interfaz devolvió a Claude por cada herramienta (para comprobar que no lleva secretos) [R30.12]. */
   assistantResults: { name: string; ok: boolean; result: unknown }[];
+  /** Elección de rama de cada lanzamiento, en orden [R97.3]. */
+  gitChoices: (GitChoice | undefined)[];
   /** Mensajes que recibió el asistente en cada turno. */
   assistantTurns: AssistantMessage[][];
 };

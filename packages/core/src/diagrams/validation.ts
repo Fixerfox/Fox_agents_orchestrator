@@ -81,6 +81,7 @@ export function validateDiagram(diagram: Diagram, path: Id[] = []): ValidationIs
       else if (!isKnownModel(node.model)) add('node-unknown-model', `${node.label ?? node.id}: modelo desconocido «${String(node.model)}»`, node.id);
     }
     // Confirmar antes de terminar: solo en agentes [R43.2].
+    if (node.ownsBranch !== undefined && node.kind !== 'agent') add('node-ownsbranch-not-agent', `${node.label ?? node.id}: solo los pasos de agente pueden gestionar ramas`, node.id);
     if (node.confirm !== undefined && node.kind !== 'agent') add('node-confirm-not-agent', `${node.label ?? node.id}: solo los pasos de agente confirman antes de terminar`, node.id);
     // Límites y reintentos solo en pasos de agente, y con valores válidos [R70.7][R71.10].
     if ((node.limits !== undefined || node.onRetry !== undefined) && node.kind !== 'agent') add('node-limits-not-agent', `${node.label ?? node.id}: solo los pasos de agente tienen límites de tiempo y reintentos`, node.id);

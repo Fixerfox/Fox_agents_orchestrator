@@ -20,6 +20,7 @@
     "@orquestador/runtime": "*",
     "@orquestador/store": "*",
     "@orquestador/ui": "*",
+    "@orquestador/git": "*",
     "@orquestador/workspace": "*",
     "zod": "4.6.7"
   }

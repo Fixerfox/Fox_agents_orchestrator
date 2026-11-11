@@ -32,6 +32,7 @@
   "getLibraryFolders": "library:get-folders",
   "getSettings": "settings:get",
   "getWorkFolder": "workfolder:get",
+  "gitGuard": "run:git-guard",
   "inspectImport": "import:inspect",
   "inspectWorkFolder": "workfolder:inspect",
   "joinWorkFolder": "workfolder:join",

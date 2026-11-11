@@ -1,8 +1,9 @@
 import { promises as fsp } from 'node:fs';
 import path from 'node:path';
+import { GitCli } from '@orquestador/git';
 import { MEMORY_SERVER, claudePathPolicy, createClaudeEngine, type AppToolDef, type ClaudeEnvironment, type CreateAppServer, type QueryFn } from '@orquestador/claude';
 import { agentsTotal, defaultSettings, searchMemory, type MemoryEntry } from '@orquestador/core';
-import type { AppSettings, LibraryReader, Orchestrator } from '@orquestador/core';
+import type { AppSettings, LibraryReader, Orchestrator, VersionControl } from '@orquestador/core';
 import { AppResources, createEngineOrchestrator, snapshotLibrary, withBuiltinAgents, type RunPorts, type RunSnapshots } from '@orquestador/runtime';
 import { ProjectStore, libraryReaderOf, runRepositoryOf } from '@orquestador/store';
 import { BranchSpaceManager, cleanupBranchSpaces, workspaceFiles } from '@orquestador/workspace';
@@ -142,8 +143,18 @@ export function composeOrchestrator(ctx: OrchestratorContext, query: QueryFn): O
 }
 
 /** Puertos del servicio de ejecución para un proyecto [R56.5]. */
-export function composeRunPorts(store: ProjectStore): RunPorts {
-  return { runs: runRepositoryOf(store), library: libraryReaderOf(store), policy: claudePathPolicy, files: workspaceFiles, stepDir: stepSpaceDir, memory: { load: () => store.loadProjectMemory(), save: (entries) => store.saveProjectMemory(entries) } };
+/** Git de la carpeta del proyecto; apagado (motor simulado) se comporta como una carpeta sin repositorio [R97.1]. */
+export function projectGit(store: Pick<ProjectStore, 'getWorkFolder'>, enabled: () => boolean = () => true): VersionControl {
+  const cli = new GitCli(() => store.getWorkFolder());
+  return {
+    state: async () => (enabled() ? cli.state() : { repo: false, dirty: 0, branches: [] }),
+    createBranch: (name, from) => cli.createBranch(name, from),
+    stash: (label) => cli.stash(label),
+  };
+}
+
+export function composeRunPorts(store: ProjectStore, opts: { git?: () => boolean } = {}): RunPorts {
+  return { runs: runRepositoryOf(store), library: libraryReaderOf(store), policy: claudePathPolicy, files: workspaceFiles, stepDir: stepSpaceDir, memory: { load: () => store.loadProjectMemory(), save: (entries) => store.saveProjectMemory(entries) }, git: projectGit(store, opts.git) };
 }
 
 /** Biblioteca del proyecto sin copias, para listar trabajos [R52.4]. */

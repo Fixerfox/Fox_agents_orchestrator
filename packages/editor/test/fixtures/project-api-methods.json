@@ -32,6 +32,7 @@
   "getLibraryFolders",
   "getSettings",
   "getWorkFolder",
+  "gitGuard",
   "inspectImport",
   "inspectWorkFolder",
   "joinWorkFolder",

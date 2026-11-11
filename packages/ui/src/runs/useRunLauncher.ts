@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import type { DeliverableSpec, Diagram, UnansweredPolicy } from '@orquestador/core';
+import type { DeliverableSpec, Diagram, UnansweredPolicy, GitChoice } from '@orquestador/core';
 import { t, type EditorSession, type ProjectApi, type RunClient } from '@orquestador/editor';
 import type { RunInputs } from './RunDialog';
 import type { RunsNav } from './runsTypes';
@@ -60,7 +60,7 @@ export function useRunLauncher({ api, session, project, client, save, fail, setM
     else fail(r.error.message);
   };
   /** Lanza el diagrama del diálogo: a la vez o en cola, y va a la ejecución salvo «Quedarme donde estoy» [R52.7]. */
-  const onLaunch = async (d: Diagram, order: string, limit: number | undefined, deliverable: DeliverableSpec | null | undefined, inputs: RunInputs | undefined, opts: { whenBusy?: 'parallel' | 'queue'; stay: boolean; unanswered?: UnansweredPolicy }) => {
+  const onLaunch = async (d: Diagram, order: string, limit: number | undefined, deliverable: DeliverableSpec | null | undefined, inputs: RunInputs | undefined, opts: { whenBusy?: 'parallel' | 'queue'; stay: boolean; git?: GitChoice; unanswered?: UnansweredPolicy }) => {
     if (opts.unanswered) lastUnanswered.current.set(d.id, opts.unanswered);
     setLaunch(undefined);
     lastInputs.current.set(d.id, order);
@@ -77,6 +77,7 @@ export function useRunLauncher({ api, session, project, client, save, fail, setM
       ...(inputs && inputs.files.length > 0 ? { files: inputs.files } : {}),
       ...(inputs && inputs.attachments.length > 0 ? { attachments: inputs.attachments } : {}),
       ...(opts.whenBusy ? { whenBusy: opts.whenBusy } : {}),
+      ...(opts.git ? { git: opts.git } : {}),
       ...(opts.unanswered ? { unanswered: opts.unanswered } : {}),
     });
     if (!res.ok) return fail(res.error.message);

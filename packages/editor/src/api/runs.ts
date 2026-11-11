@@ -1,5 +1,5 @@
-import { checkProblems, deliverableProblems, isRelativeInside, memoryEntryProblems, readUnanswered } from '@orquestador/core';
-import type { CheckResult, DeliverableSpec, Diagram, Id, MemoryEntry, MemoryKind, PendingQuestion, RuleStats, RunEvent, StepCheck, UnansweredPolicy } from '@orquestador/core';
+import { checkProblems, deliverableProblems, isRelativeInside, memoryEntryProblems, readUnanswered, validBranchName } from '@orquestador/core';
+import type { CheckResult, DeliverableSpec, Diagram, GitChoice, GitState, Id, MemoryEntry, MemoryKind, PendingQuestion, RuleStats, RunEvent, StepCheck, UnansweredPolicy } from '@orquestador/core';
 import { UNHANDLED, isObject, safeId, type RequestCheck } from './check';
 import { CHANNELS } from './contract';
 import type { ApiResult } from './result';
@@ -19,6 +19,15 @@ export interface StartRunRequest {
   whenBusy?: 'parallel' | 'queue';
   /** Qué hacer si nadie responde a una pregunta de esta ejecución [R70.19]. */
   unanswered?: UnansweredPolicy;
+  /** En qué rama de git corre: la actual o una nueva; sin elegir, la de por defecto [R97.3]. */
+  git?: GitChoice;
+}
+
+/** Lo que el diálogo «Ejecutar» sabe de git: estado sin rutas, nombre propuesto y ejecuciones en marcha [R97.2]. */
+export interface GitGuardView {
+  state: GitState;
+  suggested: string;
+  otherRuns: number;
 }
 
 /** Lo que devuelve lanzar: la ejecución, o el lanzamiento en cola [R52.4]. */
@@ -119,6 +128,8 @@ export interface OpenRunTarget {
 export interface RunsApi {
   // --- ejecución (R19.7) ---
   startRun(req: StartRunRequest): Promise<ApiResult<StartRunResult>>;
+  /** Estado de git de la carpeta del proyecto para elegir la rama; `null` si no hay git [R97.2]. */
+  gitGuard(req: { diagramId: Id }): Promise<ApiResult<GitGuardView | null>>;
   /** Cola de lanzamientos y quitar uno [R52.3]. */
   listQueue(): Promise<ApiResult<QueuedRunView[]>>;
   unqueue(queuedId: string): Promise<ApiResult<boolean>>;
@@ -177,6 +188,17 @@ export interface RunsApi {
   onOpenRun(listener: (target: OpenRunTarget) => void): () => void;
 }
 
+/** ¿Es una elección de rama bien formada? Los nombres se comprueban como los de git [R97.14]. */
+function readGitChoice(v: unknown): v is GitChoice {
+  if (!isObject(v)) return false;
+  if (v.mode === 'stay') return Object.keys(v).length === 1;
+  if (v.mode !== 'new') return false;
+  if (Object.keys(v).some((k) => !['mode', 'name', 'from', 'changes'].includes(k))) return false;
+  if (typeof v.name !== 'string' || !validBranchName(v.name)) return false;
+  if (typeof v.from !== 'string' || !validBranchName(v.from)) return false;
+  return v.changes === undefined || v.changes === 'carry' || v.changes === 'stash';
+}
+
 export function parseRunsRequest(channel: string, payload: unknown, { bad, exact, str }: RequestCheck): unknown {
   switch (channel) {
     case CHANNELS.listRuns:
@@ -187,7 +209,8 @@ export function parseRunsRequest(channel: string, payload: unknown, { bad, exact
       return undefined;
     case CHANNELS.startRun: {
       if (!isObject(payload)) throw bad('se esperaba un objeto');
-      exact(payload, ['diagramId', 'order', 'maxTokens', 'maxCostUsd', 'deliverable', 'files', 'attachments', 'whenBusy', 'unanswered']);
+      exact(payload, ['diagramId', 'order', 'maxTokens', 'maxCostUsd', 'deliverable', 'files', 'attachments', 'whenBusy', 'unanswered', 'git']);
+      if (payload.git !== undefined && !readGitChoice(payload.git)) throw bad('git no válido');
       if (payload.unanswered !== undefined && !readUnanswered(payload.unanswered)) throw bad('unanswered no válido');
       if (payload.whenBusy !== undefined && payload.whenBusy !== 'parallel' && payload.whenBusy !== 'queue') throw bad('whenBusy no válido');
       // Archivos de la entrada: rutas relativas y adjuntos ya guardados [R48.6].
@@ -214,6 +237,11 @@ export function parseRunsRequest(channel: string, payload: unknown, { bad, exact
       if (!(payload.data instanceof Uint8Array) || payload.data.byteLength === 0 || payload.data.byteLength > MAX_ATTACHMENT_BYTES) throw bad('el archivo está vacío o supera los 20 MB');
       return payload;
     }
+    case CHANNELS.gitGuard:
+      if (!isObject(payload)) throw bad('se esperaba un objeto');
+      exact(payload, ['diagramId']);
+      if (!safeId(payload.diagramId)) throw bad('diagramId no válido');
+      return payload;
     case CHANNELS.resumeRun:
     case CHANNELS.dismissRun:
     case CHANNELS.unqueue:

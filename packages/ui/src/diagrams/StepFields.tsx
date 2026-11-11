@@ -242,6 +242,12 @@ export function stepSections({ node, snap, agents, patch, api, files, catalog, o
         <input type="checkbox" className="orq-toggle" checked={node.confirm === true} onChange={(e) => patch({ confirm: e.target.checked })} />
       </label>
       <p className="orq-hint">{t('insp.confirm.hint')}</p>
+      {/* Este paso gestiona ramas: no recibe la regla de la rama ni avisa si cambia [R97.11]. */}
+      <label className="orq-switch">
+        <span>{t('insp.ownsBranch')}</span>
+        <input type="checkbox" className="orq-toggle" checked={node.ownsBranch === true} onChange={(e) => patch({ ownsBranch: e.target.checked })} />
+      </label>
+      <p className="orq-hint">{t('insp.ownsBranch.hint')}</p>
       {/* Qué hacer con lo que dejó un intento fallido [R71.16]. */}
       <label className="orq-field">
         <span>{t('step.retry')}</span>

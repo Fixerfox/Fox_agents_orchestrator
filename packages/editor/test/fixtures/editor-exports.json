@@ -49,6 +49,7 @@
   "ExampleTemplate",
   "FileKind",
   "FilePreview",
+  "GitGuardView",
   "GitIgnoreMode",
   "GitIgnoreView",
   "HISTORY_MEASURES",

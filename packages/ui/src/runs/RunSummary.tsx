@@ -103,6 +103,16 @@ export function SummaryBody({ summary: s, onPick, wide = false, onOpenDeliverabl
           {s.reused.savedUsd > 0 && ` ${t('rsum.reusedFrom.saved', { usd: s.reused.savedUsd.toFixed(2) })}`}
         </p>
       )}
+      {s.git && (
+        <p className="orq-rsum__git" role="note">
+          {t('rsum.git.start')}
+          <strong className="orq-rsum__branch">{s.git.branch}</strong>
+          {s.git.commit && <code> {s.git.commit}</code>}
+          {s.git.created && ` · ${t('rsum.git.created', { from: s.git.from ?? '' })}`}
+          {s.git.dirty !== undefined && ` · ${t('rsum.git.dirty', { n: s.git.dirty })}`}
+          {s.git.stash && <span className="orq-hint"> {t('rsum.git.stash', { label: s.git.stash })}</span>}
+        </p>
+      )}
       {s.branches.length > 0 && (
         <section className="orq-rsum__branches" aria-label={t('rsum.branches')}>
           <h3>{t('rsum.branches')}</h3>
