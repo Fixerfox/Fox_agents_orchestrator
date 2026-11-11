@@ -495,6 +495,7 @@ function askText(name: string, args: Record<string, unknown>): string {
   if (name === 'remove_step') return t('as.ask.remove', { node: v('nodeId') });
   if (name === 'git_switch_branch') return t('as.ask.git.switch', { branch: v('name') });
   if (name === 'git_push') return t('as.ask.git.push');
+  if (name === 'git_create_review') return t('as.ask.git.review', { title: v('title') });
   if (name === 'git_pull') return t('as.ask.git.pull');
   if (name === 'git_merge_branch') return t('as.ask.git.merge', { branch: v('name') });
   if (name === 'git_delete_branch') return t('as.ask.git.delete', { branch: v('name') });

@@ -2602,3 +2602,27 @@ button.orq-node__alerts:hover { text-decoration: underline; }
 .orq-ver__commitform { display: flex; flex-direction: column; gap: 8px; padding: 10px 14px 14px; margin-top: auto; border-top: 1px solid var(--line); }
 .orq-ver__commitform textarea { resize: vertical; }
 .orq-ver__commitbtns { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* SPEC-099 · PR y MR en «Versiones» */
+.orq-ver__revbadge { flex: none; height: 20px; padding: 0 6px; border-radius: 6px; border: 1px solid var(--line); font-family: var(--mono); font-size: 11px; line-height: 18px; color: var(--pos); }
+.orq-ver__reviews { display: flex; flex-direction: column; gap: 8px; padding-bottom: 14px; border-top: 1px solid var(--line); }
+.orq-ver__reviews > p, .orq-ver__reviews > form, .orq-ver__reviews > .orq-ver__review, .orq-ver__reviews > button { margin: 0 14px; }
+.orq-ver__reviews > button { align-self: flex-start; }
+.orq-ver__review { display: flex; flex-direction: column; gap: 6px; padding: 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); }
+.orq-ver__review p { margin: 0; }
+.orq-ver__reviewhead { display: flex; align-items: center; gap: 8px; color: var(--pos); }
+.orq-ver__review.is-merged .orq-ver__reviewhead { color: var(--tone-violet); }
+.orq-ver__review.is-closed .orq-ver__reviewhead { color: var(--neg); }
+.orq-ver__review.is-draft .orq-ver__reviewhead { color: var(--muted); }
+.orq-ver__reviewhead strong { flex: 1; min-width: 0; color: var(--text); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.orq-ver__reviewstate { flex: none; height: 20px; padding: 0 7px; border-radius: 6px; border: 1px solid currentColor; font-size: 11px; line-height: 18px; }
+.orq-ver__reviewfoot { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.orq-ver__reviewfoot a { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; color: var(--accent-text); }
+.orq-ver__checks { display: inline-flex; align-items: center; gap: 4px; }
+.orq-ver__checks.is-passing { color: var(--pos); }
+.orq-ver__checks.is-failing { color: var(--neg); }
+.orq-ver__checks.is-pending { color: var(--text2); }
+.orq-ver__reviewform, .orq-ver__token { display: flex; flex-direction: column; gap: 8px; }
+.orq-ver__draft { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text2); }
+.orq-ver__via { display: flex; align-items: center; gap: 8px; }
+.orq-ver__linkbtn { padding: 0; border: 0; background: none; color: var(--accent-text); font-size: 12px; text-decoration: underline; cursor: pointer; }

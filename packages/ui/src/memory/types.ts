@@ -1,5 +1,5 @@
-import type { AgentDefinition, AppSettings, ContextDefinition, Diagram, GitAction, GitChoice, GitState, ImportPlan, LibraryFolders, McpServerDefinition, Orchestrator, RecentView, RunEvent, RunHandle, SkillDefinition, SourceTree } from '@orquestador/core';
-import type { ApiResult, AssistantMessage, ConnectionResult, DraftRequest, DraftResult, FilePreview, GitHistoryView, GitOverviewView, McpTestResult, ProjectApi, RunSummary, TerminalProgram } from '@orquestador/editor';
+import type { AgentDefinition, AppSettings, ContextDefinition, Diagram, GitAction, GitChoice, GitState, ReviewDraft, ImportPlan, LibraryFolders, McpServerDefinition, Orchestrator, RecentView, RunEvent, RunHandle, SkillDefinition, SourceTree } from '@orquestador/core';
+import type { ApiResult, AssistantMessage, ConnectionResult, DraftRequest, DraftResult, FilePreview, GitHistoryView, GitOverviewView, GitReviewsView, McpTestResult, ProjectApi, RunSummary, TerminalProgram } from '@orquestador/editor';
 
 export interface MemoryApiOptions {
   /** Simula unos ajustes que estaban dañados [R89.6]. */
@@ -34,7 +34,7 @@ export interface MemoryApiOptions {
   /** Git simulado de la carpeta del proyecto para la guarda de rama; sin él, no hay repositorio [R97.2]. */
   git?: { state: GitState; suggested?: string; otherRuns?: number };
   /** Repositorio simulado para la sección «Versiones»; sin él, la carpeta no es un repositorio [R98.2]. */
-  repo?: { overview: GitOverviewView; history?: GitHistoryView; diffs?: Record<string, string>; actError?: string };
+  repo?: { overview: GitOverviewView; history?: GitHistoryView; diffs?: Record<string, string>; actError?: string; /** PR o MR simuladas; sin ellas, `origin` no es de GitHub ni GitLab [R99.7]. */ reviews?: GitReviewsView; reviewError?: string };
   /** Motivo con el que falla «Unir» [R96.6]. */
   joinError?: string;
   /** La opción «Orquestador y git»; sin ella no se ofrece [R96.9]. */
@@ -101,6 +101,9 @@ export type MemoryApi = ProjectApi & {
   gitChoices: (GitChoice | undefined)[];
   /** Acciones de git hechas desde el visor o el asistente, en orden [R98.6]. */
   gitActions: GitAction[];
+  /** Revisiones abiertas desde el visor o el asistente, y los tokens guardados (nunca se devuelven) [R99.8]. */
+  reviewDrafts: ReviewDraft[];
+  reviewTokens: string[];
   /** Mensajes que recibió el asistente en cada turno. */
   assistantTurns: AssistantMessage[][];
 };

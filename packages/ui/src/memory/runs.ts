@@ -12,9 +12,11 @@ import {
   branchGuard,
   defaultChoice,
   gitActionProblem,
+  reviewDraftProblem,
   suggestBranchName,
   type Diagram,
   type GitAction,
+  type ReviewInfo,
   type RunEvent,
   type RunGit,
   type RunOptions,
@@ -50,6 +52,8 @@ export function memoryRuns(s: MemoryState, options: MemoryApiOptions) {
   const listeners = new Set<(runId: string, events: RunEvent[]) => void>();
   const gitChoices: MemoryApi['gitChoices'] = [];
   const gitActions: MemoryApi['gitActions'] = [];
+  const reviewDrafts: MemoryApi['reviewDrafts'] = [];
+  const reviewTokens: MemoryApi['reviewTokens'] = [];
   const repo = options.repo ? structuredClone(options.repo) : undefined;
   /** Aplica una acción al repositorio simulado, lo justo para que la interfaz vea el efecto [R98.6]. */
   const applyGit = (o: GitOverviewView, a: GitAction): void => {
@@ -261,6 +265,35 @@ export function memoryRuns(s: MemoryState, options: MemoryApiOptions) {
     },
     gitChoices,
     gitActions,
+    reviewDrafts,
+    reviewTokens,
+    async gitReviews() {
+      return ok(repo?.reviews ? structuredClone(repo.reviews) : null);
+    },
+    async gitCreateReview(draft) {
+      const view = repo?.reviews;
+      if (!repo || !view) return fail('git-guard', 'Este repositorio no tiene un origin de GitHub ni de GitLab.');
+      if (!view.via) return fail('git-guard', `No hay conexión con ${view.host}: inicia sesión con ${view.provider === 'github' ? 'gh' : 'glab'} o guarda un token.`);
+      const local = repo.overview.branches.filter((b) => !b.remote);
+      const problem = reviewDraftProblem(draft, { branches: local.map((b) => b.name), pushed: local.filter((b) => b.upstream && !b.gone).map((b) => b.name), open: view.reviews, word: view.word });
+      if (problem) return fail('git-guard', problem);
+      if (repo.reviewError) return fail('git-guard', repo.reviewError);
+      reviewDrafts.push(draft);
+      const number = Math.max(0, ...view.reviews.map((r) => r.number)) + 1;
+      const made: ReviewInfo = { number, title: draft.title, state: draft.draft ? 'draft' : 'open', head: draft.head, base: draft.base, url: `https://${view.host}/${view.project}/${view.provider === 'github' ? 'pull' : '-/merge_requests'}/${number}` };
+      view.reviews.unshift(made);
+      return ok({ ...made });
+    },
+    async setReviewToken(req) {
+      if (!repo?.reviews) return fail('invalid', 'Este repositorio no tiene un origin de GitHub ni de GitLab');
+      reviewTokens.push(req.token);
+      repo.reviews.via = repo.reviews.via ?? 'token';
+      return ok(null);
+    },
+    async clearReviewToken() {
+      if (repo?.reviews?.via === 'token') delete repo.reviews.via;
+      return ok(null);
+    },
     async gitOverview() {
       return ok(repo ? structuredClone(repo.overview) : null);
     },

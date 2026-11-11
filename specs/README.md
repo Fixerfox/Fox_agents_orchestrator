@@ -16,6 +16,7 @@ El hito indica cuándo debe estar cubierto por tests. `npm run spec:check` exige
 ## Índice
 | Spec | Título | Hito | Estado |
 |---|---|---|---|
+| [099](099-revisiones-remotas.md) | Control de versiones, GitHub y GitLab: PR y MR con estado y comprobaciones en «Versiones», «Abrir PR» desde el visor y el asistente, conexión con `gh`/`glab` o con un token cifrado que solo viaja al servidor de origin | M18d | Implementada |
 | [098](098-control-de-versiones.md) | Control de versiones: sección «Versiones» con ramas, grafo de commits y cambios sin guardar, qué trabajo creó cada rama y cada commit, acciones de git (rama, commit, subir, bajar, fusionar, apartar) con cerrojo mientras hay ejecuciones, y las mismas acciones para el asistente | M18c | Implementada |
 | [097](097-guarda-de-rama.md) | Guarda de rama al ejecutar: campo «Rama de git» en «Ejecutar» (seguir o rama nueva, con cambios sin commit llevados o apartados), ramas protegidas, bloqueo con operaciones a medias, regla de la rama para cada agente con aviso si se sale, y `run.git` con el punto de partida | M18b | Implementada |
 | [096](096-proyecto-en-una-carpeta.md) | El proyecto es la carpeta en la que se trabaja: `.orquestador` dentro de ella, sin carpeta de trabajo aparte, «Unir» para los proyectos antiguos (sin borrar nada) y la opción «Orquestador y git» para añadirlo al `.gitignore` | M18a | Implementada |

@@ -6,7 +6,7 @@ describe('SPEC-029 · catálogo y contrato del asistente', () => {
     const names = ASSISTANT_TOOLS.map((t) => t.name);
     expect(new Set(names).size).toBe(names.length);
     expect(names).toEqual(expect.arrayContaining(['list_agents', 'get_diagram', 'create_agent', 'add_step', 'add_parallel', 'create_diagram', 'delete_agent', 'run_diagram']));
-    expect(ASSISTANT_TOOLS.filter((t) => t.destructive).map((t) => t.name).sort()).toEqual(['accept_run', 'delete_agent', 'delete_context', 'delete_skill', 'git_delete_branch', 'git_merge_branch', 'git_pull', 'git_push', 'git_switch_branch', 'open_terminal', 'remove_step', 'resume_run', 'run_diagram', 'save_memory', 'test_mcp']);
+    expect(ASSISTANT_TOOLS.filter((t) => t.destructive).map((t) => t.name).sort()).toEqual(['accept_run', 'delete_agent', 'delete_context', 'delete_skill', 'git_create_review', 'git_delete_branch', 'git_merge_branch', 'git_pull', 'git_push', 'git_switch_branch', 'open_terminal', 'remove_step', 'resume_run', 'run_diagram', 'save_memory', 'test_mcp']);
     for (const t of ASSISTANT_TOOLS) expect(t.name).toMatch(/^[a-z_]+$/);
   });
 

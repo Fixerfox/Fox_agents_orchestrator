@@ -454,6 +454,21 @@ export async function runAssistantTool(host: AssistantHost, name: string, args: 
                         : t('as.git.stashed');
         return { ok: true, summary, result: { done: true, branch: o.state.branch ?? null, changes: o.changes.length, ...(o.state.commit ? { commit: o.state.commit } : {}) } };
       }
+      case 'git_list_reviews': {
+        const v = must(await api.gitReviews());
+        if (!v) return { ok: true, summary: t('as.git.reviews', { word: 'PR' }), result: { available: false } };
+        return { ok: true, summary: t('as.git.reviews', { word: v.word }), result: { available: true, provider: v.provider, project: v.project, connected: v.via ?? false, ...(v.error ? { error: v.error } : {}), reviews: v.reviews } };
+      }
+      case 'git_create_review': {
+        const v = must(await api.gitReviews());
+        if (!v) return { ok: false, summary: t('as.git.review.none'), result: { error: t('as.git.review.none') } };
+        const head = str(args['head']) || (must(await api.gitOverview())?.state.branch ?? '');
+        const base = str(args['base']) || (v.base ?? '');
+        if (!head || !base) return { ok: false, summary: t('as.git.review.branches'), result: { error: t('as.git.review.branches') } };
+        const made = must(await api.gitCreateReview({ title: str(args['title']), head, base, ...(str(args['body']) ? { body: str(args['body']) } : {}), ...(args['draft'] === true ? { draft: true } : {}) }));
+        host.refresh();
+        return { ok: true, summary: t('as.git.review.made', { word: v.word, n: made.number, base }), result: made };
+      }
       case 'run_diagram': {
         // Lo mismo que comprueba el lanzador, con todos los problemas [R85.5].
         const issues = validateDiagram(session.diagram);

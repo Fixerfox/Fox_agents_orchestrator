@@ -1,4 +1,5 @@
 import type { ProjectMemoryPort } from './run-memory';
+import type { ReviewConnector } from './git-service';
 import type { BranchGuardPort, DeliverableSpec, Diagram, GitChoice, VersionControl, LibraryReader, Payload, PathPolicy, RunHandle, RunOptions, RunRepository, WorkspaceFiles, UnansweredPolicy } from '@orquestador/core';
 import { RunError } from './errors';
 import type { LibrarySnapshot } from './snapshot';
@@ -17,6 +18,8 @@ export interface RunPorts {
   git?: BranchGuardPort;
   /** Git completo de la carpeta, para el visor de control de versiones [R98.1]. */
   repo?: VersionControl;
+  /** Cómo se llega a las PR o MR del repositorio [R99.7]. */
+  reviews?: ReviewConnector;
 }
 
 export interface StartRunInput {

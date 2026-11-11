@@ -1,4 +1,4 @@
-import { branchOrigins, gitActionProblem, type GitAction, type GitBranchInfo, type GitCommit, type GitFileChange, type GitOrigin, type GitStash, type GitState, type RunGitTrace, type RunRepository, type VersionControl } from '@orquestador/core';
+import { branchOrigins, defaultReviewBase, gitActionProblem, parseRemoteUrl, reviewDraftProblem, reviewWord, type RemoteRepo, type ReviewDraft, type ReviewHost, type ReviewInfo, type ReviewProvider, type GitAction, type GitBranchInfo, type GitCommit, type GitFileChange, type GitOrigin, type GitStash, type GitState, type RunGitTrace, type RunRepository, type VersionControl } from '@orquestador/core';
 import { RunError } from './errors';
 
 /** Lo que enseña la sección «Versiones» de un vistazo [R98.2]. */
@@ -19,6 +19,25 @@ export interface GitHistoryView {
   origins: Record<string, GitOrigin>;
 }
 
+/** Cómo se llega a las PR o MR de un repositorio: lo decide quien compone la app [R99.7]. */
+export type ReviewConnector = (repo: RemoteRepo) => Promise<{ host?: ReviewHost; via?: 'cli' | 'token' }>;
+
+/** Las revisiones del repositorio en GitHub o GitLab, tal como las enseña el visor [R99.7]. */
+export interface GitReviewsView {
+  provider: ReviewProvider;
+  /** «PR» o «MR». */
+  word: 'PR' | 'MR';
+  host: string;
+  project: string;
+  /** Cómo está conectado; sin valor, no lo está. */
+  via?: 'cli' | 'token';
+  reviews: ReviewInfo[];
+  /** Destino que se propone para una revisión nueva. */
+  base?: string;
+  /** Por qué no se pudieron leer. */
+  error?: string;
+}
+
 /** Cuántas ejecuciones se miran para saber qué creó cada una [R98.4]. */
 export const ORIGIN_RUNS = 60;
 
@@ -32,6 +51,7 @@ export class GitService {
     private readonly runs: Pick<RunRepository, 'list' | 'appendEvent'>,
     private readonly running: () => number,
     private readonly live: () => ReadonlySet<string>,
+    private readonly connect?: ReviewConnector,
   ) {}
 
   private async traces(): Promise<RunGitTrace[]> {
@@ -116,6 +136,47 @@ export class GitService {
       throw new RunError('git-guard', (err as Error).message);
     }
     return (await this.overview())!;
+  }
+
+  /** El repositorio remoto, si `origin` es de GitHub o GitLab [R99.1]. */
+  async remote(): Promise<RemoteRepo | undefined> {
+    const url = await this.repo.remoteUrl().catch(() => undefined);
+    return url ? parseRemoteUrl(url) : undefined;
+  }
+
+  /** Las PR o MR del repositorio; `null` si no hay `origin` o no es GitHub ni GitLab [R99.7]. */
+  async reviews(): Promise<GitReviewsView | null> {
+    const remote = await this.remote();
+    if (!remote || !this.connect) return null;
+    const state = await this.repo.state();
+    const base = defaultReviewBase(state.branches, state.branch);
+    const head: Omit<GitReviewsView, 'reviews'> = { provider: remote.provider, word: reviewWord(remote.provider), host: remote.host, project: remote.path, ...(base ? { base } : {}) };
+    const { host, via } = await this.connect(remote);
+    if (!host || !via) return { ...head, reviews: [] };
+    try {
+      return { ...head, via, reviews: await host.list() };
+    } catch (err) {
+      return { ...head, via, reviews: [], error: (err as Error).message };
+    }
+  }
+
+  /** Abre una PR o MR tras comprobarla con el estado de ahora [R99.9]. */
+  async createReview(draft: ReviewDraft): Promise<ReviewInfo> {
+    const remote = await this.remote();
+    if (!remote || !this.connect) throw new RunError('git-guard', 'Este repositorio no tiene un origin de GitHub ni de GitLab.');
+    const word = reviewWord(remote.provider);
+    const { host } = await this.connect(remote);
+    if (!host) throw new RunError('git-guard', `No hay conexión con ${remote.host}: inicia sesión con ${remote.provider === 'github' ? 'gh' : 'glab'} o guarda un token.`);
+    const branches = await this.repo.branches();
+    const open = await host.list().catch(() => []);
+    const clean: ReviewDraft = { title: draft.title.trim(), head: draft.head, base: draft.base, ...(draft.body?.trim() ? { body: draft.body.trim() } : {}), ...(draft.draft ? { draft: true } : {}) };
+    const problem = reviewDraftProblem(clean, { branches: branches.filter((b) => !b.remote).map((b) => b.name), pushed: branches.filter((b) => !b.remote && b.upstream && !b.gone).map((b) => b.name), open, word });
+    if (problem) throw new RunError('git-guard', problem);
+    try {
+      return await host.create(clean);
+    } catch (err) {
+      throw new RunError('git-guard', `No se pudo abrir la ${word}: ${(err as Error).message}`);
+    }
   }
 
   /** Al terminar una ejecución que apuntó git, guarda en qué commit quedó la carpeta [R98.4]. */

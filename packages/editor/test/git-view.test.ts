@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { GitCommit } from '@orquestador/core';
-import { ASSISTANT_TOOLS, CHANNELS, MAX_GIT_HISTORY, commitGraph, parseRequest, t } from '../src';
+import { ASSISTANT_TOOLS, CHANNELS, MAX_GIT_HISTORY, MAX_REVIEW_TOKEN, commitGraph, parseRequest, t } from '../src';
 
 const c = (sha: string, ...parents: string[]): GitCommit => ({ sha, parents, subject: sha, author: 'a', date: '2026-11-11T09:00:00Z', refs: [] });
 
@@ -62,5 +62,33 @@ describe('SPEC-098 · contrato y asistente', () => {
     expect(names.filter((n) => tool(n).alwaysConfirm)).toEqual(['git_push', 'git_delete_branch']);
     expect(Object.keys(tool('git_create_branch').params)).toEqual(['name', 'from']);
     expect(tool('git_create_branch').params['from']!.optional).toBe(true);
+  });
+});
+
+describe('SPEC-099 · contrato y asistente de las PR y MR', () => {
+  it('[R99.10] el contrato valida la revisión nueva y el token, y no admite campos de más', () => {
+    const draft = { title: 'Menú', head: 'feature/menu', base: 'develop' };
+    expect(parseRequest(CHANNELS.gitCreateReview, draft)).toEqual(draft);
+    expect(parseRequest(CHANNELS.gitCreateReview, { ...draft, body: 'Lo que hace', draft: true })).toMatchObject({ draft: true });
+    for (const bad of [undefined, {}, { ...draft, title: '  ' }, { ...draft, title: 'a\nb' }, { ...draft, title: 'x'.repeat(251) }, { ...draft, head: '--force' }, { ...draft, base: 'a b' }, { ...draft, draft: 'sí' }, { ...draft, body: 3 }, { ...draft, repo: 'otro/repo' }]) {
+      expect(() => parseRequest(CHANNELS.gitCreateReview, bad)).toThrow();
+    }
+    expect(parseRequest(CHANNELS.setReviewToken, { token: 'ghp_abcdefgh1234' })).toEqual({ token: 'ghp_abcdefgh1234' });
+    for (const bad of [undefined, 'ghp_abcdefgh1234', {}, { token: 'corto' }, { token: 'con espacio dentro' }, { token: 'dos\nlineas-largas' }, { token: 'x'.repeat(MAX_REVIEW_TOKEN + 1) }, { token: 'ghp_abcdefgh1234', host: 'evil.example' }]) {
+      expect(() => parseRequest(CHANNELS.setReviewToken, bad)).toThrow();
+    }
+    expect(parseRequest(CHANNELS.gitReviews, undefined)).toBeUndefined();
+    expect(parseRequest(CHANNELS.clearReviewToken, undefined)).toBeUndefined();
+    expect(() => parseRequest(CHANNELS.gitReviews, { host: 'x' })).toThrow();
+    expect(() => parseRequest(CHANNELS.clearReviewToken, { host: 'x' })).toThrow();
+  });
+
+  it('[R99.14] el asistente puede mirar las revisiones sin permiso y abrir una pidiéndolo siempre', () => {
+    const tool = (name: string) => ASSISTANT_TOOLS.find((x) => x.name === name)!;
+    expect(tool('git_list_reviews')).toMatchObject({ readOnly: true });
+    expect(tool('git_create_review')).toMatchObject({ destructive: true, alwaysConfirm: true });
+    expect(Object.keys(tool('git_create_review').params)).toEqual(['title', 'body', 'head', 'base', 'draft']);
+    expect(tool('git_create_review').params['title']!.optional).toBeUndefined();
+    for (const n of ['git_list_reviews', 'git_create_review']) expect(t(`as.t.${n}` as never)).not.toBe(`as.t.${n}`);
   });
 });

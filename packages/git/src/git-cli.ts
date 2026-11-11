@@ -293,4 +293,9 @@ export class GitCli implements VersionControl {
     if (!Number.isInteger(index) || index < 0) throw new GitError('Ese apartado no existe');
     await this.act('No se pudieron recuperar los cambios', ['stash', 'pop', `stash@{${index}}`]);
   }
+
+  async remoteUrl(): Promise<string | undefined> {
+    const url = await this.run(['remote', 'get-url', 'origin'], await this.dir()).then((t) => t.trim(), () => '');
+    return url === '' ? undefined : url;
+  }
 }

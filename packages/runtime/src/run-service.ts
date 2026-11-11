@@ -39,7 +39,7 @@ export class RunService {
     this.launcher = new RunLauncher(ports.runs, ports.library, defaults, snapshots, ports.git, () => this.queue.runningCount());
     this.memory = ports.memory ? new RunMemory(ports.runs, orchestrator, ports.memory) : undefined;
     this.queue = new RunQueue(live, ports.runs, orchestrator, snapshots, (runId, key, files) => this.files.snapshotStep(runId, key, files), (runId, diagram, options) => void this.afterRun(runId, diagram, options.git !== undefined));
-    this.git = ports.repo ? new GitService(ports.repo, ports.runs, () => this.queue.runningCount(), () => live.runningIds()) : undefined;
+    this.git = ports.repo ? new GitService(ports.repo, ports.runs, () => this.queue.runningCount(), () => live.runningIds(), ports.reviews) : undefined;
     this.control = new RunControl(live);
     this.corrections = new RunCorrections(live, ports.runs, orchestrator, this.history, this.launcher, this.queue);
     this.feedback = new RunFeedback(live, ports.runs);
